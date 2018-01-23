@@ -41,14 +41,19 @@ status_t nchw_pooling_fwd_t<d_type>::execute_forward(
         const exec_ctx_t &ctx) const {
     status_t status = status::success;
     const auto alg = pd()->desc()->alg_kind;
-    const auto src = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
+    const auto src_ = CTX_IN_MEM(const data_t *, DNNL_ARG_SRC);
     auto dst = CTX_OUT_CLEAN_MEM(data_t *, DNNL_ARG_DST, status);
     CHECK(status);
     auto ws = CTX_OUT_CLEAN_MEM(unsigned char *, DNNL_ARG_WORKSPACE, status);
     CHECK(status);
 
     const memory_desc_wrapper ws_d(pd()->workspace_md());
+    const memory_desc_wrapper src_d(pd()->src_md());
+    const memory_desc_wrapper dst_d(pd()->dst_md());
     const data_type_t ws_dt = ws ? ws_d.data_type() : data_type::undef;
+
+    auto src = src_ + src_d.off_l(0);
+    dst += dst_d.off_l(0);
 
     const int MB = pd()->MB();
     const int C = pd()->C();
