@@ -205,7 +205,7 @@ void jit_avx512_common_convolution_fwd_t
         start_copy = start;
 
         auto par_conv = jit_conv_call_s();
-        size_t src_c_stride = src_d.blk_off(0, 1);
+        size_t src_c_stride = src_d.blk_off(0, 1) - src_d.off_l(0);
         size_t wht_ic_stride = wht_blk_off(weights_d, 0, 0, 1);
 
         for (int icb_l2 = 0 ; icb_l2 < jcp.nb_ic; icb_l2 += jcp.nb_ic_L2) {
@@ -302,9 +302,9 @@ void jit_avx512_common_convolution_fwd_t
         start_copy = start;
 
         auto par_conv = jit_conv_call_s();
-        size_t src_h_stride = src_d.blk_off(0, 0, 1);
-        size_t src_c_stride = src_d.blk_off(0, 1);
-        size_t dst_h_stride = dst_d.blk_off(0, 0, 1);
+        size_t src_h_stride = src_d.blk_off(0, 0, 1) - src_d.off_l(0);
+        size_t src_c_stride = src_d.blk_off(0, 1) - src_d.off_l(0);
+        size_t dst_h_stride = dst_d.blk_off(0, 0, 1) - dst_d.off_l(0);
         size_t wht_h_stride = wht_blk_off(weights_d, 0, 0, 0, 1);
         size_t wht_ic_stride = wht_blk_off(weights_d, 0, 0, 1);
 
@@ -423,10 +423,10 @@ void jit_avx512_common_convolution_fwd_t
         start_copy = start;
 
         auto par_conv = jit_conv_call_s();
-        size_t src_d_stride = src_d.blk_off(0, 0, 1);
-        size_t src_h_stride = src_d.blk_off(0, 0, 0, 1);
-        size_t src_c_stride = src_d.blk_off(0, 1);
-        size_t dst_h_stride = dst_d.blk_off(0, 0, 0, 1);
+        size_t src_d_stride = src_d.blk_off(0, 0, 1) - src_d.off_l(0);
+        size_t src_h_stride = src_d.blk_off(0, 0, 0, 1) - src_d.off_l(0);
+        size_t src_c_stride = src_d.blk_off(0, 1) - src_d.off_l(0);
+        size_t dst_h_stride = dst_d.blk_off(0, 0, 0, 1) - dst_d.off_l(0);
         size_t wht_d_stride = wht_blk_off(weights_d, 0, 0, 0, 1);
         size_t wht_h_stride = wht_blk_off(weights_d, 0, 0, 0, 0, 1);
         size_t wht_ic_stride = wht_blk_off(weights_d, 0, 0, 1);

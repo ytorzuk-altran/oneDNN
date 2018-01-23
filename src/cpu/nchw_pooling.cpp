@@ -42,7 +42,12 @@ void nchw_pooling_fwd_t<d_type>::execute_forward() const {
         reinterpret_cast<unsigned char *>(this->memory(1)) : nullptr;
 
     const memory_desc_wrapper ws_d(pd()->workspace_pd());
+    const memory_desc_wrapper src_d(pd()->src_pd());
+    const memory_desc_wrapper dst_d(pd()->dst_pd());
     const data_type_t ws_dt = ws ? ws_d.data_type() : data_type::undef;
+
+    src += src_d.off_l(0);
+    dst += dst_d.off_l(0);
 
     const int MB = pd()->MB();
     const int C = pd()->C();

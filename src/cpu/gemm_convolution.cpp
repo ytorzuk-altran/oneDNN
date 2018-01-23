@@ -54,10 +54,16 @@ void gemm_convolution_fwd_t::execute_forward() const {
 
     const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
 
-    const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
+    const memory_desc_wrapper src_d(pd()->src_pd());
+    const memory_desc_wrapper dst_d(pd()->dst_pd());
+
+    const size_t src_step = (src_d.blk_off(1) - src_d.off_l(0)) / jcp.ngroups;
+    const size_t dst_step = (dst_d.blk_off(1) - dst_d.off_l(0)) / jcp.ngroups;
     const size_t weights_oc_size = jcp.ic * jcp.ks;
     const size_t weights_g_size = weights_oc_size * jcp.oc;
     const bool is_problem_3d = pd()->ndims() == 5;
+    src += src_d.off_l(0);
+    dst += dst_d.off_l(0);
 
     assert(IMPLICATION(
             is_problem_3d, jcp.os_block == jcp.os && jcp.ic_block == jcp.ic));
@@ -95,7 +101,6 @@ void gemm_convolution_fwd_t::execute_forward() const {
             const data_t one = 1.0;
 
             const int M = jcp.os * jcp.od;
-            const size_t dst_step = jcp.oc * M;
             const int m = step.sp;
             const int LDA = jcp.im2col_sz ? m : M;
             data_t *_dst = dst + (curr.n * jcp.ngroups + curr.g) * dst_step
