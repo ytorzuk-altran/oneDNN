@@ -83,13 +83,14 @@ status_t pooling_desc_init(pooling_desc_t *pool_desc,
                 (src_desc->dims[i] - kernel[i - 2] + padding_l[i - 2]
                  + padding_r[i - 2]) / strides[i - 2] + 1
                 == dst_desc->dims[i]);
-        if (alg_kind == pooling_avg_exclude_padding)
-            // It's not allowed for pooling window to be totally placeed outside
-            // of real source domain for pooling_avg_exclude_padding algorithm
-            // due to 0 / 0 ambiguity
-            consistency = consistency
-                && padding_l[i - 2] < kernel[i - 2]
-                && padding_r[i - 2] < kernel[i - 2];
+// The check is disabled in order to support old behavior
+//        if (alg_kind == pooling_avg_exclude_padding)
+//            // It's not allowed for pooling window to be totally placeed outside
+//            // of real source domain for pooling_avg_exclude_padding algorithm
+//            // due to 0 / 0 ambiguity
+//            consistency = consistency
+//                && padding_l[i - 2] < kernel[i - 2]
+//                && padding_r[i - 2] < kernel[i - 2];
     }
     if (!consistency) return invalid_arguments;
 

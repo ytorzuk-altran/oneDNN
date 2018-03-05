@@ -60,9 +60,11 @@ void jit_uni_pooling_fwd_t<isa, d_type>::execute_forward() const {
         arg.kh_padding = jpp.kh - i_t_overflow - i_b_overflow;
         arg.kh_padding_shift = i_t_overflow*jpp.kw;
         arg.kw_padding = 0;
-        arg.ker_area_h = (float)(jpp.kh -
-            nstl::max(0, oh*jpp.stride_h - jpp.t_pad + jpp.kh - jpp.ih) -
-            nstl::max(0, jpp.t_pad - oh*jpp.stride_h));
+        arg.ker_area_h = pd()->desc()->alg_kind == alg_kind::pooling_avg_exclude_padding
+             ?  (float)(jpp.kh - nstl::max(0, oh*jpp.stride_h - jpp.t_pad + jpp.kh - jpp.ih) -
+                nstl::max(0, jpp.t_pad - oh*jpp.stride_h))
+             :  (float)(jpp.kh - nstl::max(0, oh*jpp.stride_h - jpp.t_pad + jpp.kh - jpp.ih - jpp.b_pad));
+
         (*kernel_)(&arg);
     };
 

@@ -66,12 +66,11 @@ void nchw_pooling_fwd_t<d_type>::execute_forward() const {
     const int padF = pd()->padFront();
     const int padT = pd()->padT();
     const int padL = pd()->padL();
+    const int padB = pd()->padB();
+    const int padR = pd()->padR();
+    const int padBack = pd()->padBack();
 
     auto alg = pd()->desc()->alg_kind;
-
-    auto apply_offset = [=](int index, int offset) {
-        return (index > offset) ? index - offset : 0;
-    };
 
     auto set_ws = [=](int mb, int c, int od, int oh, int ow, int value) {
         // value = -1 means that pool window is placed outside of source domain
@@ -97,6 +96,7 @@ void nchw_pooling_fwd_t<d_type>::execute_forward() const {
     };
 
     auto ker_max = [=](data_t *d, const data_t *src_, int mb, int c, int od, int oh, int ow) {
+        bool is_initialized = false;
         int current_pool_size = 0;
         for (int kd = 0; kd < KD; ++kd) {
             for (int kh = 0; kh < KH; ++kh) {
@@ -114,9 +114,15 @@ void nchw_pooling_fwd_t<d_type>::execute_forward() const {
                         + (size_t)IW * kh
                         + (size_t)kw;
                     auto s = src_[src_offset];
-                    if (s > d[0]) {
+                    if (!is_initialized) {
                         d[0] = s;
-                        set_ws(mb, c, od, oh, ow, kd*KH*KW + kh*KW + kw);
+                        set_ws(mb, c, od, oh, ow, kd * KH * KW + kh * KW + kw);
+                        is_initialized = true;
+                    } else {
+                        if (s > d[0]) {
+                            d[0] = s;
+                            set_ws(mb, c, od, oh, ow, kd * KH * KW + kh * KW + kw);
+                        }
                     }
                     current_pool_size++;
                 }
@@ -131,15 +137,27 @@ void nchw_pooling_fwd_t<d_type>::execute_forward() const {
 
     auto ker_avg = [=](data_t *d, const data_t *src_,
                        int mb, int c, int od, int oh, int ow) {
-        auto id_start = apply_offset(od*SD, padF);
-        auto ih_start = apply_offset(oh*SH, padT);
-        auto iw_start = apply_offset(ow*SW, padL);
-        auto id_end = nstl::min(od*SD - padF + KD, ID);
-        auto ih_end = nstl::min(oh*SH - padT + KH, IH);
-        auto iw_end = nstl::min(ow*SW - padL + KW, IW);
+        auto id_start = od*SD - padF;
+        auto ih_start = oh*SH - padT;
+        auto iw_start = ow*SW - padL;
+        auto id_end = nstl::min(od*SD - padF + KD, ID + padBack);
+        auto ih_end = nstl::min(oh*SH - padT + KH, IH + padB);
+        auto iw_end = nstl::min(ow*SW - padL + KW, IW + padR);
 
         auto num_summands = (alg == pooling_avg_include_padding) ? KD*KW*KH
             : (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
+
+        id_start = nstl::max(id_start, 0);
+        ih_start = nstl::max(ih_start, 0);
+        iw_start = nstl::max(iw_start, 0);
+
+        id_end = nstl::min(id_end, ID);
+        ih_end = nstl::min(ih_end, IH);
+        iw_end = nstl::min(iw_end, IW);
+
+        if (alg == pooling_avg_exclude_padding)
+            num_summands = (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
+        if (num_summands == 0) return;
 
         for (int id = id_start; id < id_end; ++id) {
             for (int ih = ih_start; ih < ih_end; ++ih) {
@@ -176,7 +194,7 @@ void nchw_pooling_fwd_t<d_type>::execute_forward() const {
             set_ws(mb, c, od, oh, ow, 0);
 
             data_t *d = reinterpret_cast<data_t*>(&dst[dst_offset]);
-            d[0] = nstl::numeric_limits<data_t>::lowest();
+            d[0] = (data_t)0;
             const data_t *src_ =
                       reinterpret_cast<const data_t*>(&src[src_offset]);
 
@@ -235,6 +253,9 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward() const {
     const int padF = pd()->padFront();
     const int padT = pd()->padT();
     const int padL = pd()->padL();
+    const int padB = pd()->padB();
+    const int padR = pd()->padR();
+    const int padBack = pd()->padBack();
 
     const size_t simd_w_ = 16;
     const size_t src_size_ = MB * C * ID * IH * IW;
@@ -242,10 +263,6 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward() const {
     const size_t tail_size_ = src_size_ % simd_w_;
 
     auto alg = pd()->desc()->alg_kind;
-
-    auto apply_offset = [=](int index, int offset) {
-        return (index > offset) ? index - offset : 0;
-    };
 
     auto set_ws = [=](int mb, int c, int od, int oh, int ow, int value) {
         // value = -1 means that pool window is placed outside of source domain
@@ -272,6 +289,7 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward() const {
 
     auto ker_max = [=](float *d, const float *src_,
             int mb, int c, int od, int oh, int ow) {
+        bool is_initialized = false;
         int current_pool_size = 0;
         for (int kd = 0; kd < KD; ++kd) {
             for (int kh = 0; kh < KH; ++kh) {
@@ -289,9 +307,15 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward() const {
                         + (size_t)IW * kh
                         + (size_t)kw;
                     auto s = src_[src_offset];
-                    if (s > d[0]) {
+                    if (!is_initialized) {
                         d[0] = s;
                         set_ws(mb, c, od, oh, ow, kd*KH*KW + kh*KW + kw);
+                        is_initialized = true;
+                    } else {
+                        if (s > d[0]) {
+                            d[0] = s;
+                            set_ws(mb, c, od, oh, ow, kd*KH*KW + kh*KW + kw);
+                        }
                     }
                     current_pool_size++;
                 }
@@ -306,15 +330,27 @@ void nchw_pooling_fwd_t<data_type::bf16>::execute_forward() const {
 
     auto ker_avg = [=](float *d, const float *src_,
                        int mb, int c, int od, int oh, int ow) {
-        auto id_start = apply_offset(od*SD, padF);
-        auto ih_start = apply_offset(oh*SH, padT);
-        auto iw_start = apply_offset(ow*SW, padL);
-        auto id_end = nstl::min(od*SD - padF + KD, ID);
-        auto ih_end = nstl::min(oh*SH - padT + KH, IH);
-        auto iw_end = nstl::min(ow*SW - padL + KW, IW);
+        auto id_start = od*SD - padF;
+        auto ih_start = oh*SH - padT;
+        auto iw_start = ow*SW - padL;
+        auto id_end = nstl::min(od*SD - padF + KD, ID + padBack);
+        auto ih_end = nstl::min(oh*SH - padT + KH, IH + padB);
+        auto iw_end = nstl::min(ow*SW - padL + KW, IW + padR);
 
-        auto num_summands = (alg == pooling_avg_include_padding) ? KD*KW*KH
-            : (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
+        // case alg == pooling_avg_include_padding
+        auto num_summands = (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
+
+        id_start = nstl::max(id_start, 0);
+        ih_start = nstl::max(ih_start, 0);
+        iw_start = nstl::max(iw_start, 0);
+
+        id_end = nstl::min(id_end, ID);
+        ih_end = nstl::min(ih_end, IH);
+        iw_end = nstl::min(iw_end, IW);
+
+        if (alg == pooling_avg_exclude_padding)
+            num_summands = (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
+        if (num_summands == 0) return;
 
         for (int id = id_start; id < id_end; ++id) {
             for (int ih = ih_start; ih < ih_end; ++ih) {

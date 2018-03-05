@@ -70,13 +70,15 @@ status_t jit_uni_pool_kernel<isa>::init_conf(jit_pool_conf_t &jpp,
     jpp.f_pad = (ndims == 5 ) ? pd.padding[0][0] : 0;
     jpp.t_pad = pd.padding[0][ndims-4];
     jpp.l_pad = pd.padding[0][ndims-3];
+    jpp.b_pad = pd.padding[1][ndims-4];
+    jpp.r_pad = pd.padding[1][ndims-3];
+    jpp.back_pad = pd.padding[1][ndims-2];
 
-    int right_pad = (jpp.ow - 1) * jpp.stride_w + jpp.kw - 1 - (jpp.iw + jpp.l_pad - 1);
-    int bottom_pad = (jpp.oh - 1) * jpp.stride_h + jpp.kh - 1 - (jpp.ih + jpp.t_pad - 1);
-    int back_pad = (jpp.od - 1) * jpp.stride_d + jpp.kd - 1 - (jpp.id + jpp.f_pad - 1);
-
-    if (jpp.f_pad >= jpp.kd || jpp.t_pad >= jpp.kh || jpp.l_pad >= jpp.kw
-         || back_pad >= jpp.kd || bottom_pad >= jpp.kh || right_pad >= jpp.kw)
+// This condition was relaxed in order to support old behavior
+//    if (jpp.f_pad >= jpp.kd || jpp.t_pad >= jpp.kh || jpp.l_pad >= jpp.kw
+//         || jpp.back_pad >= jpp.kd || jpp.b_pad >= jpp.kh || jpp.r_pad >= jpp.kw)
+//        return status::unimplemented;
+    if (jpp.f_pad >= jpp.kd || jpp.back_pad >= jpp.kd)
         return status::unimplemented;
 
     jpp.alg = pd.alg_kind;
@@ -127,28 +129,31 @@ status_t jit_uni_pool_kernel<isa>::init_conf(jit_pool_conf_t &jpp,
 
 template <cpu_isa_t isa>
 inline void jit_uni_pool_kernel<isa>::maybe_recalculate_divisor(int jj,
-        int ur_w, int pad_l, int pad_r) {
+        int ur_w, int pad_l, int pad_r, int pad_r_logic) {
+    int kw = jpp.kw;
+    int stride_w = jpp.stride_w;
+
+    int non_zero_kw = kw;
     if (jpp.alg == pooling_avg_exclude_padding) {
-        int kw = jpp.kw;
-        int stride_w = jpp.stride_w;
-
-        int non_zero_kw = kw;
-        non_zero_kw -= nstl::max(0, pad_l - jj*stride_w);
-        non_zero_kw -= nstl::max(0, pad_r - (ur_w - 1 - jj)*stride_w);
-
-        if (non_zero_kw != prev_kw) {
-            mov(tmp_gpr, float2int((float)non_zero_kw));
-            movq(xmm_tmp, tmp_gpr);
-            uni_vbroadcastss(vmm_tmp, xmm_tmp);
-            uni_vmulps(vmm_tmp, vmm_tmp, vmm_ker_area_h);
-            prev_kw = non_zero_kw;
-        }
+        non_zero_kw -= nstl::max(0, pad_l - jj * stride_w);
+        non_zero_kw -= nstl::max(0, pad_r - (ur_w - 1 - jj) * stride_w);
+    } else { //  jpp.alg == pooling_avg_include_padding
+        non_zero_kw -= nstl::max(0, pad_r_logic - (ur_w - 1 - jj) * stride_w);
     }
+
+    if (non_zero_kw != prev_kw) {
+        mov(tmp_gpr, float2int((float)non_zero_kw));
+        movq(xmm_tmp, tmp_gpr);
+        uni_vbroadcastss(vmm_tmp, xmm_tmp);
+        uni_vmulps(vmm_tmp, vmm_tmp, vmm_ker_area_h);
+        prev_kw = non_zero_kw;
+    }
+
 }
 
 template <cpu_isa_t isa>
 inline void jit_uni_pool_kernel<isa>::avg_step(int ur_w, int pad_l,
-        int pad_r) {
+        int pad_r, int pad_r_logic) {
 
     int iw = jpp.iw;
     int kw = jpp.kw;
@@ -159,7 +164,7 @@ inline void jit_uni_pool_kernel<isa>::avg_step(int ur_w, int pad_l,
     for (int jj = 0; jj < ur_w; jj++) {
         if (jpp.is_backward) {
             load(jj, reg_output, jpp.dt_size * jj * c_block);
-            maybe_recalculate_divisor(jj, ur_w, pad_l, pad_r);
+            maybe_recalculate_divisor(jj, ur_w, pad_l, pad_r, pad_r_logic);
             uni_vdivps(vreg(jj), vreg(jj), vmm_tmp);
         } else {
             uni_vpxor(vreg(jj), vreg(jj), vreg(jj));
@@ -236,7 +241,7 @@ inline void jit_uni_pool_kernel<isa>::avg_step(int ur_w, int pad_l,
 
     if (!jpp.is_backward) {
         for (int jj = 0; jj < ur_w; jj++) {
-            maybe_recalculate_divisor(jj, ur_w, pad_l, pad_r);
+            maybe_recalculate_divisor(jj, ur_w, pad_l, pad_r, pad_r_logic);
             uni_vdivps(vreg(jj), vreg(jj), vmm_tmp);
             if (jpp.is_bf16) {
                 if (!isa_has_bf16(jpp.isa))
@@ -602,7 +607,6 @@ void jit_uni_pool_kernel<isa>::generate() {
     int ow = jpp.ow;
     int iw = jpp.iw;
     int kw = jpp.kw;
-    int kh = jpp.kh;
     int ur_w = jpp.ur_w;
     int c_block = jpp.c_block;
     int stride_w = jpp.stride_w;
@@ -658,32 +662,27 @@ void jit_uni_pool_kernel<isa>::generate() {
     }
 
     int r_pad  = nstl::max(0, ((ow-1)*stride_w) + kw - 1 - (iw + l_pad - 1));
+    int r_pad_log = nstl::max(0, ((ow-1)*stride_w) + kw - 1 - (iw + l_pad + jpp.r_pad - 1));
     int r_pad1 = (ur_w*n_oi - 1)*stride_w + kw - 1 - (iw + l_pad - 1);
+    int r_pad1_log = nstl::max(0, r_pad1 - jpp.r_pad);
     if (r_pad1 > 0) n_oi--;
 
-    if (jpp.alg == pooling_avg_exclude_padding) {
-        movq(xmm_ker_area_h, reg_ker_area_h);
-        uni_vpbroadcastd(vmm_ker_area_h, xmm_ker_area_h);
-    }
+    movq(xmm_ker_area_h, reg_ker_area_h);
+    uni_vpbroadcastd(vmm_ker_area_h, xmm_ker_area_h);
 
-    if (jpp.alg == pooling_avg_include_padding) {
-        mov(tmp_gpr, float2int((float)(kw * kh * jpp.kd)));
-        movq(xmm_tmp, tmp_gpr);
-        uni_vpbroadcastd(vmm_tmp, xmm_tmp);
-    }
     if (l_pad > 0) {
         n_oi--;
         if (n_oi < 0 && r_pad1 > 0) {
-            step(ur_w, l_pad, r_pad1);
+            step(ur_w, l_pad, r_pad1, r_pad1_log);
         } else  {
-            step(ur_w, l_pad, 0);
+            step(ur_w, l_pad, 0, 0);
         }
 
         if (isa == sse42) {
             if (n_oi < 0 && r_pad1 > 0) {
-                step_high_half(ur_w, l_pad, r_pad1);
+                step_high_half(ur_w, l_pad, r_pad1, r_pad1_log);
             } else  {
-                step_high_half(ur_w, l_pad, 0);
+                step_high_half(ur_w, l_pad, 0, 0);
             }
         }
 
@@ -706,10 +705,10 @@ void jit_uni_pool_kernel<isa>::generate() {
     if (n_oi > 0) {
         Label ow_loop;
         L(ow_loop); {
-            step(ur_w, 0, 0);
+            step(ur_w, 0, 0, 0);
 
             if (isa == sse42) {
-                step_high_half(ur_w, 0, 0);
+                step_high_half(ur_w, 0, 0, 0);
             }
 
             if (isa == sse42) {
@@ -735,10 +734,10 @@ void jit_uni_pool_kernel<isa>::generate() {
     }
 
     if (r_pad1 > 0 && n_oi >= 0) {
-        step(ur_w, 0, r_pad1);
+        step(ur_w, 0, r_pad1, r_pad1_log);
 
         if (isa == sse42) {
-            step_high_half(ur_w, 0, r_pad1);
+            step_high_half(ur_w, 0, r_pad1, r_pad1_log);
         }
 
         if (isa == sse42) {
@@ -757,10 +756,10 @@ void jit_uni_pool_kernel<isa>::generate() {
     }
 
     if (ur_w_tail != 0) {
-        step(ur_w_tail, 0, r_pad);
+        step(ur_w_tail, 0, r_pad, r_pad_log);
 
         if (isa == sse42) {
-            step_high_half(ur_w_tail, 0, r_pad);
+            step_high_half(ur_w_tail, 0, r_pad, r_pad_log);
         }
     }
 

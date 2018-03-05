@@ -569,7 +569,7 @@ struct jit_pool_conf_t {
     int id, ih, iw, od, oh, ow;
     int stride_d, stride_h, stride_w;
     int kd, kh, kw;
-    int f_pad, t_pad, l_pad;
+    int f_pad, t_pad, l_pad, b_pad, r_pad, back_pad;
     alg_kind_t alg;
     bool is_training;
     bool pad_w_is_null;
