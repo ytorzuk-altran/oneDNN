@@ -205,6 +205,24 @@ template <typename pd_t> static void init_info_eltwise(pd_t *s, char *buffer) {
             aux_str, prb_str);
 }
 
+template <typename pd_t> static void init_info_depthwise(pd_t *s, char *buffer) {
+    DECL_DAT_AUX_PRB_STRS();
+
+    auto fmt_data = s->src_pd()->desc()->format;
+    auto fmt_diff = s->desc()->prop_kind == prop_kind::backward_data
+        ? s->diff_src_pd()->desc()->format : memory_format::undef;
+    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN, "fdata:%s fdiff:%s",
+            mkldnn_fmt2str(fmt_data), mkldnn_fmt2str(fmt_diff));
+
+    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
+            "alg:%s", mkldnn_alg_kind2str(s->desc()->alg_kind));
+
+    format_mem_desc_str(prb_str, MKLDNN_VERBOSE_PRB_LEN, s->src_pd()->desc());
+
+    verbose_templ(buffer, s->kind(), s->name(), s->desc()->prop_kind, dat_str,
+            aux_str, prb_str);
+}
+
 template <typename pd_t> static void init_info_iprod(pd_t *s, char *buffer) {
     DECL_DAT_AUX_PRB_STRS();
 
@@ -399,6 +417,7 @@ template <typename pd_t> static void init_info_roi_pooling(pd_t *s, char *buffer
 DEFINE_STUB(bnorm);
 DEFINE_STUB(conv);
 DEFINE_STUB(eltwise);
+DEFINE_STUB(depthwise);
 DEFINE_STUB(iprod);
 DEFINE_STUB(lrn);
 DEFINE_STUB(mem);

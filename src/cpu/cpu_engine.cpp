@@ -72,6 +72,8 @@
 #include "cpu/jit_uni_softmax.hpp"
 #include "cpu/jit_uni_roi_pooling.hpp"
 #include "cpu/ref_roi_pooling.hpp"
+#include "cpu/jit_uni_depthwise.hpp"
+#include "cpu/ref_depthwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -257,6 +259,11 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_eltwise_fwd_t<bf16>),
     INSTANCE(ref_eltwise_bwd_t<f32>),
     INSTANCE(ref_eltwise_bwd_t<bf16>),
+    /* depthwise */
+    INSTANCE(jit_uni_depthwise_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_depthwise_fwd_t<avx2>),
+    INSTANCE(jit_uni_depthwise_fwd_t<sse42>),
+    INSTANCE(ref_depthwise_fwd_t<f32>),
     /* eltwise (int) */
     INSTANCE(ref_eltwise_fwd_t<s32>),
     INSTANCE(ref_eltwise_fwd_t<s16>),

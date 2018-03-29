@@ -77,6 +77,8 @@ namespace alg_kind {
     const alg_kind_t eltwise_logistic = mkldnn_eltwise_logistic;
     const alg_kind_t eltwise_exp = mkldnn_eltwise_exp;
     const alg_kind_t eltwise_gelu = mkldnn_eltwise_gelu;
+    const alg_kind_t depthwise_scale_shift = mkldnn_depthwise_scale_shift;
+    const alg_kind_t depthwise_prelu = mkldnn_depthwise_prelu;
     const alg_kind_t pooling_max = mkldnn_pooling_max;
     const alg_kind_t pooling_avg = mkldnn_pooling_avg;
     const alg_kind_t pooling_avg_include_padding = mkldnn_pooling_avg_include_padding;
@@ -297,6 +299,7 @@ namespace primitive_kind {
     const primitive_kind_t deconvolution = mkldnn_deconvolution;
     const primitive_kind_t shuffle = mkldnn_shuffle;
     const primitive_kind_t eltwise = mkldnn_eltwise;
+    const primitive_kind_t depthwise = mkldnn_depthwise;
     const primitive_kind_t softmax = mkldnn_softmax;
     const primitive_kind_t pooling = mkldnn_pooling;
     const primitive_kind_t lrn = mkldnn_lrn;
@@ -328,6 +331,7 @@ namespace query {
     const query_t deconvolution_d = mkldnn_query_deconvolution_d;
     const query_t shuffle_d = mkldnn_query_shuffle_d;
     const query_t eltwise_d = mkldnn_query_eltwise_d;
+    const query_t depthwise_d = mkldnn_query_depthwise_d;
     const query_t softmax_d = mkldnn_query_softmax_d;
     const query_t pooling_d = mkldnn_query_pooling_d;
     const query_t lrn_d = mkldnn_query_lrn_d;
@@ -363,6 +367,7 @@ using lrn_desc_t = mkldnn_lrn_desc_t;
 using batch_normalization_desc_t = mkldnn_batch_normalization_desc_t;
 using inner_product_desc_t = mkldnn_inner_product_desc_t;
 using roi_pooling_desc_t = mkldnn_roi_pooling_desc_t;
+using depthwise_desc_t = mkldnn_depthwise_desc_t;
 
 using rnn_direction_t = mkldnn_rnn_direction_t;
 using rnn_cell_desc_t = mkldnn_rnn_cell_desc_t;
@@ -387,6 +392,7 @@ struct op_desc_t {
         inner_product_desc_t inner_product;
         rnn_desc_t rnn;
         roi_pooling_desc_t roi_pooling;
+        depthwise_desc_t depthwise;
     };
 
     op_desc_t(const primitive_kind_t &_): kind(_) {}
@@ -403,6 +409,7 @@ struct op_desc_t {
     DECL_CTOR_AND_CONVERTERS(shuffle_desc_t, shuffle);
     DECL_CTOR_AND_CONVERTERS(pooling_desc_t, pooling);
     DECL_CTOR_AND_CONVERTERS(eltwise_desc_t, eltwise);
+    DECL_CTOR_AND_CONVERTERS(depthwise_desc_t, depthwise);
     DECL_CTOR_AND_CONVERTERS(softmax_desc_t, softmax);
     DECL_CTOR_AND_CONVERTERS(lrn_desc_t, lrn);
     DECL_CTOR_AND_CONVERTERS(batch_normalization_desc_t, batch_normalization);

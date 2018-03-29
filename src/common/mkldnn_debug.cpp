@@ -244,6 +244,7 @@ const char *mkldnn_prim_kind2str(mkldnn_primitive_kind_t v) {
     if (v == mkldnn_convolution) return "convolution";
     if (v == mkldnn_deconvolution) return "deconvolution";
     if (v == mkldnn_eltwise) return "eltwise";
+    if (v == mkldnn_depthwise) return "depthwise";
     if (v == mkldnn_softmax) return "softmax";
     if (v == mkldnn_pooling) return "pooling";
     if (v == mkldnn_lrn) return "lrn";
@@ -283,6 +284,8 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_vanilla_lstm) return "vanilla_lstm";
     if (v == mkldnn_vanilla_gru) return "vanilla_gru";
     if (v == mkldnn_gru_linear_before_reset) return "gru_linear_before_reset";
+    if (v == mkldnn_depthwise_scale_shift) return "depthwise_scale_shift";
+    if (v == mkldnn_depthwise_prelu) return "depthwise_prelu";
     if (v == mkldnn_roi_pooling_max) return "roi_pooling_max";
     if (v == mkldnn_roi_pooling_bilinear) return "roi_pooling_bilinear";
     assert(!"unknown alg_kind");
