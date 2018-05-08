@@ -560,6 +560,10 @@ typedef enum {
     mkldnn_eltwise_exp = 0xbf,
     /** Eltwise: gelu */
     mkldnn_eltwise_gelu = 0xcf,
+    /** Eltwise: clamp */
+    mkldnn_eltwise_clamp = 0xdf,
+    /** Eltwise: not */
+    mkldnn_eltwise_not = 0xef,
     /** Max pooling */
     mkldnn_pooling_max = 0x1ff,
     /** Average pooling include padding */

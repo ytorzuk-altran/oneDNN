@@ -148,6 +148,21 @@ T exp_bwd(T dd, T s) {
     return dd * exp_fwd<T>(s);
 }
 
+template <typename T, typename A>
+inline T clamp_fwd(T s, A alpha, A beta) {
+    return s > alpha ? alpha : s < beta ? beta : s;
+}
+
+template <typename T, typename A>
+inline T clamp_bwd(T dd, T s, A alpha, A beta) {
+    return dd * (beta < s && s < alpha ? 1 : 0);
+}
+
+template <typename T>
+inline T not_fwd(T s) {
+    return (T)(!s);
+}
+
 struct eltwise_test_params {
     engine::kind engine_kind;
     algorithm alg_kind;
@@ -191,6 +206,8 @@ void ref_eltwise_fwd(const eltwise_test_params &p,
         case eltwise_logistic:    ref_d = logistic_fwd(s);                break;
         case eltwise_exp:         ref_d = exp_fwd(s);                     break;
         case eltwise_gelu:        ref_d = gelu_fwd(s);                    break;
+        case eltwise_clamp:       ref_d = clamp_fwd(s, p.alpha, p.beta);  break;
+        case eltwise_not:         ref_d = not_fwd(s);                     break;
         default: assert(!"unknown alg_kind");
         }
         dst_data[i] = ref_d;
@@ -260,6 +277,7 @@ void check_eltwise_bwd(const eltwise_test_params &p,
         case eltwise_logistic: ref_ds = logistic_bwd(ref_dd, ref_s); break;
         case eltwise_exp:      ref_ds = exp_bwd(ref_dd, ref_s);      break;
         case eltwise_gelu:     ref_ds = gelu_bwd(ref_dd, ref_s);     break;
+        case eltwise_clamp: ref_ds = clamp_bwd(ref_dd, ref_s, p.alpha, p.beta); break;
         default: assert(!"unknown alg_kind");
         }
         float diff_err = diff_src_data[map_index(diff_data_d, i)] - ref_ds;

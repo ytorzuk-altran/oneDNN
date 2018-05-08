@@ -16,7 +16,7 @@
 
 #include "gtest/gtest.h"
 #include "mkldnn_test_common.hpp"
-
+#include "math_utils.hpp"
 #include "mkldnn.hpp"
 #include "src/cpu/cpu_isa_traits.hpp"
 #include "test_eltwise.hpp"
@@ -214,12 +214,16 @@ TEST_P(eltwise_test_bfloat16, TestsEltwise) {}
     EXPAND(PARAMS(eltwise_abs, __VA_ARGS__)), \
     EXPAND(PARAMS(eltwise_gelu, __VA_ARGS__))
 
+
 #define PARAMS_ALL_ALG_SDPART(...) \
     EXPAND(PARAMS(eltwise_sqrt, __VA_ARGS__)), \
     EXPAND(PARAMS(eltwise_linear, __VA_ARGS__)), \
     EXPAND(PARAMS(eltwise_soft_relu, __VA_ARGS__)), \
     EXPAND(PARAMS(eltwise_bounded_relu, __VA_ARGS__)), \
-    EXPAND(PARAMS(eltwise_logistic, __VA_ARGS__))
+    EXPAND(PARAMS(eltwise_logistic, __VA_ARGS__)), \
+    EXPAND(PARAMS(eltwise_clamp, __VA_ARGS__)), \
+    EXPAND(PARAMS(eltwise_exp, __VA_ARGS__))
+
 
 #define INST_TEST_CASE(str, ...) \
 INSTANTIATE_TEST_SUITE_P( \

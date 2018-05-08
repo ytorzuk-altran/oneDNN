@@ -53,7 +53,9 @@ using convolution_test_s8s8s32f32 =
     EXPAND_ARGS(PARAMS_CONV(eltwise_linear, __VA_ARGS__)), \
     EXPAND_ARGS(PARAMS_CONV(eltwise_bounded_relu, __VA_ARGS__)), \
     EXPAND_ARGS(PARAMS_CONV(eltwise_soft_relu, __VA_ARGS__)), \
-    EXPAND_ARGS(PARAMS_CONV(eltwise_logistic, __VA_ARGS__))
+    EXPAND_ARGS(PARAMS_CONV(eltwise_logistic, __VA_ARGS__)), \
+    EXPAND_ARGS(PARAMS_CONV(eltwise_clamp, __VA_ARGS__)), \
+    EXPAND_ARGS(PARAMS_CONV(eltwise_exp, __VA_ARGS__))
 
 #define ELTWISE_ALPHA 0.5f
 #define ELTWISE_BETA 0.f

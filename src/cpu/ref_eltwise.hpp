@@ -153,6 +153,9 @@ struct ref_eltwise_bwd_t: public cpu_primitive_t {
             if (use_generic && !one_of(diff_dst_d.ndims(), 4, 5))
                 return status::unimplemented;
 
+            if (desc()->alg_kind == mkldnn_eltwise_not)
+                return status::unimplemented;
+
             return status::success;
         }
 

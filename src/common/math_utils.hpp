@@ -263,13 +263,31 @@ inline U gelu_bwd(T dd, T s) {
     return (U)(dd * 0.5 * (1. + v) * (1. + s * (1 - v) * dg));
 }
 
+template <typename T, typename A,
+         typename U = typename utils::remove_reference<T>::type>
+inline U clamp_fwd(T s, A alpha, A beta) {
+    return (U)(s > alpha ? alpha : s < beta ? beta : s);
+}
+
+template <typename T, typename A,
+         typename U = typename utils::remove_reference<T>::type>
+inline U clamp_bwd(T dd, T s, A alpha, A beta) {
+    return dd * (beta < s && s < alpha ? 1 : 0);
+}
+
+template <typename T,
+        typename U = typename utils::remove_reference<T>::type>
+inline U not_fwd(T s) {
+    return (U)(!s);
+}
+
 inline bool eltwise_fwd_preserves_zero(alg_kind_t alg, bool jit_impl = false) {
     using namespace alg_kind;
     using namespace utils;
     const bool preserves_zero = true
         && !one_of(alg, eltwise_linear, eltwise_soft_relu, eltwise_logistic,
-                eltwise_exp)
-        && IMPLICATION(jit_impl, !one_of(alg, eltwise_elu, eltwise_tanh));
+                eltwise_exp, eltwise_clamp, eltwise_not)
+        && IMPLICATION(jit_impl, !one_of(alg, eltwise_elu, eltwise_tanh, eltwise_clamp, eltwise_not));
     return preserves_zero;
 }
 

@@ -54,10 +54,11 @@ TEST_P(convolution_test, TestConvolutionEltwise)
     EXPAND_ARGS(PARAMS_CONV(eltwise_linear, __VA_ARGS__)), \
     EXPAND_ARGS(PARAMS_CONV(eltwise_bounded_relu, __VA_ARGS__)), \
     EXPAND_ARGS(PARAMS_CONV(eltwise_soft_relu, __VA_ARGS__)), \
-    EXPAND_ARGS(PARAMS_CONV(eltwise_logistic, __VA_ARGS__))
+    EXPAND_ARGS(PARAMS_CONV(eltwise_logistic, __VA_ARGS__)), \
+    EXPAND_ARGS(PARAMS_CONV(eltwise_clamp, __VA_ARGS__))
 
-#define ELTWISE_ALPHA 0.5f
-#define ELTWISE_BETA 1.5f
+#define ELTWISE_ALPHA 1.5f
+#define ELTWISE_BETA 0.5f
 
 #define PARAMS_CONV(alg, src, weights, bias, dst, ...) \
     test_convolution_eltwise_params_t {alg,  mkldnn::engine::kind::cpu, \
@@ -73,7 +74,7 @@ TEST_P(convolution_test, TestConvolutionEltwise)
     );
 
     INST_TEST_CASE(SimpleSmall_Blocked,
-        PARAMS(nChw8c, Goihw8g, x, nChw8c, 1, 48, 48, 20, 20, 48, 20, 20, 3, 3, 1, 1, 1, 1),
+        PARAMS(nChw8c, Goihw8g, x, nChw8c, 1, 8, 8, 5, 5, 8, 5, 5, 3, 3, 1, 1, 1, 1),
         PARAMS(nChw8c, OIhw8i8o, x, nChw8c, 1, 1, 48, 20, 20, 48, 20, 20, 1, 1, 0, 0, 1, 1),
         PARAMS(nChw8c, OIhw8i8o, x, nChw8c, 1, 1, 48, 20, 20, 48, 20, 20, 3, 3, 0, 0, 1, 1)
     );

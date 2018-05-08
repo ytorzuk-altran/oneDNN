@@ -272,6 +272,10 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_eltwise_soft_relu) return "eltwise_soft_relu";
     if (v == mkldnn_eltwise_logistic) return "eltwise_logistic";
     if (v == mkldnn_eltwise_gelu) return "eltwise_gelu";
+    if (v == mkldnn_eltwise_exp) return "eltwise_exp";
+    if (v == mkldnn_eltwise_clamp) return "eltwise_clamp";
+    if (v == mkldnn_eltwise_exp) return "eltwise_exp";
+    if (v == mkldnn_eltwise_not) return "eltwise_not";
     if (v == mkldnn_pooling_max) return "pooling_max";
     if (v == mkldnn_pooling_avg_include_padding) return "pooling_avg_include_padding";
     if (v == mkldnn_pooling_avg_exclude_padding) return "pooling_avg_exclude_padding";

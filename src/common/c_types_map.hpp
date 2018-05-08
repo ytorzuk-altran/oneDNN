@@ -77,6 +77,8 @@ namespace alg_kind {
     const alg_kind_t eltwise_logistic = mkldnn_eltwise_logistic;
     const alg_kind_t eltwise_exp = mkldnn_eltwise_exp;
     const alg_kind_t eltwise_gelu = mkldnn_eltwise_gelu;
+    const alg_kind_t eltwise_clamp = mkldnn_eltwise_clamp;
+    const alg_kind_t eltwise_not = mkldnn_eltwise_not;
     const alg_kind_t depthwise_scale_shift = mkldnn_depthwise_scale_shift;
     const alg_kind_t depthwise_prelu = mkldnn_depthwise_prelu;
     const alg_kind_t pooling_max = mkldnn_pooling_max;
