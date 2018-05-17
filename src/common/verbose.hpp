@@ -370,6 +370,24 @@ template <typename pd_t> static void init_info_rnn(pd_t *s, char *buffer) {
             aux_str, prb_str);
 }
 
+template <typename pd_t> static void init_info_roi_pooling(pd_t *s, char *buffer) {
+    DECL_DAT_AUX_PRB_STRS();
+
+    auto fmt_data = s->src_pd()->desc()->format;
+    auto fmt_diff = s->desc()->prop_kind == prop_kind::backward_data
+                    ? s->diff_src_pd()->desc()->format : memory_format::undef;
+    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN, "fdata:%s fdiff:%s",
+             mkldnn_fmt2str(fmt_data), mkldnn_fmt2str(fmt_diff));
+
+    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
+             "alg:%s", mkldnn_alg_kind2str(s->desc()->alg_kind));
+
+    snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
+             "ph%dpw%dcs%f", s->pooledH(), s->pooledW(), s->spatialScale());
+    verbose_templ(buffer, s->kind(), s->name(), s->desc()->prop_kind, dat_str,
+                  aux_str, prb_str);
+}
+
 #else /* !defined(DISABLE_VERBOSE) */
 #define MKLDNN_VERBOSE_BUF_LEN 1
 
@@ -388,6 +406,7 @@ DEFINE_STUB(pool);
 DEFINE_STUB(softmax);
 DEFINE_STUB(rnn);
 DEFINE_STUB(shuffle);
+DEFINE_STUB(roi_pooling);
 #undef DEFINE_STUB
 #endif /* !defined(DISABLE_VERBOSE) */
 

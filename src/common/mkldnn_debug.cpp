@@ -250,6 +250,7 @@ const char *mkldnn_prim_kind2str(mkldnn_primitive_kind_t v) {
     if (v == mkldnn_batch_normalization) return "batch_normalization";
     if (v == mkldnn_inner_product) return "inner_product";
     if (v == mkldnn_rnn) return "rnn";
+    if (v == mkldnn_roi_pooling) return "roi_pooling";
     assert(!"unknown prim_kind");
     return "unknown prim_kind";
 }
@@ -282,6 +283,8 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_vanilla_lstm) return "vanilla_lstm";
     if (v == mkldnn_vanilla_gru) return "vanilla_gru";
     if (v == mkldnn_gru_linear_before_reset) return "gru_linear_before_reset";
+    if (v == mkldnn_roi_pooling_max) return "roi_pooling_max";
+    if (v == mkldnn_roi_pooling_bilinear) return "roi_pooling_bilinear";
     assert(!"unknown alg_kind");
     return "unknown alg_kind";
 }

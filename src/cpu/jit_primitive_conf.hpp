@@ -511,6 +511,36 @@ struct jit_pool_call_s {
     float ker_area_h;
 };
 
+/* roi pooling */
+struct jit_roi_pool_conf_t {
+    int mb, c;
+    int ih, iw, oh, ow;
+
+    int c_block, nb_c, nb_c_blocking;
+
+    double spatial_scale;
+    int pooled_h;
+    int pooled_w;
+
+    alg_kind_t alg;
+};
+
+struct jit_roi_pool_call_s {
+    const float *src;
+    float *dst;
+
+    size_t kh;
+    size_t kw;
+    size_t bin_area;
+
+    size_t c_blocks;
+
+    float xf;
+    float yf;
+
+    size_t xoff;
+    size_t yoff;
+};
 
 }
 }

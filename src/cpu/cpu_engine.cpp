@@ -70,6 +70,8 @@
 #include "cpu/jit_avx512_core_fp32_wino_conv_2x3.hpp"
 #include "cpu/jit_uni_batch_normalization_s8.hpp"
 #include "cpu/jit_uni_softmax.hpp"
+#include "cpu/jit_uni_roi_pooling.hpp"
+#include "cpu/ref_roi_pooling.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -369,6 +371,11 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_inner_product_fwd_t<u8, s8, f32, s32>),
     INSTANCE(ref_inner_product_fwd_t<s16, s16, s32, s32>),
     INSTANCE(ref_inner_product_bwd_data_t<s32, s16, s16, s32>),
+    /* roi pooling */
+    INSTANCE(jit_uni_roi_pooling_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_roi_pooling_fwd_t<avx2>),
+    INSTANCE(jit_uni_roi_pooling_fwd_t<sse42>),
+    INSTANCE(ref_roi_pooling_fwd_t<data_type::f32>),
     /* eol */
     nullptr,
 };

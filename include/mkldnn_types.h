@@ -517,6 +517,8 @@ typedef enum {
     mkldnn_inner_product,
     /** A rnn primitive. */
     mkldnn_rnn,
+    /** A ROI pooling primitive. */
+    mkldnn_roi_pooling,
 } mkldnn_primitive_kind_t;
 
 /** Kinds of algorithms. */
@@ -582,6 +584,10 @@ typedef enum {
      * \f$[b_{u}, b_{r}, b_{c_x}, b_{c_h}]\f$
      * */
     mkldnn_gru_linear_before_reset = 0x4fff,
+    /** ROI max pooling **/
+    mkldnn_roi_pooling_max = 0xafff,
+    /** ROI pooling with bilinear interpolation**/
+    mkldnn_roi_pooling_bilinear = 0xbfff,
 } mkldnn_alg_kind_t;
 
 /** Flags for batch-normalization primititve. */
@@ -1072,6 +1078,26 @@ typedef struct {
     mkldnn_memory_desc_t diff_dst_iter_desc;
 } mkldnn_rnn_desc_t;
 
+/** A descriptor of a ROI Pooling operation. */
+typedef struct {
+    /** The kind of primitive. Used for self identifying the primitive
+     * descriptor. Must be #mkldnn_roi_pooling. */
+    mkldnn_primitive_kind_t primitive_kind;
+    /** The kind of propagation. Possible values: #mkldnn_forward. */
+    mkldnn_prop_kind_t prop_kind;
+    /** Source memory descriptor. */
+    mkldnn_memory_desc_t* src_desc;
+    /** Destination memory descriptor. */
+    mkldnn_memory_desc_t dst_desc;
+
+    /** Primitive parameters. */
+    int pooled_h;
+    int pooled_w;
+    double spatial_scale;
+    int num_src;
+    mkldnn_alg_kind_t alg_kind;
+} mkldnn_roi_pooling_desc_t;
+
 /** @} */
 
 /** @addtogroup c_api_engine_types Engine
@@ -1259,6 +1285,7 @@ typedef enum {
     mkldnn_query_batch_normalization_d, /**< batch normalization descriptor */
     mkldnn_query_inner_product_d, /**< inner product descriptor */
     mkldnn_query_rnn_d, /**< rnn descriptor */
+    mkldnn_query_roi_pooling_d, /**< roi descriptor */
 
     /* (memory) primitive descriptor section */
     mkldnn_query_some_pd = 128, /**< stub */

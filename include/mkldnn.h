@@ -1687,6 +1687,22 @@ mkldnn_status_t MKLDNN_API mkldnn_rnn_backward_desc_init(
 
 /** @} */
 
+/** @addtogroup c_api_roi_pooling ROI Pooling
+ * A primitive to perform roi pooling.
+ * @{ */
+
+/** Initializes a @p roi_pooling_desc for forward propagation using @p prop_kind
+ * (possible value are #mkldnn_forward_inference)
+ *  and memory descriptor @p data_desc. */
+mkldnn_status_t MKLDNN_API mkldnn_roi_pooling_forward_desc_init(
+        mkldnn_roi_pooling_desc_t *roi_pooling_desc, mkldnn_prop_kind_t prop_kind,
+        mkldnn_alg_kind_t algorithm,
+        mkldnn_memory_desc_t *src_descs, int num_inputs,
+        const mkldnn_memory_desc_t *dst_desc,
+        int pooled_h, int pooled_w, double spatial_scale);
+
+/** @} */
+
 /** @} */
 
 /** @addtogroup c_api_engine Engine operations

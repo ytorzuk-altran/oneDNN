@@ -280,7 +280,9 @@ enum algorithm {
     vanilla_rnn = mkldnn_vanilla_rnn,
     vanilla_lstm = mkldnn_vanilla_lstm,
     vanilla_gru = mkldnn_vanilla_gru,
-    gru_linear_before_reset = mkldnn_gru_linear_before_reset
+    gru_linear_before_reset = mkldnn_gru_linear_before_reset,
+    roi_pooling_max = mkldnn_roi_pooling_max,
+    roi_pooling_bilinear = mkldnn_roi_pooling_bilinear
 };
 
 inline mkldnn_alg_kind_t convert_to_c(algorithm aalgorithm) {
@@ -2032,6 +2034,58 @@ struct deconvolution_backward_weights : public primitive {
         error::wrap_c_api(mkldnn_primitive_create(&result,
                     aprimitive_desc.get(), inputs, outputs),
                 "could not create a deconvolution backward weights primitive");
+        reset(result);
+    }
+};
+
+/// @}
+
+/// @addtogroup cpp_api_roi_pooling ROIPooling
+/// @{
+
+struct roi_pooling_forward : public primitive {
+    struct desc {
+        mkldnn_roi_pooling_desc_t data;
+        std::vector<mkldnn_memory_desc_t> c_api_inputs;
+
+        desc(prop_kind aprop_kind, algorithm aalgorithm, std::vector<memory::desc> inputs,
+             const memory::desc &dst_desc, int pooled_h, int pooled_w, double spatial_scale) {
+
+            for(size_t i = 0; i < inputs.size(); i++) {
+                c_api_inputs.push_back(inputs[i].data);
+            }
+
+            error::wrap_c_api(mkldnn_roi_pooling_forward_desc_init(&data,
+                        mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm), &c_api_inputs[0],
+                        c_api_inputs.size(),
+                        &dst_desc.data, pooled_h, pooled_w, spatial_scale),
+                    "could not create a roi pooling forward descriptor");
+        }
+    };
+
+    struct primitive_desc : public handle<mkldnn_primitive_desc_t>{
+        primitive_desc(const desc &adesc, const engine &aengine) {
+            mkldnn_primitive_desc_t result;
+            error::wrap_c_api(mkldnn_primitive_desc_create(
+                        &result, &adesc.data, aengine.get(), nullptr),
+                    "could not create a roi pooling forward primitive descriptor");
+            reset(result);
+        }
+    };
+
+    roi_pooling_forward(const primitive_desc &aprimitive_desc,
+            std::vector<primitive::at> &inputs, const memory &dst) {
+        mkldnn_primitive_t result;
+
+        std::vector<mkldnn_primitive_at_t> p_inputs;
+        for (size_t i = 0; i < inputs.size(); i++) {
+            p_inputs.push_back(inputs[i].data);
+        }
+
+        const_mkldnn_primitive_t outputs[] = { dst.get() };
+        error::wrap_c_api(mkldnn_primitive_create(&result,
+                    aprimitive_desc.get(), &p_inputs[0], outputs),
+                "could not create a roi pooling forward primitive");
         reset(result);
     }
 };

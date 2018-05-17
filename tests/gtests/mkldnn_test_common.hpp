@@ -597,6 +597,43 @@ struct test_convolution_eltwise_params_t {
     mkldnn_status_t expected_status;
 };
 
+struct test_roi_pool_desc_t {
+    struct {
+        int mb, c;
+        int h, w;
+    } data;
+
+    struct {
+        int mb, c;
+        int h, w;
+    } roi;
+
+    int pooled_h, pooled_w;
+    double spatial_scale;
+};
+
+struct roi_pool_test_params {
+    mkldnn::prop_kind aprop_kind;
+    mkldnn::algorithm algorithm_kind;
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::memory::format data_format;
+    mkldnn::memory::format roi_format;
+    mkldnn::memory::format dst_format;
+    test_roi_pool_desc_t test_pd;
+};
+
+std::ostream &operator<<(std::ostream &stream,
+                         const roi_pool_test_params &tp)
+{
+    return stream << "(" << "input_data:" << " mb = " << tp.test_pd.data.mb  << ", c = " << tp.test_pd.data.c
+                  << ", h = " << tp.test_pd.data.h   << ", w = " << tp.test_pd.data.w
+                  << ", rois_num: " << tp.test_pd.roi.mb
+                  << ", pooled_h: " << tp.test_pd.pooled_h
+                  << ", pooled_w: " << tp.test_pd.pooled_w
+                  << ", spatial_scale: " << tp.test_pd.spatial_scale
+                  << ")";
+}
+
 template<typename F> bool catch_expected_failures(const F &f,
         bool expect_to_fail, mkldnn_status_t expected_status, bool ignore_unimplemented = true)
 {

@@ -87,6 +87,8 @@ namespace alg_kind {
     const alg_kind_t vanilla_lstm = mkldnn_vanilla_lstm;
     const alg_kind_t vanilla_gru = mkldnn_vanilla_gru;
     const alg_kind_t gru_linear_before_reset = mkldnn_gru_linear_before_reset;
+    const alg_kind_t roi_pooling_max = mkldnn_roi_pooling_max;
+    const alg_kind_t roi_pooling_bilinear = mkldnn_roi_pooling_bilinear;
 }
 
 using data_type_t = mkldnn_data_type_t;
@@ -301,6 +303,7 @@ namespace primitive_kind {
     const primitive_kind_t batch_normalization = mkldnn_batch_normalization;
     const primitive_kind_t inner_product = mkldnn_inner_product;
     const primitive_kind_t rnn = mkldnn_rnn;
+    const primitive_kind_t roi_pooling = mkldnn_roi_pooling;
 }
 
 using query_t = mkldnn_query_t;
@@ -331,6 +334,7 @@ namespace query {
     const query_t batch_normalization_d = mkldnn_query_batch_normalization_d;
     const query_t inner_product_d = mkldnn_query_inner_product_d;
     const query_t rnn_d = mkldnn_query_rnn_d;
+    const query_t roi_pooling_d = mkldnn_query_roi_pooling_d;
 
     const query_t some_pd = mkldnn_query_some_pd;
     const query_t input_pd = mkldnn_query_input_pd;
@@ -358,6 +362,7 @@ using softmax_desc_t = mkldnn_softmax_desc_t;
 using lrn_desc_t = mkldnn_lrn_desc_t;
 using batch_normalization_desc_t = mkldnn_batch_normalization_desc_t;
 using inner_product_desc_t = mkldnn_inner_product_desc_t;
+using roi_pooling_desc_t = mkldnn_roi_pooling_desc_t;
 
 using rnn_direction_t = mkldnn_rnn_direction_t;
 using rnn_cell_desc_t = mkldnn_rnn_cell_desc_t;
@@ -381,6 +386,7 @@ struct op_desc_t {
         batch_normalization_desc_t batch_normalization;
         inner_product_desc_t inner_product;
         rnn_desc_t rnn;
+        roi_pooling_desc_t roi_pooling;
     };
 
     op_desc_t(const primitive_kind_t &_): kind(_) {}
@@ -402,6 +408,7 @@ struct op_desc_t {
     DECL_CTOR_AND_CONVERTERS(batch_normalization_desc_t, batch_normalization);
     DECL_CTOR_AND_CONVERTERS(inner_product_desc_t, inner_product);
     DECL_CTOR_AND_CONVERTERS(rnn_desc_t, rnn);
+    DECL_CTOR_AND_CONVERTERS(roi_pooling_desc_t, roi_pooling);
 
 #   undef DECL_CTOR_AND_CONVERTERS
 };
