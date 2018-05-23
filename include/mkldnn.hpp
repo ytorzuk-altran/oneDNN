@@ -77,8 +77,8 @@ public:
     /// @param t The new value of the C handle.
     /// @param weak A flag to specify whether the wrapper should be weak.
     void reset(T t, bool weak = false) {
-        auto dummy_destructor = [](T) { return decltype(traits::destructor(0))(0); };
-        _data.reset(t, weak ? dummy_destructor : traits::destructor);
+        if (weak) _data.reset(t, [](T) { return decltype(traits::destructor(0))(0); });
+        else _data.reset(t, traits::destructor);
     }
 
     /// Returns the value of the underlying C handle.
