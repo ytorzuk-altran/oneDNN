@@ -70,7 +70,7 @@ struct jit_sse42_convolution_fwd_t: public cpu_primitive_t {
         virtual status_t set_default_params() override {
             using namespace memory_format;
 
-            const bool flat = this->IC() == 3;
+            const bool flat = this->IC() == 3 || this->IC() == 1;
             if (this->src_pd_.desc()->format == any)
                 CHECK(this->src_pd_.set_format(flat
                     ? utils::pick(this->ndims() - 3, ncw, nchw)
