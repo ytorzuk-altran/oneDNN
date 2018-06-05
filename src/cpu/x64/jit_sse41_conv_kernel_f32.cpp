@@ -470,7 +470,7 @@ status_t jit_sse41_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
                     broadcasting_strategy_t::per_oc}});
     if (!post_ops_ok_) return status::unimplemented;
 
-    const bool flat = jcp.ic == 3;
+    const bool flat = jcp.ic == 3 || jcp.ic == 1;
     const bool mimo = !flat;
 
     bool args_ok = true
