@@ -73,7 +73,7 @@ struct _jit_avx512_common_convolution_winograd_t {
     ~_jit_avx512_common_convolution_winograd_t() { delete kernel_; }
 
     protected:
-        void _execute_data_W_S_G_D(float *inp_ptr, float *out_ptr,
+        void _execute_data_W_S_G_D(const int MB, float *inp_ptr, float *out_ptr,
                 float *wei_ptr, float *bias_ptr,
                 const memory_tracking::grantor_t &scratchpad) const;
         _jit_avx512_common_conv_winograd_data_kernel_f32 *kernel_;
@@ -168,8 +168,10 @@ struct jit_avx512_common_convolution_winograd_fwd_t
         float *dst = (float *)this->memory();
         float *weights = (float *)this->input_memory(1);
         float *bias = (float *)this->input_memory(2);
-        this->_execute_data_W_S_G_D(src, dst, weights, bias,
+
+        this->_execute_data_W_S_G_D(pd()->MB(), src, dst, weights, bias,
                 this->scratchpad());
+
         e->set_state(event_t::ready);
     }
 
@@ -261,8 +263,10 @@ struct jit_avx512_common_convolution_winograd_bwd_data_t
         float *diff_dst = (float *)this->input_memory(0);
         float *diff_src = (float *)this->memory();
         float *weights = (float *)this->input_memory(1);
-        this->_execute_data_W_S_G_D(diff_dst, diff_src, weights, nullptr,
+
+        this->_execute_data_W_S_G_D(pd()->MB(), diff_dst, diff_src, weights, nullptr,
                 this->scratchpad());
+
         e->set_state(event_t::ready);
     }
 

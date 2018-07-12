@@ -101,10 +101,10 @@ struct _jit_avx512_core_fp32_wino_conv_4x3_t {
         void output_transform_tileblock_data(int tile_block,
             const jit_conv_winograd_conf_t &jcp, const post_ops_t &p_ops,
             float *toutp, float *outp, float *bias) const;
-        void _execute_data_W_S_G_D(float *inp_ptr, float *out_ptr,
+        void _execute_data_W_S_G_D(const int MB, float *inp_ptr, float *out_ptr,
                 float *wei_ptr, float *bias_ptr,
                 const memory_tracking::grantor_t &scratchpad) const;
-        void _execute_data_W_SGD(float *inp_ptr, float *out_ptr,
+        void _execute_data_W_SGD(const int MB, float *inp_ptr, float *out_ptr,
                 float *wei_ptr, float *bias_ptr,
                 const memory_tracking::grantor_t &scratchpad) const;
         _jit_avx512_core_fp32_wino_conv_4x3_data_kernel *kernel_;
@@ -201,10 +201,10 @@ struct jit_avx512_core_fp32_wino_conv_4x3_fwd_t
 
         switch ((pd()->jcp_).sched_policy) {
         case WSCHED_DATA_W_S_G_D:
-            this->_execute_data_W_S_G_D(src, dst, weights, bias, scratchpad);
+            this->_execute_data_W_S_G_D(pd()->MB(), src, dst, weights, bias, scratchpad);
             break;
         case WSCHED_DATA_W_SGD:
-            this->_execute_data_W_SGD(src, dst, weights, bias, scratchpad);
+            this->_execute_data_W_SGD(pd()->MB(), src, dst, weights, bias, scratchpad);
             break;
         default:
             break;
@@ -301,12 +301,12 @@ struct jit_avx512_core_fp32_wino_conv_4x3_bwd_data_t
         if (pd()->desc()->prop_kind == prop_kind::backward_data) {
             switch ((pd()->jcp_).sched_policy) {
             case WSCHED_DATA_W_S_G_D:
-                this->_execute_data_W_S_G_D(diff_dst, diff_src, weights, NULL,
+                this->_execute_data_W_S_G_D(pd()->MB(), diff_dst, diff_src, weights, NULL,
                         scratchpad);
                 break;
 
             case WSCHED_DATA_W_SGD:
-                this->_execute_data_W_SGD(diff_dst, diff_src, weights, NULL,
+                this->_execute_data_W_SGD(pd()->MB(), diff_dst, diff_src, weights, NULL,
                         scratchpad);
                 break;
 

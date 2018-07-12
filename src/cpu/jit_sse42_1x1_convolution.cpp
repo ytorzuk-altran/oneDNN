@@ -45,10 +45,11 @@ void jit_sse42_1x1_convolution_fwd_t::execute_forward() const {
     const memory_desc_wrapper dst_d(pd()->dst_pd());
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
-    const auto &jcp = kernel_->jcp;
     const int ndims = src_d.ndims();
+    const auto &jcp = kernel_->jcp;
+    int MB = pd()->MB();
 
-    const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
+    const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
 
     parallel(0, [&](const int ithr, const int nthr) {
         // TODO (Roma): remove this restriction
@@ -67,7 +68,7 @@ void jit_sse42_1x1_convolution_fwd_t::execute_forward() const {
         int iwork = start;
         while (iwork < end) {
             int n{0}, g{0}, osb{0};
-            nd_iterator_init(iwork, n, jcp.mb, g, jcp.ngroups, osb,
+            nd_iterator_init(iwork, n, MB, g, jcp.ngroups, osb,
                     jcp.nb_bcast);
 
             const int bcast_step_rem = jcp.nb_bcast - osb;

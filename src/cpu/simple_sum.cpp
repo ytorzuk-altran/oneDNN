@@ -38,10 +38,10 @@ void simple_sum_t<src_data_type, dst_data_type>::execute() const {
                 this->input_memory(a)) + i_d.blk_off(0);
     }
 
-    const size_t nelems = pd()->nelems_;
+    const size_t nelems = o_d.nelems();
     const size_t block_size = pd()->block_size_;
-    const size_t blocks_number = pd()->blocks_number_;
-    const size_t tail = pd()->tail_;
+    const size_t blocks_number = nelems / block_size;
+    const size_t tail = nelems % block_size;
 
     const auto &scales = pd()->scales_;
 

@@ -280,7 +280,7 @@ void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>
 
 template <bool is_fwd>
 void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>::_execute_data_W_S_G_D(
-        float *inp_ptr, float *out_ptr, float *wei_ptr, float *bias_ptr,
+        const int MB, float *inp_ptr, float *out_ptr, float *wei_ptr, float *bias_ptr,
         const memory_tracking::grantor_t &scratchpad) const {
     const auto &jcp = kernel_->jcp;
     const auto &p_ops = attr_->post_ops_;
@@ -296,10 +296,10 @@ void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>::_execute_data_W_S_G_D(
        FWD/BWD: V: src/diff_dst transform, U:weight transform,
                 M:dst/diff_src transform  */
     array_offset_calculator<float, 5> input(inp_ptr,
-            jcp.mb, jcp.dimK/jcp.dimK_reg_block, inph, inpw,
+            MB, jcp.dimK/jcp.dimK_reg_block, inph, inpw,
             jcp.dimK_reg_block);
     array_offset_calculator<float, 5> output(out_ptr,
-            jcp.mb, jcp.dimM/jcp.dimM_simd_block, outh, outw,
+            MB, jcp.dimM/jcp.dimM_simd_block, outh, outw,
             jcp.dimM_simd_block);
     array_offset_calculator<float, 6> weights(wei_ptr,
             jcp.oc/jcp.oc_simd_block, jcp.ic/jcp.ic_simd_block, jcp.kh, jcp.kw,
@@ -342,8 +342,7 @@ void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>::_execute_data_W_S_G_D(
 
 PRAGMA_OMP(parallel)
     {
-
-        parallel_nd_in_omp(jcp.mb, jcp.dimK_nb_block, jcp.dimK_block,
+        parallel_nd_in_omp(MB, jcp.dimK_nb_block, jcp.dimK_block,
                 [&](int img, int K_blk1, int K_blk2) {
                 input_transform_data(img, jcp,
                     &(input(img, K_blk1 * jcp.dimK_block + K_blk2,
@@ -385,7 +384,7 @@ PRAGMA_OMP(barrier)
 
 PRAGMA_OMP(barrier)
 
-        parallel_nd_in_omp(jcp.mb, jcp.dimM_nb_block, (jcp.dimM_block * jcp.dimM_reg_block),
+        parallel_nd_in_omp(MB, jcp.dimM_nb_block, (jcp.dimM_block * jcp.dimM_reg_block),
                     [&](int img, int M_blk1, int M_blk2) {
             const int M_blk =
                 M_blk1 * jcp.dimM_block  * jcp.dimM_reg_block + M_blk2;
@@ -397,14 +396,14 @@ PRAGMA_OMP(barrier)
                     &(M(0, M_blk1, 0, 0, 0, M_blk2, 0, 0)),
                     &(output(img, M_blk, 0, 0, 0)), bias_ptr);
         });
-
     }
 }
 
 template <bool is_fwd>
-void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>::_execute_data_W_SGD(
+void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>::_execute_data_W_SGD(const int MB,
         float *inp_ptr, float *out_ptr, float *wei_ptr, float *bias_ptr,
         const memory_tracking::grantor_t &scratchpad) const {
+
     const auto &jcp = kernel_->jcp;
     const auto &p_ops = attr_->post_ops_;
 
@@ -414,9 +413,9 @@ void _jit_avx512_core_fp32_wino_conv_4x3_t<is_fwd>::_execute_data_W_SGD(
     const int outw = is_fwd ? jcp.ow : jcp.iw;
 
     array_offset_calculator<float, 5> input(inp_ptr,
-        jcp.mb, jcp.dimK/jcp.dimK_reg_block, inph, inpw, jcp.dimK_reg_block);
+        MB, jcp.dimK/jcp.dimK_reg_block, inph, inpw, jcp.dimK_reg_block);
     array_offset_calculator<float, 5> output(out_ptr,
-        jcp.mb, jcp.dimM/jcp.dimM_simd_block, outh, outw, jcp.dimM_simd_block);
+        MB, jcp.dimM/jcp.dimM_simd_block, outh, outw, jcp.dimM_simd_block);
     array_offset_calculator<float, 6> weights(wei_ptr,
         jcp.oc/jcp.oc_simd_block, jcp.ic/jcp.ic_simd_block, jcp.kh, jcp.kw,
         jcp.ic_simd_block, jcp.oc_simd_block);

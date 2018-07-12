@@ -74,16 +74,16 @@ struct batch_normalization_pd_t: public primitive_desc_t {
     }
     inline bool is_bwd() const { return !this->is_fwd(); }
 
-    inline int MB() const { return desc_.data_desc.dims[0]; }
-    inline int C() const { return desc_.data_desc.dims[1]; }
-    inline int D() const { return ndims() == 5 ? desc_.data_desc.dims[2] : 1; }
+    inline int MB() const { return input_pd()->desc()->dims[0]; }
+    inline int C() const { return input_pd()->desc()->dims[1]; }
+    inline int D() const { return ndims() == 5 ? input_pd()->desc()->dims[2] : 1; }
     inline int H() const {
         assert(ndims() == 4 || ndims() == 5);
-        return desc_.data_desc.dims[ndims()-2];
+        return input_pd()->desc()->dims[ndims()-2];
     }
     inline int W() const {
         assert(ndims() == 4 || ndims() == 5);
-        return desc_.data_desc.dims[ndims()-1];
+        return input_pd()->desc()->dims[ndims()-1];
     }
 
     bool with_relu_post_op() const {

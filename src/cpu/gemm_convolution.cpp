@@ -52,7 +52,8 @@ void gemm_convolution_fwd_t::execute_forward() const {
 
     auto col = scratchpad().get<data_t>(key_conv_gemm_col);
 
-    const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+    const auto &jcp = this->pd()->jcp_;
+    const int MB = pd()->MB();
 
     const memory_desc_wrapper src_d(pd()->src_pd());
     const memory_desc_wrapper dst_d(pd()->dst_pd());
@@ -164,11 +165,11 @@ void gemm_convolution_fwd_t::execute_forward() const {
         end.ic = jcp.ic;
 
         if (!is_problem_3d) {
-            const int sp_work = jcp.mb * jcp.ngroups * jcp.od * jcp.os;
+            const int sp_work = MB * jcp.ngroups * jcp.od * jcp.os;
             balance2D(nthr, ithr, sp_work, start.sp, end.sp, jcp.oc, start.oc,
                     end.oc, jcp.nthr_oc);
         } else {
-            const int sp_work = jcp.mb * jcp.ngroups * jcp.od;
+            const int sp_work = MB * jcp.ngroups * jcp.od;
             balance2D(nthr, ithr, sp_work, start.sp, end.sp, jcp.oc, start.oc,
                     end.oc, jcp.nthr_oc);
             start.sp *= jcp.os;
@@ -185,7 +186,7 @@ void gemm_convolution_fwd_t::execute_forward() const {
             for (curr.ic = 0; curr.ic < jcp.ic; curr.ic += step.ic)
                 for (int spatial = start.sp; spatial < end.sp;
                         spatial += step.sp) {
-                    nd_iterator_init(spatial, curr.n, jcp.mb, curr.g,
+                    nd_iterator_init(spatial, curr.n, MB, curr.g,
                             jcp.ngroups, curr.od, jcp.od, curr.sp, jcp.os);
                     for (curr.oc = start.oc; curr.oc < end.oc;
                             curr.oc += step.oc) {
@@ -194,7 +195,7 @@ void gemm_convolution_fwd_t::execute_forward() const {
                 }
         else if (jcp.loop_order == gemm_loop_lrb)
             for (int spatial = start.sp; spatial < end.sp; spatial += step.sp) {
-                nd_iterator_init(spatial, curr.n, jcp.mb, curr.g, jcp.ngroups,
+                nd_iterator_init(spatial, curr.n, MB, curr.g, jcp.ngroups,
                         curr.od, jcp.od, curr.sp, jcp.os);
                 for (curr.ic = 0; curr.ic < jcp.ic; curr.ic += step.ic)
                     for (curr.oc = start.oc; curr.oc < end.oc;
@@ -213,7 +214,8 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
 
     auto col = scratchpad().get<data_t>(key_conv_gemm_col);
 
-    const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+    const auto &jcp = this->pd()->jcp_;
+    const int MB = pd()->MB();
 
     const int M = jcp.os * jcp.od;
     const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
@@ -225,7 +227,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
     const int N = jcp.ic * jcp.ks;
     const int LDC = jcp.im2col_sz ? m : M;
 
-    const size_t work_amount = (size_t)jcp.ngroups * jcp.mb;
+    const size_t work_amount = (size_t)jcp.ngroups * MB;
     const bool is_problem_3d = pd()->ndims() == 5;
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
@@ -234,7 +236,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
         int g{0}, n{0};
         size_t start = 0, end = 0;
         balance211(work_amount, nthr, ithr, start, end);
-        nd_iterator_init(start, g, jcp.ngroups, n, jcp.mb);
+        nd_iterator_init(start, g, jcp.ngroups, n, MB);
         for (size_t iwork = start; iwork < end; ++iwork) {
 
             data_t *_diff_src = diff_src + (n * jcp.ngroups + g)*src_step;
@@ -264,7 +266,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
                             _diff_src, od);
                 }
             }
-            nd_iterator_step(g, jcp.ngroups, n, jcp.mb);
+            nd_iterator_step(g, jcp.ngroups, n, MB);
         }
     });
 }

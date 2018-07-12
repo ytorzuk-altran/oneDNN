@@ -66,21 +66,21 @@ struct pooling_fwd_pd_t: public primitive_desc_t {
     }
 
     /* common pooling aux functions */
-    inline bool is_3d() const { return desc_.src_desc.ndims == 5; }
+    inline bool is_3d() const { return input_pd()->desc()->ndims == 5; }
 
-    inline int MB() const { return desc_.src_desc.dims[0]; }
-    inline int C() const { return desc_.src_desc.dims[1]; }
-    inline int ID() const { return is_3d() ? desc_.src_desc.dims[2] : 1; }
+    inline int MB() const { return input_pd()->desc()->dims[0]; }
+    inline int C() const { return input_pd()->desc()->dims[1]; }
+    inline int ID() const { return is_3d() ? input_pd()->desc()->dims[2] : 1; }
     inline int IH() const { return is_3d()
-        ? desc_.src_desc.dims[3] : desc_.src_desc.dims[2]; }
+        ? input_pd()->desc()->dims[3] : input_pd()->desc()->dims[2]; }
     inline int IW() const { return is_3d()
-        ? desc_.src_desc.dims[4] : desc_.src_desc.dims[3]; }
+        ? input_pd()->desc()->dims[4] : input_pd()->desc()->dims[3]; }
     inline int OD() const { return is_3d()
-        ? desc_.dst_desc.dims[2] : 1; }
+        ? output_pd()->desc()->dims[2] : 1; }
     inline int OH() const { return is_3d()
-        ? desc_.dst_desc.dims[3] : desc_.dst_desc.dims[2]; }
+        ? output_pd()->desc()->dims[3] : output_pd()->desc()->dims[2]; }
     inline int OW() const { return is_3d()
-        ? desc_.dst_desc.dims[4] : desc_.dst_desc.dims[3]; }
+        ? output_pd()->desc()->dims[4] : output_pd()->desc()->dims[3]; }
     inline int KD() const { return is_3d() ? desc_.kernel[0] : 1; }
     inline int KH() const
     { return is_3d() ? desc_.kernel[1] : desc_.kernel[0]; }

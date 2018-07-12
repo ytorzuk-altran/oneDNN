@@ -69,21 +69,21 @@ struct inner_product_fwd_pd_t: public primitive_desc_t {
 
     /* common inner_product aux functions */
 
-    inline int MB() const { return desc_.dst_desc.dims[0]; }
-    inline int IC() const { return desc_.src_desc.dims[1]; }
+    inline int MB() const { return input_pd()->desc()->dims[0]; }
+    inline int IC() const { return input_pd()->desc()->dims[1]; }
     inline int IC_total() const
-    { return utils::array_product(&desc_.src_desc.dims[1], ndims() - 1); }
-    inline int OC() const { return desc_.dst_desc.dims[1]; }
+    { return utils::array_product(&input_pd()->desc()->dims[1], ndims() - 1); }
+    inline int OC() const { return output_pd()->desc()->dims[1]; }
 
     inline int ID() const
-    { return ndims() == 5 ? desc_.src_desc.dims[2] : 1; }
+    { return ndims() == 5 ? input_pd()->desc()->dims[2] : 1; }
     inline int IH() const {
         assert(utils::one_of(ndims(), 3, 4, 5));
-        return ndims() == 3 ? 1 : desc_.src_desc.dims[ndims()-2];
+        return ndims() == 3 ? 1 : input_pd()->desc()->dims[ndims()-2];
     }
     inline int IW() const {
         assert(utils::one_of(ndims(), 3, 4, 5));
-        return desc_.src_desc.dims[ndims()-1];
+        return input_pd()->desc()->dims[ndims()-1];
     }
     inline int KD() const
     { return ndims() == 5 ? desc_.weights_desc.dims[2] : 1; }
@@ -96,7 +96,7 @@ struct inner_product_fwd_pd_t: public primitive_desc_t {
         return desc_.weights_desc.dims[ndims()-1];
     }
 
-    inline int ndims() const { return desc_.src_desc.ndims; }
+    inline int ndims() const { return input_pd()->desc()->ndims; }
     inline bool with_bias() const
     { return !memory_desc_wrapper(desc_.bias_desc).is_zero(); }
 

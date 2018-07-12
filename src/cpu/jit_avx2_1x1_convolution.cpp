@@ -49,10 +49,12 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward() const {
     const memory_desc_wrapper dst_d(pd()->dst_pd());
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
-    const auto &jcp = kernel_->jcp;
     auto rtus_space = scratchpad().get<data_t>(key_conv_rtus_space);
 
-    const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
+    const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
+
+    const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
     const int ndims = dst_d.ndims();
 
     const int stride_h = (ndims == 3) ? 1 : pd()->desc()->strides[0];
@@ -83,7 +85,7 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward() const {
         int iwork = start;
         while (iwork < end) {
             int n{0}, g{0}, osb{0};
-            nd_iterator_init(iwork, n, jcp.mb, g, jcp.ngroups, osb,
+            nd_iterator_init(iwork, n, MB, g, jcp.ngroups, osb,
                     jcp.nb_bcast);
 
             int bcast_step = step(jcp.nb_bcast_blocking, jcp.nb_bcast - osb,
@@ -179,8 +181,10 @@ void jit_avx2_1x1_convolution_bwd_data_t::execute_backward_data() const {
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
     const memory_desc_wrapper diff_src_d(pd()->diff_src_pd());
 
-    const auto &jcp = kernel_->jcp;
     auto rtus_space = scratchpad().get<data_t>(key_conv_rtus_space);
+
+    const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
 
     // TODO (Roma): remove this restriction
     assert(jcp.stride_w == 1 && jcp.stride_h == 1);
@@ -196,7 +200,7 @@ void jit_avx2_1x1_convolution_bwd_data_t::execute_backward_data() const {
     const int os_block = jcp.bcast_block;
     const int nb_oc_blocking = jcp.nb_reduce_blocking;
 
-    const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
+    const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
 
     auto step = [](int default_step, int remaining, int tail_step) {
         assert(default_step <= tail_step);
@@ -222,7 +226,7 @@ void jit_avx2_1x1_convolution_bwd_data_t::execute_backward_data() const {
             int bcast_step;
             for (int iwork = start; iwork < end; iwork += bcast_step) {
                 int n{0}, g{0}, osb{0};
-                nd_iterator_init(iwork, n, jcp.mb, g, jcp.ngroups, osb,
+                nd_iterator_init(iwork, n, MB, g, jcp.ngroups, osb,
                         jcp.nb_bcast);
 
                 bcast_step = step(jcp.nb_bcast_blocking, jcp.nb_bcast - osb,

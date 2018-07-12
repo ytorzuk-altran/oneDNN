@@ -101,8 +101,9 @@ void _jit_uni_dw_convolution_fwd_t<isa, src_type, dst_type>::execute_forward()
         return par_conv;
     };
 
+    int MB = pd()->MB();
     const int chb_work = utils::div_up(jcp.nb_ch, jcp.nb_ch_blocking);
-    parallel_nd(jcp.mb, chb_work, jcp.oh,
+    parallel_nd(MB, chb_work, jcp.oh,
             [&](int n, int chb, int oh) {
         int ch = chb * jcp.nb_ch_blocking;
         int ch_num = jcp.nb_ch_blocking;
@@ -208,8 +209,9 @@ void _jit_uni_dw_convolution_bwd_data_t<isa, diff_dst_type,
 
     const int aux_w
             = nstl::min(jcp.iw, jcp.iw - jcp.kw + jcp.r_pad + jcp.stride_w);
+    int MB = pd()->MB();
     const int chb_work = utils::div_up(jcp.nb_ch, jcp.nb_ch_blocking);
-    parallel_nd(jcp.mb, chb_work, jcp.ih,
+    parallel_nd(MB, chb_work, jcp.ih,
         [&](int n, int chb, int ih) {
         int ch = chb * jcp.nb_ch_blocking;
         int ch_num = jcp.nb_ch_blocking;

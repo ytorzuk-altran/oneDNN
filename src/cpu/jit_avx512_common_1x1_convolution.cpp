@@ -49,7 +49,7 @@ execute_forward() const {
 
     auto scratchpad = this->scratchpad();
 
-    const auto &jcp = kernel_->jcp;
+    auto &jcp = kernel_->jcp;
     if (pd()->wants_padded_bias()) {
         auto padded_bias = scratchpad.template get<dst_data_t>(
                 key_conv_padded_bias);
@@ -76,7 +76,6 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
     const memory_desc_wrapper dst_d(pd()->dst_pd());
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
-    const auto &jcp = kernel_->jcp;
     auto rtus_space = scratchpad.get<src_data_t>(key_conv_rtus_space);
 
     const int ndims = src_d.ndims();
@@ -85,7 +84,9 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
     const int pad_t = (ndims == 3) ? 0 : pd()->desc()->padding[0][0];
     const int pad_l = pd()->desc()->padding[0][ndims - 3];
 
-    const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
+    const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
+    const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
 
     auto step = [](int default_step, int remaining, int tail_step) {
         assert(default_step <= tail_step);
@@ -109,7 +110,7 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src,
             int &oh, int &ow, int &ih, int &iw)
     {
         int osb{0};
-        nd_iterator_init(iwork, n, jcp.mb, g, jcp.ngroups, osb,
+        nd_iterator_init(iwork, n, MB, g, jcp.ngroups, osb,
             jcp.nb_bcast);
         bcast_step = step(jcp.nb_bcast_blocking, jcp.nb_bcast - osb,
                 jcp.nb_bcast_blocking_max);
@@ -271,11 +272,12 @@ void jit_avx512_common_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
     const memory_desc_wrapper diff_src_d(pd()->diff_src_pd());
 
-    const auto &jcp = kernel_->jcp;
     auto rtus_space = scratchpad().template get<diff_src_data_t>(
             key_conv_rtus_space);
 
     const int ndims = diff_src_d.ndims();
+    const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
 
     assert(jcp.stride_w == 1 && jcp.stride_h == 1);
 
@@ -289,7 +291,7 @@ void jit_avx512_common_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
     const int os_block = jcp.bcast_block;
     const int nb_oc_blocking = jcp.nb_reduce_blocking;
 
-    const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
+    const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
 
     auto step = [](int default_step, int remaining, int tail_step) {
         assert(default_step <= tail_step);
@@ -331,7 +333,7 @@ void jit_avx512_common_1x1_convolution_bwd_data_t<diff_dst_type, wei_type,
                     iwork += bcast_step)
                 {
                     int n{0}, g{0}, osb{0};
-                    nd_iterator_init(iwork, n, jcp.mb, g, jcp.ngroups, osb,
+                    nd_iterator_init(iwork, n, MB, g, jcp.ngroups, osb,
                             jcp.nb_bcast);
 
                     bcast_step = step(jcp.nb_bcast_blocking, jcp.nb_bcast - osb,

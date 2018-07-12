@@ -285,10 +285,11 @@ void jit_avx512_common_convolution_fwd_t
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
     const auto &jcp = pd()->jcp_;
+    const int MB = pd()->MB();
     assert(jcp.nb_oc % jcp.nb_oc_blocking == 0);
 
     int oc_chunks = jcp.nb_oc / jcp.nb_oc_blocking;
-    int work_amount = jcp.mb * jcp.ngroups * oc_chunks * jcp.oh * jcp.nb_ow;
+    int work_amount = MB * jcp.ngroups * oc_chunks * jcp.oh * jcp.nb_ow;
 
     int nthr;
     if (jcp.aligned_threads)
@@ -314,9 +315,9 @@ void jit_avx512_common_convolution_fwd_t
 
             if (jcp.loop_order == loop_cwgn)
                 nd_iterator_init(start, occ, oc_chunks, owb, jcp.nb_ow,
-                    g, jcp.ngroups, n, jcp.mb, oh_s, jcp.oh);
+                    g, jcp.ngroups, n, MB, oh_s, jcp.oh);
             else if (jcp.loop_order == loop_gncw)
-                nd_iterator_init(start, g, jcp.ngroups, n, jcp.mb,
+                nd_iterator_init(start, g, jcp.ngroups, n, MB,
                     occ, oc_chunks, owb, jcp.nb_ow, oh_s, jcp.oh);
             else
                 assert(!"unsupported loop order");
@@ -376,9 +377,9 @@ void jit_avx512_common_convolution_fwd_t
 
                 if (jcp.loop_order == loop_cwgn)
                     nd_iterator_jump(start, end, occ, oc_chunks, owb, jcp.nb_ow,
-                        g, jcp.ngroups, n, jcp.mb, oh_s, jcp.oh);
+                        g, jcp.ngroups, n, MB, oh_s, jcp.oh);
                 else if (jcp.loop_order == loop_gncw)
-                    nd_iterator_jump(start, end, g, jcp.ngroups, n, jcp.mb, occ,
+                    nd_iterator_jump(start, end, g, jcp.ngroups, n, MB, occ,
                         oc_chunks, owb, jcp.nb_ow, oh_s, jcp.oh);
                 else
                     assert(!"unsupported loop order");
@@ -412,12 +413,13 @@ void jit_avx512_common_convolution_fwd_t
     const memory_desc_wrapper bias_d(pd()->weights_pd(1));
 
     const auto &jcp = pd()->jcp_;
+    const int MB = pd()->MB();
     assert(jcp.nb_oc % jcp.nb_oc_blocking == 0);
 
     parallel(0, [&](const int ithr, const int nthr) {
         int oc_chunks = jcp.nb_oc / jcp.nb_oc_blocking;
         int start{0}, end{0}, start_copy;
-        int work_amount = jcp.mb * jcp.ngroups * oc_chunks * jcp.od * jcp.oh
+        int work_amount = MB * jcp.ngroups * oc_chunks * jcp.od * jcp.oh
             * jcp.nb_ow;
         balance211(work_amount, nthr, ithr, start, end);
         start_copy = start;
@@ -437,11 +439,11 @@ void jit_avx512_common_convolution_fwd_t
 
             if (jcp.loop_order == loop_cwgn)
                 nd_iterator_init(start,
-                    occ, oc_chunks, owb, jcp.nb_ow, g, jcp.ngroups, n, jcp.mb,
+                    occ, oc_chunks, owb, jcp.nb_ow, g, jcp.ngroups, n, MB,
                     od_s, jcp.od, oh_s, jcp.oh);
             else if (jcp.loop_order == loop_gncw)
                 nd_iterator_init(start,
-                    g, jcp.ngroups, n, jcp.mb, occ, oc_chunks, owb, jcp.nb_ow,
+                    g, jcp.ngroups, n, MB, occ, oc_chunks, owb, jcp.nb_ow,
                     od_s, jcp.od, oh_s, jcp.oh);
             else
                 assert(!"unsupported loop order");
@@ -505,11 +507,11 @@ void jit_avx512_common_convolution_fwd_t
 
                 if (jcp.loop_order == loop_cwgn)
                     nd_iterator_jump(start, end,
-                      occ, oc_chunks, owb, jcp.nb_ow, g, jcp.ngroups, n, jcp.mb,
+                      occ, oc_chunks, owb, jcp.nb_ow, g, jcp.ngroups, n, MB,
                       od_s, jcp.od, oh_s, jcp.oh);
                 else if (jcp.loop_order == loop_gncw)
                     nd_iterator_jump(start, end,
-                      g, jcp.ngroups, n, jcp.mb, occ, oc_chunks, owb, jcp.nb_ow,
+                      g, jcp.ngroups, n, MB, occ, oc_chunks, owb, jcp.nb_ow,
                       od_s, jcp.od, oh_s, jcp.oh);
                 else
                     assert(!"unsupported loop order");
@@ -625,11 +627,12 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
     const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
 
     parallel(0, [&](const int ithr, const int nthr) {
         int start{0}, end{0}, start_copy;
         int ic_chunks = jcp.nb_ic / jcp.nb_ic_blocking;
-        int work_amount = jcp.ngroups * jcp.mb * ic_chunks * jcp.ih;
+        int work_amount = jcp.ngroups * MB * ic_chunks * jcp.ih;
         balance211(work_amount, nthr, ithr, start, end);
         start_copy = start;
 
@@ -647,10 +650,10 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
             int n{0}, g{0}, icc{0}, ih_s{0};
             if (jcp.loop_order == loop_cgn)
                 nd_iterator_init(start,
-                    icc, ic_chunks, g, jcp.ngroups, n, jcp.mb, ih_s, jcp.ih);
+                    icc, ic_chunks, g, jcp.ngroups, n, MB, ih_s, jcp.ih);
             else if (jcp.loop_order == loop_gnc)
                 nd_iterator_init(start,
-                    g, jcp.ngroups, n, jcp.mb, icc, ic_chunks, ih_s, jcp.ih);
+                    g, jcp.ngroups, n, MB, icc, ic_chunks, ih_s, jcp.ih);
             else
                 assert(!"unsupported loop order");
 
@@ -721,10 +724,10 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
 
                 if (jcp.loop_order == loop_cgn)
                     nd_iterator_jump(start, end,
-                      icc, ic_chunks, g, jcp.ngroups, n, jcp.mb, ih_s, jcp.ih);
+                      icc, ic_chunks, g, jcp.ngroups, n, MB, ih_s, jcp.ih);
                 else if (jcp.loop_order == loop_gnc)
                     nd_iterator_jump(start, end,
-                      g, jcp.ngroups, n, jcp.mb, icc, ic_chunks, ih_s, jcp.ih);
+                      g, jcp.ngroups, n, MB, icc, ic_chunks, ih_s, jcp.ih);
                 else
                     assert(!"unsupported loop order");
             }
@@ -753,11 +756,12 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
     const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
 
     parallel(0, [&](const int ithr, const int nthr) {
         int start{0}, end{0}, start_copy;
         int ic_chunks = jcp.nb_ic / jcp.nb_ic_blocking;
-        int work_amount = jcp.ngroups * jcp.mb * ic_chunks * jcp.id * jcp.ih;
+        int work_amount = jcp.ngroups * MB * ic_chunks * jcp.id * jcp.ih;
         balance211(work_amount, nthr, ithr, start, end);
         start_copy = start;
 
@@ -779,11 +783,11 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
             int n{0}, g{0}, icc{0}, ih_s{0}, id_s{0};
             if (jcp.loop_order == loop_cgn)
                 nd_iterator_init(start,
-                    icc, ic_chunks, g, jcp.ngroups, n, jcp.mb, id_s, jcp.id,
+                    icc, ic_chunks, g, jcp.ngroups, n, MB, id_s, jcp.id,
                     ih_s, jcp.ih);
             else if (jcp.loop_order == loop_gnc)
                 nd_iterator_init(start,
-                    g, jcp.ngroups, n, jcp.mb, icc, ic_chunks, id_s, jcp.id,
+                    g, jcp.ngroups, n, MB, icc, ic_chunks, id_s, jcp.id,
                     ih_s, jcp.ih);
             else
                 assert(!"unsupported loop order");
@@ -895,11 +899,11 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
 
                 if (jcp.loop_order == loop_cgn)
                     nd_iterator_jump(start, end,
-                      icc, ic_chunks, g, jcp.ngroups, n, jcp.mb, id_s, jcp.id,
+                      icc, ic_chunks, g, jcp.ngroups, n, MB, id_s, jcp.id,
                       ih_s, jcp.ih);
                 else if (jcp.loop_order == loop_gnc)
                     nd_iterator_jump(start, end,
-                      g, jcp.ngroups, n, jcp.mb, icc, ic_chunks, id_s, jcp.id,
+                      g, jcp.ngroups, n, MB, icc, ic_chunks, id_s, jcp.id,
                       ih_s, jcp.ih);
                 else
                     assert(!"unsupported loop order");

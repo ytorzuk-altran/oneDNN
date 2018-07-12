@@ -59,9 +59,10 @@ void jit_avx2_convolution_fwd_t::execute_forward() const {
     const memory_desc_wrapper bias_d(pd()->weights_pd(1));
 
     const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
 
     int ocb_work = div_up(jcp.nb_oc, jcp.nb_oc_blocking);
-    const size_t work_amount = jcp.mb * jcp.ngroups * ocb_work * jcp.od
+    const size_t work_amount = MB * jcp.ngroups * ocb_work * jcp.od
         * jcp.oh;
 
     auto ker = [&](const int ithr, const int nthr) {
@@ -76,7 +77,7 @@ void jit_avx2_convolution_fwd_t::execute_forward() const {
                 icb_step = icb_step_rem;
 
             size_t n{0}, g{0}, ocbb{0}, oh{0}, od{0};
-            nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups, ocbb, ocb_work,
+            nd_iterator_init(start, n, MB, g, jcp.ngroups, ocbb, ocb_work,
                              od, jcp.od, oh, jcp.oh);
             for (size_t iwork = start; iwork < end; ++iwork) {
                 int ocb = ocbb * jcp.nb_oc_blocking;
@@ -142,7 +143,7 @@ void jit_avx2_convolution_fwd_t::execute_forward() const {
 
                     kernel_->jit_ker(&par_conv);
                 }
-                nd_iterator_step(n, jcp.mb, g, jcp.ngroups, ocbb, ocb_work,
+                nd_iterator_step(n, MB, g, jcp.ngroups, ocbb, ocb_work,
                                 od, jcp.od, oh, jcp.oh);
             }
             icbb += icb_step;
@@ -173,11 +174,12 @@ void jit_avx2_convolution_bwd_data_t::execute_backward_data() const {
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
 
     const auto &jcp = kernel_->jcp;
+    const int MB = pd()->MB();
 
     int icb_work = jcp.nb_ic / jcp.nb_ic_blocking;
     int ih_block_size = jcp.ih;
     int num_ih_blocks = utils::div_up(jcp.ih, ih_block_size);
-    size_t work_amount = jcp.mb * jcp.ngroups * icb_work * num_ih_blocks;
+    size_t work_amount = MB * jcp.ngroups * icb_work * num_ih_blocks;
     if (work_amount < (size_t)2 * mkldnn_get_max_threads()) {
         ih_block_size = 1;
         num_ih_blocks = utils::div_up(jcp.ih, ih_block_size);
@@ -189,8 +191,9 @@ void jit_avx2_convolution_bwd_data_t::execute_backward_data() const {
         balance211(work_amount, nthr, ithr, start, end);
 
         size_t n{0}, g{0}, icbb{0}, ihb{0};
-        nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups, icbb, icb_work,
+        nd_iterator_init(start, n, MB, g, jcp.ngroups, icbb, icb_work,
                          ihb, num_ih_blocks);
+
         for (size_t iwork = start; iwork < end; ++iwork) {
             for (int oc = 0; oc < jcp.nb_oc; oc += jcp.nb_oc_blocking)
             for (int id = 0; id < jcp.id; ++id) {
@@ -242,7 +245,7 @@ void jit_avx2_convolution_bwd_data_t::execute_backward_data() const {
                     kernel_->jit_ker(&par_conv);
                 }
             }
-            nd_iterator_step(n, jcp.mb, g, jcp.ngroups, icbb, icb_work, ihb,
+            nd_iterator_step(n, MB, g, jcp.ngroups, icbb, icb_work, ihb,
                              num_ih_blocks);
         }
     };

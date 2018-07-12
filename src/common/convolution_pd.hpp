@@ -86,23 +86,19 @@ struct convolution_fwd_pd_t: public primitive_desc_t {
 
     /* common conv aux functions */
 
-    inline int MB() const { return desc_.src_desc.dims[0]; }
+    inline int MB() const { return input_pd()->desc()->dims[0]; }
 
-    inline int IC() const { return desc_.src_desc.dims[1]; }
-    inline int OC() const { return desc_.dst_desc.dims[1]; }
+    inline int IC() const { return input_pd()->desc()->dims[1]; }
+    inline int OC() const { return output_pd()->desc()->dims[1]; }
     inline int G() const
     { return with_groups() ? desc_.weights_desc.dims[0] : 1; }
 
-    inline int ID() const { return (ndims() == 5)
-        ? desc_.src_desc.dims[2] : 1; }
-    inline int IH() const { return (ndims() == 3)
-        ? 1 : desc_.src_desc.dims[ndims()-2]; }
-    inline int IW() const { return desc_.src_desc.dims[ndims()-1]; }
-    inline int OD() const { return (ndims() == 5)
-        ? desc_.dst_desc.dims[2] : 1; }
-    inline int OH() const { return (ndims() == 3)
-        ? 1 : desc_.dst_desc.dims[ndims()-2]; }
-    inline int OW() const { return desc_.dst_desc.dims[ndims()-1]; }
+    inline int ID() const { return (ndims() == 5) ? input_pd()->desc()->dims[2] : 1; }
+    inline int IH() const { return (ndims() == 3) ? 1 : input_pd()->desc()->dims[ndims()-2]; }
+    inline int IW() const { return input_pd()->desc()->dims[ndims()-1]; }
+    inline int OD() const { return (ndims() == 5) ? output_pd()->desc()->dims[2] : 1; }
+    inline int OH() const { return (ndims() == 3) ? 1 : output_pd()->desc()->dims[ndims()-2]; }
+    inline int OW() const { return output_pd()->desc()->dims[ndims()-1]; }
     inline int KD() const { return (ndims() == 5)
         ? desc_.weights_desc.dims[2 + with_groups()] : 1; }
     inline int KH() const
@@ -202,23 +198,18 @@ struct convolution_bwd_data_pd_t: public primitive_desc_t {
 
     /* common conv aux functions */
 
-    inline int MB() const { return desc_.diff_src_desc.dims[0]; }
-
-    inline int IC() const { return desc_.diff_src_desc.dims[1]; }
-    inline int OC() const { return desc_.diff_dst_desc.dims[1]; }
+    inline int MB() const { return output_pd()->desc()->dims[0]; }
+    inline int IC() const { return output_pd()->desc()->dims[1]; }
+    inline int OC() const { return input_pd()->desc()->dims[1]; }
     inline int G() const
     { return with_groups() ? desc_.weights_desc.dims[0] : 1; }
 
-    inline int ID() const { return (ndims() == 5)
-        ? desc_.diff_src_desc.dims[2] : 1; }
-    inline int IH() const { return (ndims() == 3)
-        ? 1 : desc_.diff_src_desc.dims[ndims()-2]; }
-    inline int IW() const { return desc_.diff_src_desc.dims[ndims()-1]; }
-    inline int OD() const { return (ndims() == 5)
-        ? desc_.diff_dst_desc.dims[2] : 1; }
-    inline int OH() const { return (ndims() == 3)
-        ? 1 : desc_.diff_dst_desc.dims[ndims()-2]; }
-    inline int OW() const { return desc_.diff_dst_desc.dims[ndims()-1]; }
+    inline int ID() const { return (ndims() == 5) ? output_pd()->desc()->dims[2] : 1; }
+    inline int IH() const { return (ndims() == 3) ? 1 : output_pd()->desc()->dims[ndims()-2]; }
+    inline int IW() const { return output_pd()->desc()->dims[ndims()-1]; }
+    inline int OD() const { return (ndims() == 5) ? input_pd()->desc()->dims[2] : 1; }
+    inline int OH() const { return (ndims() == 3) ? 1 : input_pd()->desc()->dims[ndims()-2]; }
+    inline int OW() const { return input_pd()->desc()->dims[ndims()-1]; }
     inline int KD() const { return (ndims() == 5)
         ? desc_.weights_desc.dims[2 + with_groups()] : 1; }
     inline int KH() const

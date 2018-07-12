@@ -44,6 +44,8 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense() const {
     const size_t ou_stride = axis > 0
         ? data_d.blocking_desc().strides[0][axis - 1] : 1u;
 
+    int outer_size_ = utils::array_product(pd()->src_pd()->desc()->dims, pd()->desc()->softmax_axis);
+
     parallel_nd(outer_size_, [&](int ou) {
         const data_t *src_data = src + ou * ou_stride;
         data_t *dst_data = dst + ou * ou_stride;
@@ -72,6 +74,8 @@ void ref_softmax_fwd_t<data_type>::execute_forward_generic() const {
 
     const memory_desc_wrapper data_d(pd()->src_pd());
     const size_t dim = channels_ * inner_size_;
+
+    int outer_size_ = utils::array_product(pd()->src_pd()->desc()->dims, pd()->desc()->softmax_axis);
 
     for (int ou = 0; ou < outer_size_; ou++) {
         utils::array_set(space_max, -FLT_MAX, inner_size_);

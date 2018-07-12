@@ -72,13 +72,13 @@ struct depthwise_fwd_pd_t: public primitive_desc_t {
 
     /* common depthwise aux functions */
 
-    inline int MB() const { return desc_.src_desc.ndims > 0 ? desc_.src_desc.dims[0] : 1; }
-    inline int C()  const { return desc_.src_desc.ndims > 1 ? desc_.src_desc.dims[1] : 1; }
-    inline int D()  const { return desc_.src_desc.ndims > 4 ? desc_.src_desc.dims[2] : 1; }
-    inline int H()  const { return desc_.src_desc.ndims > 4 ? desc_.src_desc.dims[3] :
-            desc_.src_desc.ndims > 2 ? desc_.src_desc.dims[2] : 1; }
-    inline int W()  const { return desc_.src_desc.ndims > 4 ? desc_.src_desc.dims[4] :
-            desc_.src_desc.ndims > 3 ? desc_.src_desc.dims[3] : 1; }
+    inline int MB() const { return input_pd()->desc()->ndims > 0 ? input_pd()->desc()->dims[0] : 1; }
+    inline int C()  const { return input_pd()->desc()->ndims > 1 ? input_pd()->desc()->dims[1] : 1; }
+    inline int D()  const { return input_pd()->desc()->ndims > 4 ? input_pd()->desc()->dims[2] : 1; }
+    inline int H()  const { return input_pd()->desc()->ndims > 4 ? input_pd()->desc()->dims[3] :
+            input_pd()->desc()->ndims > 2 ? input_pd()->desc()->dims[2] : 1; }
+    inline int W()  const { return input_pd()->desc()->ndims > 4 ? input_pd()->desc()->dims[4] :
+            input_pd()->desc()->ndims > 3 ? input_pd()->desc()->dims[3] : 1; }
 
 protected:
     depthwise_desc_t desc_;

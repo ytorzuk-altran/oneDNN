@@ -900,8 +900,8 @@ void diff_weights_transform_bwd_weights(jit_conv_winograd_conf_t conv,
 
 template <bool is_fwd>
 void _jit_avx512_common_convolution_winograd_t<is_fwd>::_execute_data_W_S_G_D(
-        float *inp_ptr, float *out_ptr, float *wei_ptr, float *bias_ptr,
-        const memory_tracking::grantor_t &scratchpad) const {
+        const int MB, float *inp_ptr, float *out_ptr, float *wei_ptr, float *bias_ptr,
+        const memory_tracking::grantor_t &scratchpad) const{
     const auto &jcp = kernel_->jcp;
     const auto &p_ops = attr_->post_ops_;
 
@@ -935,10 +935,10 @@ void _jit_avx512_common_convolution_winograd_t<is_fwd>::_execute_data_W_S_G_D(
        FWD/BWD: V: src/diff_dst transform, U:weight transform,
                 M:dst/diff_src transform  */
     array_offset_calculator<float, 5> input(inp_ptr,
-            jcp.mb, jcp.dimK/jcp.dimK_reg_block, inph, inpw,
+            MB, jcp.dimK/jcp.dimK_reg_block, inph, inpw,
             jcp.dimK_reg_block);
     array_offset_calculator<float, 5> output(out_ptr,
-            jcp.mb, jcp.dimM/jcp.dimM_simd_block, outh, outw,
+            MB, jcp.dimM/jcp.dimM_simd_block, outh, outw,
             jcp.dimM_simd_block);
     array_offset_calculator<float, 6> weights(wei_ptr,
             jcp.oc/jcp.oc_simd_block, jcp.ic/jcp.ic_simd_block, jcp.kh, jcp.kw,
@@ -982,7 +982,7 @@ void _jit_avx512_common_convolution_winograd_t<is_fwd>::_execute_data_W_S_G_D(
 
 PRAGMA_OMP(parallel)
     {
-        parallel_nd_in_omp(jcp.mb, jcp.dimK_nb_block, jcp.dimK_block,
+        parallel_nd_in_omp(MB, jcp.dimK_nb_block, jcp.dimK_block,
             [&](int img, int K_blk1, int K_blk2) {
             input_transform_data<is_fwd>(img, jcp,
                 &(input(img, K_blk1 * jcp.dimK_block + K_blk2, 0, 0, 0)),
@@ -1027,7 +1027,7 @@ PRAGMA_OMP(barrier)
 
 PRAGMA_OMP(barrier)
 
-        parallel_nd_in_omp(jcp.mb, jcp.dimM_nb_block, jcp.dimM_block,
+        parallel_nd_in_omp(MB, jcp.dimM_nb_block, jcp.dimM_block,
                     [&](int img, int M_blk1, int M_blk2) {
 
             const int M_blk = M_blk1 * jcp.dimM_block + M_blk2;
@@ -1042,7 +1042,6 @@ PRAGMA_OMP(barrier)
                     bias_ptr, output_is_aligned);
 
        });
-
     }
 }
 

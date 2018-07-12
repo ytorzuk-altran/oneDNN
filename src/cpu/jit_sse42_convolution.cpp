@@ -54,9 +54,10 @@ void jit_sse42_convolution_fwd_t::execute_forward() const {
     const memory_desc_wrapper bias_d(pd()->weights_pd(1));
 
     const auto &jcp = kernel_->jcp;
+    int MB = pd()->MB();
 
     int ocb_work = div_up(jcp.nb_oc, jcp.nb_oc_blocking);
-    const size_t work_amount = jcp.mb * jcp.ngroups * ocb_work * jcp.oh;
+    const size_t work_amount = MB * jcp.ngroups * ocb_work * jcp.oh;
 
     parallel(0, [&](const int ithr, const int nthr) {
         size_t start{ 0 }, end{ 0 };
@@ -120,7 +121,7 @@ void jit_sse42_convolution_fwd_t::execute_forward() const {
                     par_conv.kh_padding = nstl::max(0, kh_padding);
                     kernel_->jit_ker(&par_conv);
                 }
-                nd_iterator_step(n, jcp.mb, g, jcp.ngroups, ocbb, ocb_work,
+                nd_iterator_step(n, MB, g, jcp.ngroups, ocbb, ocb_work,
                                  oh, jcp.oh);
             }
             icbb += icb_step;
