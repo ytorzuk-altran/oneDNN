@@ -168,9 +168,16 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
     }
 
     for (int ii = 0; ii < oc_blocks; ii++)
-        for (int jj = 0; jj < ur_w; jj++)
+        for (int jj = 0; jj < ur_w; jj++) {
+            int o_off;
+            if (jcp.with_dw_conv)
+                o_off = (ii * jcp.dw_conv_ker_h * ow + jj) * oc_blk;
+            else
+                o_off = (ii * oh * ow + jj) * oc_blk;
+
             movups(Xmm(ur_w * ii + jj + 1), xword[reg_output
-                   + sizeof(float) * (ii * oh * ow + jj) * oc_blk]);
+                + sizeof(float) * o_off]);
+        }
 
     if (jcp.with_sum && jcp.with_bias) {
         test(reg_ci_flag, FLAG_IC_FIRST);
@@ -237,7 +244,11 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     for (int ii = 0; ii < oc_blocks; ii++) {
         for (int jj = 0; jj < ur_w; jj++) {
-            const size_t o_off = (ii * oh * ow + jj) * oc_blk;
+            int o_off;
+            if (jcp.with_dw_conv)
+                o_off = (ii * jcp.dw_conv_ker_h * ow + jj) * oc_blk;
+            else
+                o_off = (ii * oh * ow + jj) * oc_blk;
 
             Xmm reg_out = Xmm(ur_w * ii + jj + 1);
             movups(xword[reg_output + sizeof(float) * o_off], reg_out);
@@ -354,17 +365,21 @@ bool jit_sse42_conv_fwd_kernel_f32::post_ops_ok(
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
+    auto is_dw_conv = [&](int idx) { return p.entry_[idx].is_dw_conv(); };
 
     switch (p.len_) {
-    case 0: return true; // no post_ops
-    case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
-    case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+    case 0: return true;
+    case 1: return is_eltwise(0) || is_sum(0) || is_dw_conv(0);
+    case 2: return (is_sum(0) && is_eltwise(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
+                   (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1));
+    case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
+                   (is_dw_conv(0) && is_sum(1) && is_eltwise(2));
+    case 4: return is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3);
     default: return false;
     }
 
     return false;
 }
-
 
 status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
         const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
@@ -425,11 +440,45 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
         return status::unimplemented;
 
     const auto &p = attr.post_ops_;
-    jcp.with_sum = p.find(primitive_kind::sum) != -1;
-    const int eltwise_ind = p.find(primitive_kind::eltwise);
+
+    jcp.with_dw_conv = false;
+    int dw_conv_ind = p.find(primitive_kind::convolution);
+    if (dw_conv_ind != -1) {
+        jcp.with_dw_conv = true;
+        jcp.dw_conv_in_h = p.entry_[dw_conv_ind].dw_conv.in_h;
+        jcp.dw_conv_in_w = p.entry_[dw_conv_ind].dw_conv.in_w;
+        jcp.dw_conv_ker_h = p.entry_[dw_conv_ind].dw_conv.ker_h;
+        jcp.dw_conv_ker_w = p.entry_[dw_conv_ind].dw_conv.ker_w;
+        jcp.dw_conv_str_h = p.entry_[dw_conv_ind].dw_conv.str_h;
+        jcp.dw_conv_str_w = p.entry_[dw_conv_ind].dw_conv.str_w;
+        jcp.dw_conv_weights = p.entry_[dw_conv_ind].dw_conv.weights_data;
+        jcp.dw_conv_biases = p.entry_[dw_conv_ind].dw_conv.biases_data;
+    }
+
+    const int eltwise_ind = p.find(primitive_kind::eltwise, 0, dw_conv_ind);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise)
         jcp.eltwise = p.entry_[eltwise_ind].eltwise;
+
+    if (jcp.with_dw_conv) {
+        int dw_conv_eltwise_ind = p.find(primitive_kind::eltwise, dw_conv_ind);
+        if (dw_conv_eltwise_ind != -1) {
+            jcp.dw_conv_with_eltwise = true;
+            jcp.dw_conv_eltwise_alg = p.entry_[dw_conv_eltwise_ind].eltwise.alg;
+            jcp.dw_conv_eltwise_alpha = p.entry_[dw_conv_eltwise_ind].eltwise.alpha;
+            jcp.dw_conv_eltwise_beta = p.entry_[dw_conv_eltwise_ind].eltwise.beta;
+        }
+    }
+
+    jcp.with_sum = p.find(primitive_kind::sum, 0, dw_conv_ind) != -1;
+    if (jcp.with_dw_conv) {
+        jcp.dw_conv_with_sum = p.find(primitive_kind::sum, dw_conv_ind) != -1;
+    }
+
+    if (jcp.with_dw_conv) {
+        jcp.oh = jcp.dw_conv_in_h;
+        jcp.ow = jcp.dw_conv_in_w;
+    }
 
     const bool flat = jcp.ic == 3 || jcp.ic == 1;
     const bool mimo = !flat;
@@ -510,9 +559,18 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
 }
 
 void jit_sse42_conv_fwd_kernel_f32::init_scratchpad(
-        memory_tracking::registrar_t &scratchpad, const jit_conv_conf_t &jcp) {
+        memory_tracking::registrar_t &scratchpad, const jit_conv_conf_t &jcp, const jit_conv_conf_t &jcp_dw) {
     if (jcp.with_bias && jcp.oc != jcp.oc_without_padding)
         scratchpad.book(key_conv_padded_bias, sizeof(float) * jcp.oc);
+
+    if (jcp.with_dw_conv) {
+        const int nthreads = mkldnn_get_max_threads();
+        size_t dw_conv_buffer_size_ = (size_t)jcp_dw.kh * jcp_dw.iw * jcp_dw.ch_block * jcp.nb_oc_blocking;
+        scratchpad.book(key_dw_conv_buffer, sizeof(float) * dw_conv_buffer_size_ * nthreads);
+
+        if (jcp.oc != jcp.oc_without_padding)
+            scratchpad.book(key_dw_conv_padded_bias, sizeof(float) * jcp.oc);
+    }
 }
 
 }

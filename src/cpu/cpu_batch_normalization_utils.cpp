@@ -18,7 +18,6 @@
 #include "utils.hpp"
 
 #include "jit_generator.hpp"
-
 #include "cpu_batch_normalization_utils.hpp"
 
 namespace mkldnn {

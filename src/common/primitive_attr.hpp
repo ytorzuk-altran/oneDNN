@@ -17,6 +17,7 @@
 #ifndef PRIMITIVE_ATTR_HPP
 #define PRIMITIVE_ATTR_HPP
 
+#include <mkldnn.hpp>
 #include "mkldnn.h"
 
 #include "c_types_map.hpp"
@@ -100,6 +101,16 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
         union {
             struct { float scale; } sum;
             eltwise_t eltwise;
+            struct {
+                int in_h;
+                int in_w;
+                int ker_h;
+                int ker_w;
+                int str_h;
+                int str_w;
+                const float* weights_data;
+                const float* biases_data;
+            } dw_conv;
         };
 
         bool is_eltwise(bool require_scale_one = true) const {
@@ -121,6 +132,11 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
             return kind == primitive_kind::sum
                 && IMPLICATION(require_scale_one, sum.scale == 1.f);
         }
+
+        bool is_dw_conv() const {
+            using namespace mkldnn::impl;
+            return kind == primitive_kind::convolution;
+        }
     };
 
     mkldnn_post_ops(): len_(0) {}
@@ -128,6 +144,9 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
     mkldnn::impl::status_t append_sum(float scale);
     mkldnn::impl::status_t append_eltwise(float scale,
             mkldnn::impl::alg_kind_t alg, float alpha, float beta);
+    mkldnn::impl::status_t append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+                                          const float* weights_data,
+                                          const float* biases_data);
 
     int find(mkldnn::impl::primitive_kind_t kind, int start = 0,
             int stop = -1) const {

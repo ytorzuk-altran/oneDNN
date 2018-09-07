@@ -59,7 +59,7 @@ struct jit_avx2_1x1_conv_kernel_f32: public jit_generator {
             const primitive_attr_t &attr);
 
     static void init_scratchpad(memory_tracking::registrar_t &scratchpad,
-            const jit_1x1_conv_conf_t &jcp);
+            const jit_1x1_conv_conf_t &jcp, const jit_conv_conf_t &jcp_dw = jit_conv_conf_t());
 
     jit_1x1_conv_conf_t jcp;
     const primitive_attr_t &attr_;

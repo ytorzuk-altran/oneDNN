@@ -455,6 +455,25 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_eltwise(
 
 /** @} */
 
+/** Appends DW convolution post operation to the @p post_ops with given parameters
+ * @p weights and @p bias.
+ *
+ * The kind of this post operation is #mkldnn_convolution.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_dw_conv(
+        mkldnn_post_ops_t post_ops, int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+        const float* weights_data, const float* biases_data);
+
+/** Gets the DW convolution parameters of the post operation with index @p index in
+ * the sequence of @p post_ops.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_dw_conv(
+        const_mkldnn_post_ops_t post_ops, int index, int* in_h, int* in_w,
+        int* ker_h, int* ker_w, int* str_h, int* str_w, const float** weights_data,
+        const float** biases_data);
+
+/** @} */
+
 /** @} */
 
 /** @addtogroup c_api_memory Memory
@@ -1799,6 +1818,12 @@ mkldnn_status_t MKLDNN_API mkldnn_set_jit_dump(int dump);
  *  - patch -- patch release number
  *  - hash -- git commit hash */
 const mkldnn_version_t MKLDNN_API *mkldnn_version();
+
+/** Returns cache size for specified level in bytes.
+ * @note
+ *     Currently, if it is not able to fetch the cache topology
+ *     function defaults to 32KB of L1, 512KB of L2 and 1MB of L3 per core. */
+unsigned int MKLDNN_API mkldnn_get_cache_size(int level, int per_core);
 
 /** @} */
 

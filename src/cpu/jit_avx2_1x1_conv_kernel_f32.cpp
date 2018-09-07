@@ -142,8 +142,13 @@ void jit_avx2_1x1_conv_kernel_f32::generate_reduce_loop(
                 + (i ? reg_output_stride * i : 0) // TODO: Xbyak should allow 0 scale
                 + sizeof(float) * jcp.oc_block * j];
         default:
-            return ptr[aux_reg_output_data +
-                (i * jcp.os + j) * jcp.oc_block * sizeof(float)];
+            if (jcp.with_dw_conv) {
+                return ptr[aux_reg_output_data +
+                           (i * jcp.dw_conv_ker_h * jcp.ow + j) * jcp.oc_block * sizeof(float)];
+            } else {
+                return ptr[aux_reg_output_data +
+                           (i * jcp.os + j) * jcp.oc_block * sizeof(float)];
+            }
         }
     };
 
@@ -342,7 +347,11 @@ void jit_avx2_1x1_conv_kernel_f32::generate()
         case forward_training:
         case forward_inference:
             add(reg_bias_data, load_loop_blk * jcp.oc_block * sizeof(float));
-            add(reg_output_data,
+            if (jcp.with_dw_conv)
+                add(reg_output_data,
+                    load_loop_blk * jcp.ow * jcp.oc_block * sizeof(float));
+            else
+                add(reg_output_data,
                     load_loop_blk * jcp.os * jcp.oc_block * sizeof(float));
             break;
         case backward_data:
@@ -416,11 +425,16 @@ bool jit_avx2_1x1_conv_kernel_f32::post_ops_ok(
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
+    auto is_dw_conv = [&](int idx) { return p.entry_[idx].is_dw_conv(); };
 
     switch (p.len_) {
-    case 0: return true; // no post_ops
-    case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
-    case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+    case 0: return true;
+    case 1: return is_eltwise(0) || is_sum(0) || is_dw_conv(0);
+    case 2: return (is_sum(0) && is_eltwise(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
+                   (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1));
+    case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
+                   (is_dw_conv(0) && is_sum(1) && is_eltwise(2));
+    case 4: return is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3);
     default: return false;
     }
 
@@ -465,21 +479,58 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.src_fmt = src_d.format();
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
 
-    jcp.os = jcp.oh * jcp.ow;
-    jcp.is = jcp.ih * jcp.iw;
-
     if (!post_ops_ok(jcp, attr))
         return status::unimplemented;
 
     const auto &p = attr.post_ops_;
-    jcp.with_sum = p.find(primitive_kind::sum) != -1;
-    const int eltwise_ind = p.find(primitive_kind::eltwise);
+
+    jcp.with_dw_conv = false;
+    int dw_conv_ind = p.find(primitive_kind::convolution);
+    if (dw_conv_ind != -1) {
+        jcp.with_dw_conv = true;
+        jcp.dw_conv_in_h = p.entry_[dw_conv_ind].dw_conv.in_h;
+        jcp.dw_conv_in_w = p.entry_[dw_conv_ind].dw_conv.in_w;
+        jcp.dw_conv_ker_h = p.entry_[dw_conv_ind].dw_conv.ker_h;
+        jcp.dw_conv_ker_w = p.entry_[dw_conv_ind].dw_conv.ker_w;
+        jcp.dw_conv_str_h = p.entry_[dw_conv_ind].dw_conv.str_h;
+        jcp.dw_conv_str_w = p.entry_[dw_conv_ind].dw_conv.str_w;
+        jcp.dw_conv_weights = p.entry_[dw_conv_ind].dw_conv.weights_data;
+        jcp.dw_conv_biases = p.entry_[dw_conv_ind].dw_conv.biases_data;
+    }
+
+    if (jcp.with_dw_conv && !mayiuse(avx2))
+        return status::unimplemented;
+
+    const int eltwise_ind = p.find(primitive_kind::eltwise, 0, dw_conv_ind);
     jcp.with_eltwise = eltwise_ind != -1;
     if (jcp.with_eltwise) {
         jcp.eltwise = p.entry_[eltwise_ind].eltwise;
         if (!mayiuse(avx2) && jcp.eltwise.alg != alg_kind::eltwise_relu)
             return status::unimplemented;
     }
+
+    if (jcp.with_dw_conv) {
+        int dw_conv_eltwise_ind = p.find(primitive_kind::eltwise, dw_conv_ind);
+        if (dw_conv_eltwise_ind != -1) {
+            jcp.dw_conv_with_eltwise = true;
+            jcp.dw_conv_eltwise_alg = p.entry_[dw_conv_eltwise_ind].eltwise.alg;
+            jcp.dw_conv_eltwise_alpha = p.entry_[dw_conv_eltwise_ind].eltwise.alpha;
+            jcp.dw_conv_eltwise_beta = p.entry_[dw_conv_eltwise_ind].eltwise.beta;
+        }
+    }
+
+    jcp.with_sum = p.find(primitive_kind::sum, 0, dw_conv_ind) != -1;
+    if (jcp.with_dw_conv) {
+        jcp.dw_conv_with_sum = p.find(primitive_kind::sum, dw_conv_ind) != -1;
+    }
+
+    if (jcp.with_dw_conv) {
+        jcp.oh = jcp.dw_conv_in_h;
+        jcp.ow = jcp.dw_conv_in_w;
+    }
+
+    jcp.os = jcp.oh * jcp.ow;
+    jcp.is = jcp.ih * jcp.iw;
 
     const int is_bwd_d = jcp.prop_kind == backward_data;
     memory_format_t weights_format = with_groups
@@ -531,7 +582,7 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.load_dim = jcp.oc;
         jcp.load_block = jcp.oc_block;
 
-        jcp.bcast_dim = jcp.is;
+        jcp.bcast_dim = jcp.with_dw_conv ? jcp.iw : jcp.is;
         jcp.bcast_block = jcp.ur;
 
         jcp.reduce_loop_unroll = jcp.reduce_block;
@@ -548,8 +599,8 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.load_loop_load_step = jcp.ic * jcp.oc_block * sizeof(float);
         jcp.load_loop_iter_step = jcp.oc_block;
 
-        load_blocking = 120; // assumes the kernel is jcp.ur x 3
-        load_blocking_max = 144;
+        load_blocking = jcp.with_dw_conv ? nstl::min(3 * jcp.load_block, jcp.oc) : 120; // assumes the kernel is jcp.ur x 3
+        load_blocking_max = jcp.with_dw_conv ? nstl::min(3 * jcp.load_block, jcp.oc) : 144;
         bcast_blocking = 128; // affects load balancing across threads
         bcast_blocking_max = 192;
         reduce_blocking = 128; // affects L1$ utilization
@@ -649,7 +700,7 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
     jcp.nb_load_blocking_max = load_blocking_max / jcp.load_block;
     jcp.nb_reduce_blocking = reduce_blocking / jcp.reduce_block;
 
-    jcp.nb_bcast = div_up(jcp.bcast_dim, jcp.bcast_block);
+    jcp.nb_bcast = jcp.with_dw_conv ? jcp.ih : div_up(jcp.bcast_dim, jcp.bcast_block);
     jcp.nb_load = div_up(jcp.load_dim, jcp.load_block);
     jcp.nb_reduce = div_up(jcp.reduce_dim, jcp.reduce_block);
 
@@ -658,11 +709,20 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
 
 void jit_avx2_1x1_conv_kernel_f32::init_scratchpad(
         memory_tracking::registrar_t &scratchpad,
-        const jit_1x1_conv_conf_t &jcp) {
+        const jit_1x1_conv_conf_t &jcp, const jit_conv_conf_t &jcp_dw) {
     using namespace mkldnn::impl::memory_tracking::names;
 
     if (jcp.prop_kind != backward_data && jcp.oc != jcp.oc_without_padding)
         scratchpad.book(key_conv_padded_bias, sizeof(float) * jcp.oc);
+
+    if (jcp.with_dw_conv) {
+        const int nthreads = mkldnn_get_max_threads();
+        size_t dw_conv_buffer_size_ = (size_t)jcp_dw.kh * jcp_dw.iw * jcp_dw.ch_block * (jcp.oc / jcp.oc_block);
+        scratchpad.book(key_dw_conv_buffer, sizeof(float) * dw_conv_buffer_size_ * nthreads);
+
+        if (jcp.oc != jcp.oc_without_padding)
+            scratchpad.book(key_dw_conv_padded_bias, sizeof(float) * jcp.oc);
+    }
 }
 
 }

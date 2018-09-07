@@ -597,6 +597,54 @@ struct test_convolution_eltwise_params_t {
     mkldnn_status_t expected_status;
 };
 
+struct test_convolution_dw_conv_sizes_t {
+    test_convolution_dw_conv_sizes_t(
+            int mb, int ic, int ih, int iw,
+            int conv1_oc,
+            int conv1_kh, int conv1_kw,
+            int conv1_padh, int conv1_padw,
+            int conv1_strh, int conv1_strw,
+            int conv2_oc,
+            int conv2_kh, int conv2_kw,
+            int conv2_padh, int conv2_padw,
+            int conv2_strh, int conv2_strw
+    ) :
+            mb(mb), ic(ic), ih(ih), iw(iw),
+            conv1_oc(conv1_oc),
+            conv1_kh(conv1_kh), conv1_kw(conv1_kw),
+            conv1_padh(conv1_padh), conv1_padw(conv1_padw),
+            conv1_strh(conv1_strh), conv1_strw(conv1_strw),
+            conv2_oc(conv2_oc),
+            conv2_kh(conv2_kh), conv2_kw(conv2_kw),
+            conv2_padh(conv2_padh), conv2_padw(conv2_padw),
+            conv2_strh(conv2_strh), conv2_strw(conv2_strw) {}
+    int mb, ic, ih, iw;
+    int conv1_oc;
+    int conv1_kh,   conv1_kw;
+    int conv1_padh, conv1_padw;
+    int conv1_strh, conv1_strw;
+    int conv2_oc;
+    int conv2_kh,   conv2_kw;
+    int conv2_padh, conv2_padw;
+    int conv2_strh, conv2_strw;
+};
+
+struct test_convolution_dw_conv_formats_t {
+    mkldnn::memory::format src_format;
+    mkldnn::memory::format conv1_weights_format;
+    mkldnn::memory::format conv1_bias_format;
+    mkldnn::memory::format conv2_weights_format;
+    mkldnn::memory::format conv2_bias_format;
+    mkldnn::memory::format dst_format;
+};
+
+struct test_convolution_dw_conv_params_t {
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::algorithm aalgorithm;
+    test_convolution_dw_conv_formats_t formats;
+    test_convolution_dw_conv_sizes_t sizes;
+};
+
 struct test_roi_pool_desc_t {
     struct {
         int mb, c;

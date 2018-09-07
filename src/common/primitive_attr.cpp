@@ -88,6 +88,27 @@ status_t post_ops_t::append_eltwise(float scale, alg_kind_t alg, float alpha,
     return success;
 }
 
+status_t post_ops_t::append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+                                    const float* weights_data,
+                                    const float* biases_data) {
+    if (len_ == capacity)
+        return out_of_memory;
+
+    entry_[len_].kind = primitive_kind::convolution;
+    entry_[len_].dw_conv.in_h = in_h;
+    entry_[len_].dw_conv.in_w = in_w;
+    entry_[len_].dw_conv.ker_h = ker_h;
+    entry_[len_].dw_conv.ker_w = ker_w;
+    entry_[len_].dw_conv.str_h = str_h;
+    entry_[len_].dw_conv.str_w = str_w;
+    entry_[len_].dw_conv.weights_data = weights_data;
+    entry_[len_].dw_conv.biases_data = biases_data;
+
+    len_++;
+
+    return success;
+}
+
 status_t primitive_attr_t::set_round_mode(round_mode_t round_mode) {
     using namespace mkldnn::impl::round_mode;
 
@@ -287,4 +308,37 @@ status_t mkldnn_primitive_attr_set_rnn_weights_qparams(
         return invalid_arguments;
 
     return attr->rnn_weights_qparams_.set(count, mask, scales);
+}
+
+status_t mkldnn_post_ops_append_dw_conv(post_ops_t *post_ops,
+                                        int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+                                        const float* weights_data,
+                                        const float* biases_data) {
+    if (post_ops == nullptr)
+        return invalid_arguments;
+
+    return post_ops->append_dw_conv(in_h, in_w, ker_h, ker_w, str_h, str_w, weights_data, biases_data);
+}
+
+status_t mkldnn_post_ops_get_params_dw_conv(const post_ops_t *post_ops,
+                                            int index, int *in_h, int *in_w, int *ker_h, int *ker_w, int *str_h, int *str_w,
+                                            const float** weights_data,
+                                            const float** biases_data) {
+    bool ok = true
+              && simple_get_params_check(post_ops, index, primitive_kind::convolution)
+              && !any_null(in_h, in_w, ker_h, ker_w, str_h, str_w, weights_data, biases_data);
+    if (!ok)
+        return invalid_arguments;
+
+    const auto &e = post_ops->entry_[index].dw_conv;
+    *in_h = e.in_h;
+    *in_w = e.in_w;
+    *ker_h = e.ker_h;
+    *ker_w = e.ker_w;
+    *str_h = e.str_h;
+    *str_w = e.str_w;
+    *weights_data = e.weights_data;
+    *biases_data = e.biases_data;
+
+    return success;
 }

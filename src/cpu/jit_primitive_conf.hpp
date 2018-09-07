@@ -75,12 +75,28 @@ struct jit_conv_conf_t {
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
+    bool with_dw_conv;
 
     post_ops_t::entry_t::eltwise_t eltwise;
 
     int nthr, nthr_mb, nthr_g, nthr_oc_b, nthr_ic_b;
 
     int idp, ihp, iwp, ohp, owp;
+    int dw_conv_in_h;
+    int dw_conv_in_w;
+    int dw_conv_ker_h;
+    int dw_conv_ker_w;
+    int dw_conv_str_h;
+    int dw_conv_str_w;
+    const float* dw_conv_weights;
+    const float* dw_conv_biases;
+
+    bool dw_conv_with_sum;
+    bool dw_conv_with_eltwise;
+    alg_kind_t dw_conv_eltwise_alg;
+    float dw_conv_eltwise_alpha;
+    float dw_conv_eltwise_beta;
+
     int nb_ic, ic_block;
     int nb_oc, oc_block;
     int nb_ow, ow_block;
@@ -317,6 +333,10 @@ struct jit_conv_call_s {
     size_t t_overflow;
     size_t b_overflow;
     int flags;
+
+    const void *src_row0; /* hack, non-const for backward_data */
+    const void *src_row1; /* hack, non-const for backward_data */
+    const void *src_row2; /* hack, non-const for backward_data */
 };
 
 struct jit_deconv_call_s {
@@ -369,14 +389,31 @@ struct jit_1x1_conv_conf_t {
     int ngroups, ic, oc, oc_without_padding, ic_without_padding;
     int iw, ih, ow, oh;
     int l_pad, t_pad;
+    int r_pad, b_pad;
     int kh, kw;
     int stride_h, stride_w;
     memory_format_t src_fmt;
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
+    bool with_dw_conv;
 
     post_ops_t::entry_t::eltwise_t eltwise;
+
+    int dw_conv_in_h;
+    int dw_conv_in_w;
+    int dw_conv_ker_h;
+    int dw_conv_ker_w;
+    int dw_conv_str_h;
+    int dw_conv_str_w;
+    const float* dw_conv_weights;
+    const float* dw_conv_biases;
+
+    bool dw_conv_with_sum;
+    bool dw_conv_with_eltwise;
+    alg_kind_t dw_conv_eltwise_alg;
+    float dw_conv_eltwise_alpha;
+    float dw_conv_eltwise_beta;
 
     int is, os;
     int ic_block, oc_block;
@@ -463,6 +500,10 @@ struct jit_1x1_conv_call_s {
     size_t output_stride; // used in backward_weights only
 
     size_t first_last_flag;
+
+    // dw conv fusing
+    const void *weights_dw;
+    const void *bias_dw;
 };
 
 /* pooling */

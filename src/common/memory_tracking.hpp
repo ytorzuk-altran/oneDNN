@@ -192,7 +192,9 @@ enum {
     key_wino_V,
     key_wino_M,
     key_barrier,
-    key_sum_bf16cvt
+    key_sum_bf16cvt,
+    key_dw_conv_buffer,
+    key_dw_conv_padded_bias,
 };
 
 enum {

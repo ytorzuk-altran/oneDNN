@@ -360,6 +360,8 @@ inline void msan_unpoison(void *ptr, size_t size) {
 #endif
 }
 
+unsigned int get_cache_size(int level, bool per_core);
+
 }
 }
 

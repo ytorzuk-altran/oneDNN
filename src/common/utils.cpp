@@ -16,6 +16,11 @@
 
 #include <string.h>
 
+#define XBYAK64
+#define XBYAK_NO_OP_NAMES
+
+#include <cpu/xbyak/xbyak_util.h>
+
 #ifdef _WIN32
 #include <malloc.h>
 #include <windows.h>
@@ -24,6 +29,8 @@
 
 #include "mkldnn.h"
 #include "utils.hpp"
+#include "mkldnn_thread.hpp"
+#include "mkldnn.h"
 
 #if defined(MKLDNN_X86_64)
 #include "xmmintrin.h"
@@ -145,6 +152,31 @@ int32_t mkldnn_fetch_and_add(int32_t *dst, int32_t val) {
 #endif
 }
 
+static Xbyak::util::Cpu cpu_;
+
+unsigned int get_cache_size(int level, bool per_core) {
+    unsigned int l = level - 1;
+    // Currently, if XByak is not able to fetch the cache topology
+    // we default to 32KB of L1, 512KB of L2 and 1MB of L3 per core.
+    if (cpu_.getDataCacheLevels() == 0){
+        const int L1_cache_per_core = 32000;
+        const int L2_cache_per_core = 512000;
+        const int L3_cache_per_core = 1024000;
+        int num_cores = per_core ? 1 : mkldnn_get_max_threads();
+        switch(l){
+            case(0): return L1_cache_per_core * num_cores;
+            case(1): return L2_cache_per_core * num_cores;
+            case(2): return L3_cache_per_core * num_cores;
+            default: return 0;
+        }
+    }
+    if (l < cpu_.getDataCacheLevels()) {
+        return cpu_.getDataCacheSize(l)
+               / (per_core ? cpu_.getCoresSharingDataCache(l) : 1);
+    } else
+        return 0;
+}
+
 }
 }
 
@@ -154,4 +186,8 @@ mkldnn_status_t mkldnn_set_jit_dump(int dump) {
     mkldnn::impl::dump_jit_code = dump;
     mkldnn::impl::initialized = true;
     return success;
+}
+
+unsigned int mkldnn_get_cache_size(int level, int per_core) {
+    return mkldnn::impl::get_cache_size(level, per_core != 0);
 }
