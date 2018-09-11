@@ -69,7 +69,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     /* direct copy for icc, which is faster than jitted code */
     REG_SR_DIRECT_COPY(f32, s32),
     REG_SR_DIRECT_COPY(f32, s8),
-    REG_SR_DIRECT_COPY(f32, u8),
+//    REG_SR_DIRECT_COPY(f32, u8), FIXME: Disabled due to accuracy failure on int8 network
     REG_SR_DIRECT_COPY(s32, f32),
     REG_SR_DIRECT_COPY(s32, s32),
     REG_SR_DIRECT_COPY(s32, s8),
