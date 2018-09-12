@@ -54,11 +54,10 @@ TEST_P(convolution_test, TestConvolutionEltwise)
     EXPAND_ARGS(PARAMS_CONV(eltwise_linear, __VA_ARGS__)), \
     EXPAND_ARGS(PARAMS_CONV(eltwise_bounded_relu, __VA_ARGS__)), \
     EXPAND_ARGS(PARAMS_CONV(eltwise_soft_relu, __VA_ARGS__)), \
-    EXPAND_ARGS(PARAMS_CONV(eltwise_logistic, __VA_ARGS__)), \
-    EXPAND_ARGS(PARAMS_CONV(eltwise_clamp, __VA_ARGS__))
+    EXPAND_ARGS(PARAMS_CONV(eltwise_logistic, __VA_ARGS__))
 
-#define ELTWISE_ALPHA 1.5f
-#define ELTWISE_BETA 0.5f
+#define ELTWISE_ALPHA 0.5f
+#define ELTWISE_BETA 1.5f
 
 #define PARAMS_CONV(alg, src, weights, bias, dst, ...) \
     test_convolution_eltwise_params_t {alg,  mkldnn::engine::kind::cpu, \
@@ -98,5 +97,4 @@ TEST_P(convolution_test, TestConvolutionEltwise)
         PARAMS(nChw16c, OIhw16i16o, x, nChw16c, 1, 1, 47, 20, 20, 47, 20, 20, 3, 3, 0, 0, 1, 1),
         PARAMS(nChw16c, OIhw16i16o, x, nChw16c, 2, 1, 32, 32, 32, 32, 32, 32, 3, 3, 0, 0, 1, 1)
     );
-
 }

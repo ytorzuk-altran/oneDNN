@@ -23,6 +23,7 @@
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
+#include "jit_uni_depthwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -32,19 +33,24 @@ template <cpu_isa_t isa>
 struct jit_uni_dw_conv_fwd_kernel_f32 : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_dw_conv_fwd_kernel_f32)
 
-    jit_uni_dw_conv_fwd_kernel_f32(jit_conv_conf_t ajcp)
-        : jcp(ajcp), eltwise_injector_(nullptr) {
-        if (jcp.with_eltwise)
-            eltwise_injector_
-                    = new jit_uni_eltwise_injector_f32<isa>(this, jcp.eltwise);
-
+    jit_uni_dw_conv_fwd_kernel_f32(jit_conv_conf_t ajcp,
+            const primitive_attr_t &attr): jcp(ajcp), attr_(attr) {
         this->generate();
-        jit_ker = (void (*)(jit_conv_call_s *)) this->getCode();
+        jit_ker = (void (*)(jit_conv_call_s *))this->getCode();
     }
 
-    ~jit_uni_dw_conv_fwd_kernel_f32() { delete eltwise_injector_; }
+    ~jit_uni_dw_conv_fwd_kernel_f32() {
+        for (auto inj : eltwise_injectors)
+            delete inj;
+        eltwise_injectors.clear();
+
+        for (auto inj : depthwise_injectors)
+            delete inj;
+        depthwise_injectors.clear();
+    }
 
     jit_conv_conf_t jcp;
+    const primitive_attr_t &attr_;
     void (*jit_ker)(jit_conv_call_s *);
 
 private:
@@ -72,6 +78,9 @@ private:
     reg64_t reg_ch_blocks = aux1_reg_input;
     reg64_t imm_addr64 = aux1_reg_input;
 
+    reg64_t reg_d_weights = imm_addr64;
+    reg64_t reg_d_bias = iter_kh;
+
     inline Vmm get_ker_reg(int idx) { return Vmm(idx + 0); }
     inline Vmm get_src_reg(int idx) { return Vmm(idx + 1); }
     inline Vmm get_acc_reg(int idx) { return Vmm(idx + 4); }
@@ -79,13 +88,14 @@ private:
     inline void load_src(int ur_ch_blocks, int ur_w);
     inline void apply_filter(int ur_ch_blocks, int ur_w);
     inline void apply_filter_unrolled(int ur_ch_blocks, int ur_w);
-    inline void apply_activation(int ur_ch_blocks, int ur_w);
+    inline void apply_postprocess(int ur_ch_blocks, int ur_w);
     inline void store_dst(int ur_ch_blocks, int ur_w);
     inline void loop_body(int ur_ch_blocks);
 
-    jit_uni_eltwise_injector_f32<isa> *eltwise_injector_;
-
     void generate();
+
+    nstl::vector<jit_uni_eltwise_injector_f32<isa>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<isa>*> depthwise_injectors;
 };
 
 template <cpu_isa_t isa>

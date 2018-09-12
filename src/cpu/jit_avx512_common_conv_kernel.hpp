@@ -24,6 +24,7 @@
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
+#include "jit_uni_depthwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -34,18 +35,20 @@ struct _jit_avx512_common_conv_fwd_kernel : public jit_generator {
 
     _jit_avx512_common_conv_fwd_kernel(jit_conv_conf_t ajcp,
             const primitive_attr_t &attr)
-        : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr)
+        : jcp(ajcp), attr_(attr)
     {
-        if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
-                    this, jcp.eltwise);
-
         generate();
         jit_ker_ = (void (*)(jit_conv_call_s *))getCode();
     }
 
     ~_jit_avx512_common_conv_fwd_kernel() {
-        delete eltwise_injector_;
+        for (auto inj : eltwise_injectors)
+            delete inj;
+        eltwise_injectors.clear();
+
+        for (auto inj : depthwise_injectors)
+            delete inj;
+        depthwise_injectors.clear();
     }
 
     DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx512_common_conv_fwd_kernel)
@@ -128,7 +131,11 @@ private:
     Xbyak::Reg64 imm_addr64 = r15;
     Vmm vmm_wei = Vmm(31);
 
-    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+    reg64_t reg_d_weights = imm_addr64;
+    reg64_t reg_d_bias = reg_kj;
+
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);

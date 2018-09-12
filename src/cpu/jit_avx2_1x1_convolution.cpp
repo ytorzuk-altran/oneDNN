@@ -146,6 +146,8 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward() const {
                     } else
                         p.bcast_data = src + data_blk_off(src_d, n, _icb, ih, iw);
 
+                    p.oc_off = _ocb * jcp.oc_block * sizeof(float);
+
                     kernel_->jit_ker(&p);
                 }
 
@@ -255,6 +257,8 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward_fusing() const {
                         } else {
                             p.bcast_data = src + src_d.blk_off(n, _icb, ih, iw);
                         }
+
+                        p.oc_off = _ocb * jcp.oc_block * sizeof(float);
 
                         kernel_->jit_ker(&p);
                     }

@@ -43,14 +43,14 @@ using namespace mkldnn::impl::utils;
 template <cpu_isa_t isa, data_type_t kernel_dt>
 struct jit_uni_dw_conv_fwd_kernel {
 
-    jit_uni_dw_conv_fwd_kernel(jit_conv_conf_t ajcp)
+    jit_uni_dw_conv_fwd_kernel(jit_conv_conf_t ajcp, const primitive_attr_t &attr)
         : jit_ker(nullptr), ker_(nullptr) {
-        ker_ = new jit_kernel_t(ajcp);
+        ker_ = new jit_kernel_t(ajcp, attr);
         jit_ker = ker_->jit_ker;
     }
     ~jit_uni_dw_conv_fwd_kernel() { delete ker_; }
 
-    static bool post_ops_ok(jit_conv_conf_t &jcp, const primitive_attr_t &attr);
+    static bool post_ops_ok(jit_conv_conf_t &jcp, const primitive_attr_t &attr, bool is_bf16);
 
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
@@ -72,17 +72,29 @@ private:
 
 template <cpu_isa_t isa, data_type_t kernel_dt>
 bool jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::post_ops_ok(
-        jit_conv_conf_t &jcp, const primitive_attr_t &attr) {
+        jit_conv_conf_t &jcp, const primitive_attr_t &attr, bool is_bf16) {
     const auto &p = attr.post_ops_;
 
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
-    switch (p.len_) {
-    case 0: return true; // no post_ops
-    case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
-    case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
-    default: return false;
+    if (is_bf16) {
+        switch (p.len_) {
+            case 0: return true; // no post_ops
+            case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
+            case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+            default: return false;
+        }
+    } else {
+        switch (p.len_) {
+            case 0: return true;
+            case 1: return is_simple(0) || is_sum(0);
+            case 2: return (is_sum(0) && is_simple(1)) || (is_simple(0) && is_simple(1));
+            case 3: return is_sum(0) && is_simple(1) && is_simple(2);
+            default: return false;
+        }
     }
 
     return false;
@@ -138,7 +150,7 @@ status_t jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::init_conf(
     jcp.src_fmt = src_d.format();
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
 
-    if (!post_ops_ok(jcp, attr))
+    if (!post_ops_ok(jcp, attr, is_bf16))
         return status::unimplemented;
 
     const auto &p = attr.post_ops_;

@@ -125,31 +125,62 @@ void gemm_convolution_fwd_t::execute_forward() const {
                 // outermost "parallel". It is not good. Consider to use
                 // "parallel" here with number of threads passed as parameter
                 const int oc_start = curr.g * jcp.oc + curr.oc;
-                if (eltwise_) {
-                    // fast branch for ReLU case
-                    if (eltwise_->alg_ == alg_kind::eltwise_relu) {
-                        parallel_nd(step.oc, [&](const int oc) {
-                            data_t b = jcp.with_bias ? bias[oc_start + oc] : 0;
-                            data_t *d_ = _dst + oc * M;
-                            PRAGMA_OMP_SIMD()
-                            for (int oS = 0; oS < m; ++oS) {
-                                d_[oS] += b;
-                                if (d_[oS] < 0)
-                                    d_[oS] *= eltwise_->alpha_;
-                            }
-                        });
-                    } else {
-                        parallel_nd(step.oc, [&](const int oc) {
-                            data_t b = jcp.with_bias ? bias[oc_start + oc] : 0;
-                            data_t *d_ = _dst + oc * M;
-                            PRAGMA_OMP_SIMD()
-                            for (int oS = 0; oS < m; ++oS) {
-                                d_[oS] += b;
-                                d_[oS] = eltwise_->compute_scalar(d_[oS]);
-                            }
-                        });
+                const auto &p = pd()->attr()->post_ops_;
+                bool need_bias = jcp.with_bias;
+                if (use_fast_relu) {
+                    parallel_nd(step.oc, [&](const int oc) {
+                        data_t b = need_bias ? bias[oc_start + oc] : 0;
+                        data_t *d_ = _dst + oc * M;
+                        PRAGMA_OMP_SIMD()
+                        for (int oS = 0; oS < m; ++oS) {
+                            d_[oS] += b;
+                            if (d_[oS] < 0) d_[oS] *= fast_relu_ns;
+                        }
+                    });
+
+                    need_bias = false;
+                } else if (p.len_ > 0) {
+                    int eltwise_inj_idx = 0;
+                    int depthwise_inj_idx = 0;
+
+                    for (int i = 0; i < p.len_; i++) {
+                        auto& post_op = p.entry_[i];
+                        if (post_op.is_eltwise()) {
+                            parallel_nd(step.oc, [&](const int oc) {
+                                data_t b = need_bias ? bias[oc_start + oc] : 0;
+                                data_t *d_ = _dst + oc * M;
+                                PRAGMA_OMP_SIMD()
+                                for (int oS = 0; oS < m; ++oS) {
+                                    d_[oS] += b;
+                                    d_[oS] = eltwise_injectors[eltwise_inj_idx]->compute_scalar(d_[oS]);
+                                }
+                            });
+
+                            eltwise_inj_idx++;
+                            need_bias = false;
+                        } else if (post_op.is_depthwise()) {
+                            auto depthwise_weights = post_op.depthwise.weights_data;
+                            auto depthwise_bias = post_op.depthwise.biases_data;
+
+                            parallel_nd(step.oc, [&](const int oc) {
+                                data_t b = need_bias ? bias[oc_start + oc] : 0;
+                                data_t *d_ = _dst + oc * M;
+                                PRAGMA_OMP_SIMD()
+                                for (int oS = 0; oS < m; ++oS) {
+                                    d_[oS] += b;
+                                    d_[oS] = depthwise_injectors[depthwise_inj_idx]->compute_scalar(d_[oS],
+                                                                                                    depthwise_weights + oc_start + oc,
+                                                                                                    depthwise_bias + oc_start + oc);
+                                }
+                            });
+
+                            depthwise_inj_idx++;
+                            need_bias = false;
+                        }
                     }
-                } else if (jcp.with_bias) {
+                }
+
+                if (need_bias) {
                     parallel_nd(step.oc, [&](const int oc) {
                         data_t b = bias[oc_start + oc];
                         data_t *d_ = _dst + oc * M;

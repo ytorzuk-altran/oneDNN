@@ -25,11 +25,56 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "jit_primitive_conf.hpp"
+#include "jit_generator.hpp"
 #include "jit_uni_eltwise.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+
+template <cpu_isa_t isa>
+struct jit_uni_depthwise_injector_f32 {
+    jit_uni_depthwise_injector_f32(jit_generator* host, alg_kind_t depthwise_alg_)
+        : h(host), depthwise_alg(depthwise_alg_) {
+        assert(utils::one_of(isa, sse42, avx2, avx512_common));
+        assert(utils::one_of(depthwise_alg, alg_kind::depthwise_scale_shift, alg_kind::depthwise_prelu));
+    }
+
+    void compute_vector_range(int start_idx, int end_idx, const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias);
+
+private:
+    jit_generator* h;
+
+    using Vmm = typename utils::conditional3<isa == sse42, Xbyak::Xmm,
+            isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
+
+    size_t vlen = cpu_isa_traits<isa>::vlen;
+
+    alg_kind_t depthwise_alg;
+
+    Vmm vmm_mask;
+    Vmm vmm_aux0;
+
+    Xbyak::Opmask k_mask = Xbyak::Opmask(1);
+
+    const static size_t preserved_vecs_max = 5;
+    size_t vecs_to_preserve = 0;
+    size_t vecs_count = isa == avx512_common ? 32 : 16;
+    size_t preserved_vecs_count = 0;
+    size_t preserved_vec_idxs[preserved_vecs_max] = {0};
+    size_t start_idx_tail = 0;
+
+    int aux_vecs_count(alg_kind_t elt_alg);
+
+    void compute_body(size_t start_idx, size_t end_idx, const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias);
+    void injector_preamble(size_t start_idx, size_t end_idx);
+    void injector_preamble_tail(size_t start_idx, size_t end_idx);
+    void injector_postamble();
+    void assign_regs();
+
+    void scale_shift_compute_vector(const Vmm &vmm_src, const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias);
+    void prelu_compute_vector(const Vmm &vmm_src, const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias);
+};
 
 struct jit_uni_depthwise_kernel_f32;
 

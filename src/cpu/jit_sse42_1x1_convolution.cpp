@@ -126,6 +126,8 @@ void jit_sse42_1x1_convolution_fwd_t::execute_forward() const {
                         ? weights_d.blk_off(g, ocb, icb)
                         : weights_d.blk_off(ocb, icb)];
 
+                    par_conv.oc_off = _ocb * jcp.oc_block * sizeof(float);
+
                     kernel_->jit_ker(&par_conv);
                 }
 
@@ -203,6 +205,8 @@ void jit_sse42_1x1_convolution_fwd_t::execute_forward_fusing() const {
 
                         const int _icb = g * jcp.nb_reduce + icb;
                         p.bcast_data = src + src_d.blk_off(n, _icb, ih, iw);
+
+                        p.oc_off = _ocb * jcp.oc_block * sizeof(float);
 
                         kernel_->jit_ker(&p);
                     }

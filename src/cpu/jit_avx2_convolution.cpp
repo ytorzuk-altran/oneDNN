@@ -124,9 +124,11 @@ void jit_avx2_convolution_fwd_t::execute_forward() const {
                         par_conv.flags |= FLAG_IC_FIRST;
                     }
 
-                    if (jcp.with_eltwise && icb + 1 == jcp.nb_ic) {
+                    if (icb + 1 == jcp.nb_ic) {
                         par_conv.flags |= FLAG_IC_LAST;
                     }
+
+                    par_conv.oc_off = _oc * jcp.oc_block * sizeof(float);
 
                     par_conv.oc_blocks =
                             nstl::min(ocb + ocb_num, jcp.nb_oc) - ocb;
@@ -228,9 +230,11 @@ void jit_avx2_convolution_fwd_t::execute_forward_fusing() const {
                             par_conv.flags |= FLAG_IC_FIRST;
                         }
 
-                        if (jcp.with_eltwise && icb + 1 == jcp.nb_ic) {
+                        if (icb + 1 == jcp.nb_ic) {
                             par_conv.flags |= FLAG_IC_LAST;
                         }
+
+                        par_conv.oc_off = _oc * jcp.oc_block * sizeof(float);
 
                         par_conv.oc_blocks =
                                 nstl::min(ocb + ocb_num, jcp.nb_oc) - ocb;

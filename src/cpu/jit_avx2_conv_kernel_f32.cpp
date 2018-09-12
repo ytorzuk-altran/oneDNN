@@ -281,14 +281,39 @@ void jit_avx2_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     Label regular_store;
 
-    if (jcp.with_eltwise) {
-        test(reg_ci_flag, FLAG_IC_LAST);
-        je(regular_store, T_NEAR);
+    test(reg_ci_flag, FLAG_IC_LAST);
+    je(regular_store, T_NEAR);
 
-        eltwise_injector_->compute_vector_range(0, oc_blocks * ur_w);
+    int eltwise_inj_idx = 0;
+    int depthwise_inj_idx = 0;
+    const auto &p = attr_.post_ops_;
 
-        L(regular_store);
+    int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+    for (int i = 0; i < end_idx; i++) {
+        auto& post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors[eltwise_inj_idx]->compute_vector_range(0, oc_blocks * ur_w);
+            eltwise_inj_idx++;
+        } else if (post_op.is_depthwise()) {
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+
+            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
+            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
+
+            for (int ii = 0; ii < oc_blocks; ii++) {
+                depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                        ur_w * ii, ur_w * ii + ur_w, reg_d_weights, reg_d_bias);
+
+                add(reg_d_weights, jcp.oc_block * sizeof(float));
+                add(reg_d_bias, jcp.oc_block * sizeof(float));
+            }
+
+            depthwise_inj_idx++;
+        }
     }
+
+    L(regular_store);
 
     for (int ii = 0; ii < oc_blocks; ii++) {
         for (int jj = 0; jj < ur_w; jj++) {
@@ -364,6 +389,25 @@ inline void jit_avx2_conv_fwd_kernel_f32::solve_common(
 
 void jit_avx2_conv_fwd_kernel_f32::generate()
 {
+    const auto &p = attr_.post_ops_;
+    int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+    for (int i = 0; i < end_idx; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx2>(
+                    this,
+                    post_op.eltwise.alg,
+                    post_op.eltwise.alpha,
+                    post_op.eltwise.beta
+            ));
+        } else if (post_op.is_depthwise()) {
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx2>(
+                    this,
+                    post_op.depthwise.alg
+            ));
+        }
+    }
+
     this->preamble();
 
     mov(reg_input, ptr[this->param1 + GET_OFF(src)]);
@@ -401,8 +445,8 @@ void jit_avx2_conv_fwd_kernel_f32::generate()
 
     this->postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    for (auto& inj : eltwise_injectors)
+        inj->prepare_table();
 }
 
 bool jit_avx2_conv_fwd_kernel_f32::post_ops_ok(
@@ -410,18 +454,22 @@ bool jit_avx2_conv_fwd_kernel_f32::post_ops_ok(
     const auto &p = attr.post_ops_;
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
     auto is_dw_conv = [&](int idx) { return p.entry_[idx].is_dw_conv(); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
     switch (p.len_) {
-    case 0: return true;
-    case 1: return is_eltwise(0) || is_sum(0) || is_dw_conv(0);
-    case 2: return (is_sum(0) && is_eltwise(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
-                   (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1));
-    case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
-                   (is_dw_conv(0) && is_sum(1) && is_eltwise(2));
-    case 4: return is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3);
-    default: return false;
+        case 0: return true;
+        case 1: return is_simple(0) || is_sum(0) || is_dw_conv(0);
+        case 2: return (is_sum(0) && is_simple(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
+                       (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1)) ||
+                       (is_simple(0) && is_simple(1));
+        case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
+                       (is_dw_conv(0) && is_sum(1) && is_eltwise(2)) ||
+                       (is_sum(0) && is_simple(1) && is_simple(2));
+        case 4: return (is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3));
+        default: return false;
     }
 
     return false;
@@ -511,12 +559,16 @@ status_t jit_avx2_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
     if (jcp.with_dw_conv && jcp.ndims == 5)
         return status::unimplemented;
 
-    const int eltwise_ind = p.find(primitive_kind::eltwise, 0, dw_conv_ind);
-    jcp.with_eltwise = eltwise_ind != -1;
-    if (jcp.with_eltwise) {
-        jcp.eltwise = p.entry_[eltwise_ind].eltwise;
-        if (!mayiuse(avx2) && jcp.eltwise.alg != alg_kind::eltwise_relu)
-            return status::unimplemented;
+    if (!mayiuse(avx2)) {
+        for (int i = 0; i < p.len_; i++) {
+            auto &post_op = p.entry_[i];
+            if (post_op.is_eltwise()) {
+                if (post_op.eltwise.alg != alg_kind::eltwise_relu)
+                    return status::unimplemented;
+            } else if (post_op.is_depthwise()) {
+                return status::unimplemented;
+            }
+        }
     }
 
     if (jcp.with_dw_conv) {

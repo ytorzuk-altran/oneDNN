@@ -636,6 +636,17 @@ struct test_convolution_eltwise_params_t {
     mkldnn_status_t expected_status;
 };
 
+struct test_convolution_depthwise_params_t {
+    const mkldnn::algorithm alg;
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::algorithm aalgorithm;
+    test_convolution_formats_t formats;
+    test_convolution_attr_t attr;
+    test_convolution_sizes_t sizes;
+    bool expect_to_fail;
+    mkldnn_status_t expected_status;
+};
+
 struct test_convolution_dw_conv_sizes_t {
     test_convolution_dw_conv_sizes_t(
             int mb, int ic, int ih, int iw,

@@ -418,6 +418,22 @@ struct post_ops: public handle<mkldnn_post_ops_t> {
         alg = static_cast<algorithm>(c_alg);
     }
 
+    void append_depthwise(algorithm alg, const float* weights_data,
+            const float* biases_data) {
+        error::wrap_c_api(mkldnn_post_ops_append_depthwise(get(),
+                    convert_to_c(alg), weights_data, biases_data),
+                "could not append depthwise");
+    }
+
+    void get_params_depthwise(int index, algorithm &alg,
+            const float** weights_data, const float** biases_data) const {
+        mkldnn_alg_kind_t c_alg;
+        error::wrap_c_api(mkldnn_post_ops_get_params_depthwise(get(), index,
+                    &c_alg, weights_data, biases_data),
+                "could not get depthwise params");
+        alg = static_cast<algorithm>(c_alg);
+    }
+
     void append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
             const float* weights_data, const float* biases_data) {
         error::wrap_c_api(mkldnn_post_ops_append_dw_conv(get(),

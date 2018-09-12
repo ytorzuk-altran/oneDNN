@@ -95,7 +95,7 @@ void _jit_avx512_common_conv_fwd_kernel<Vmm>::prepare_output(int ur_w)
 template<typename Vmm>
 void _jit_avx512_common_conv_fwd_kernel<Vmm>::store_output(int ur_w)
 {
-    Label no_update_label, store_label, eltwise_label;
+    Label no_update_label, store_label, postproc_label;
 
     mov(reg_channel, ptr[param1 + GET_OFF(channel)]);
     if (jcp.with_bias) {
@@ -116,10 +116,10 @@ void _jit_avx512_common_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         }
 
     if (!jcp.with_sum) {
-        jmp(eltwise_label, T_NEAR);
+        jmp(postproc_label, T_NEAR);
     } else {
         cmp(reg_channel, 0);
-        jne(eltwise_label, T_NEAR);
+        jne(postproc_label, T_NEAR);
     }
 
     L(no_update_label);
@@ -134,30 +134,56 @@ void _jit_avx512_common_conv_fwd_kernel<Vmm>::store_output(int ur_w)
         }
     }
 
-    L(eltwise_label);
-    if (jcp.with_eltwise) {
-        cmp(reg_channel, jcp.nb_ic - 1);
-        jl(store_label, T_NEAR);
+    L(postproc_label);
 
-        if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni) {
-            Vmm vmm_zero = vmm_wei;
-            vpxord(vmm_zero, vmm_zero, vmm_zero);
+    cmp(reg_channel, jcp.nb_ic - 1);
+    jl(store_label, T_NEAR);
 
-            for (int k = 0; k < jcp.nb_oc_blocking; k++)
-            for (int j = 0; j < ur_w; j++) {
-                Vmm vmm = vmm_out(j, k);
-                vpcmpd(k1, vmm, vmm_zero, _cmp_lt_os);
-                vpmulld(vmm | k1, vmm, vmm_zero);
-            }
-        } else {
-            if (ur_w == jcp.ur_w) {
-                eltwise_injector_->compute_vector_range(0,
-                        jcp.nb_oc_blocking * jcp.ur_w);
-            } else {
+    int eltwise_inj_idx = 0;
+    int depthwise_inj_idx = 0;
+    const auto &p = attr_.post_ops_;
+
+    for (int i = 0; i < p.len_; i++) {
+        auto& post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            if (jcp.ver == ver_4vnni || jcp.ver == ver_vnni) {
+                Vmm vmm_zero = vmm_wei;
+                vpxord(vmm_zero, vmm_zero, vmm_zero);
+
                 for (int k = 0; k < jcp.nb_oc_blocking; k++)
-                    eltwise_injector_->compute_vector_range(k * jcp.ur_w,
-                            k * jcp.ur_w + ur_w);
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm = vmm_out(j, k);
+                        vpcmpd(k1, vmm, vmm_zero, _cmp_lt_os);
+                        vpmulld(vmm | k1, vmm, vmm_zero);
+                    }
+            } else {
+                if (ur_w == jcp.ur_w) {
+                    eltwise_injectors[eltwise_inj_idx]->compute_vector_range(0,
+                                                            jcp.nb_oc_blocking * jcp.ur_w);
+                } else {
+                    for (int k = 0; k < jcp.nb_oc_blocking; k++)
+                        eltwise_injectors[eltwise_inj_idx]->compute_vector_range(k * jcp.ur_w,
+                                                                                 k * jcp.ur_w + ur_w);
+                }
             }
+
+            eltwise_inj_idx++;
+        } else if (post_op.is_depthwise()) {
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+
+            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
+            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
+
+            for (int k = 0; k < jcp.nb_oc_blocking; k++) {
+                depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                        k*jcp.ur_w, k*jcp.ur_w + ur_w, reg_d_weights, reg_d_bias);
+
+                add(reg_d_weights, jcp.oc_block * sizeof(float));
+                add(reg_d_bias, jcp.oc_block * sizeof(float));
+            }
+
+            depthwise_inj_idx++;
         }
     }
 
@@ -1025,6 +1051,24 @@ void _jit_avx512_common_conv_fwd_kernel<Vmm>::compute_loop(int ur_w,
 template<typename Vmm>
 void _jit_avx512_common_conv_fwd_kernel<Vmm>::generate()
 {
+    const auto &p = attr_.post_ops_;
+    for (int i = 0; i < p.len_; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common>(
+                    this,
+                    post_op.eltwise.alg,
+                    post_op.eltwise.alpha,
+                    post_op.eltwise.beta
+            ));
+        } else if (post_op.is_depthwise()) {
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
+                    this,
+                    post_op.depthwise.alg
+            ));
+        }
+    }
+
     int iw = jcp.iw;
     int ow = jcp.ow;
     int ow_block = jcp.ow_block;
@@ -1240,8 +1284,8 @@ void _jit_avx512_common_conv_fwd_kernel<Vmm>::generate()
     }
     postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    for (auto& inj : eltwise_injectors)
+        inj->prepare_table();
 }
 
 bool jit_avx512_common_conv_fwd_kernel::post_ops_ok(
@@ -1249,12 +1293,15 @@ bool jit_avx512_common_conv_fwd_kernel::post_ops_ok(
     const auto &p = attr.post_ops_;
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
     switch (p.len_) {
-    case 0: return true; // no post_ops
-    case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
-    case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+    case 0: return true;
+    case 1: return is_simple(0) || is_sum(0);
+    case 2: return (is_sum(0) && is_simple(1)) || (is_simple(0) && is_simple(1));
+    case 3: return is_sum(0) && is_simple(1) && is_simple(2);
     default: return false;
     }
 

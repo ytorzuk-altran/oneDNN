@@ -97,6 +97,7 @@ void _jit_uni_dw_convolution_fwd_t<isa, src_type, dst_type>::execute_forward()
         par_conv.ur_w = (size_t)ur_w_step;
 
         par_conv.ch_blocks = nstl::min(ch + ch_num, jcp.nb_ch) - ch;
+        par_conv.oc_off = ch * jcp.ch_block * sizeof(float);
 
         return par_conv;
     };

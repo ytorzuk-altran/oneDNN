@@ -89,7 +89,7 @@ void jit_avx2_1x1_conv_kernel_f32::generate_reduce_loop(
     };
 
     auto vreg_accum = [=](int i, int j) {
-        return Ymm(j * load_loop_blk + i);
+        return Ymm(j + i*ur);
     };
 
     auto bias_ptr = [=](int i) {
@@ -195,17 +195,43 @@ void jit_avx2_1x1_conv_kernel_f32::generate_reduce_loop(
 
         L(store_noadd);
 
-        if (jcp.with_eltwise) {
-            assert(ur * load_loop_blk < 14);
+        Label store_norelu;
+        test(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
+        jz(store_norelu, T_NEAR);
 
-            Label store_norelu;
-            test(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
-            jz(store_norelu, T_NEAR);
+        int eltwise_inj_idx = 0;
+        int depthwise_inj_idx = 0;
+        const auto &p = attr_.post_ops_;
 
-            eltwise_injector_->compute_vector_range(0, ur * load_loop_blk);
+        int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+        for (int i = 0; i < end_idx; i++) {
+            auto& post_op = p.entry_[i];
+            if (post_op.is_eltwise()) {
+                eltwise_injectors[eltwise_inj_idx]->compute_vector_range(0, ur * load_loop_blk);
+                eltwise_inj_idx++;
+            } else if (post_op.is_depthwise()) {
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
 
-            L(store_norelu);
+                add(reg_d_weights, reg_oc_off);
+                add(reg_d_bias, reg_oc_off);
+
+                for (int j = 0; j < load_loop_blk; ++j) {
+                    int start_idx = vreg_accum(j, 0).getIdx();
+                    int end_idx = start_idx + ur;
+
+                    depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                            start_idx, end_idx, reg_d_weights, reg_d_bias);
+
+                    add(reg_d_weights, jcp.oc_block * sizeof(float));
+                    add(reg_d_bias, jcp.oc_block * sizeof(float));
+                }
+
+                depthwise_inj_idx++;
+            }
         }
+
+        L(store_norelu);
 
         for (int j = 0; j < ur; ++j)
             for (int i = 0; i < load_loop_blk; ++i) {
@@ -319,6 +345,25 @@ void jit_avx2_1x1_conv_kernel_f32::generate_diff_bias_loop(int load_loop_blk)
 
 void jit_avx2_1x1_conv_kernel_f32::generate()
 {
+    const auto &p = attr_.post_ops_;
+    int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+    for (int i = 0; i < end_idx; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx2>(
+                    this,
+                    post_op.eltwise.alg,
+                    post_op.eltwise.alpha,
+                    post_op.eltwise.beta
+            ));
+        } else if (post_op.is_depthwise()) {
+        depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx2>(
+                this,
+                post_op.depthwise.alg
+        ));
+        }
+    }
+
     preamble();
 
     mov(reg_bcast_data, ptr[param1 + GET_OFF(bcast_data)]);
@@ -339,6 +384,7 @@ void jit_avx2_1x1_conv_kernel_f32::generate()
     mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(first_last_flag)]);
     if (jcp.prop_kind == backward_weights)
         mov(reg_output_stride, ptr[param1 + GET_OFF(output_stride)]);
+    mov(reg_oc_off, ptr[param1 + GET_OFF(oc_off)]);
 
     auto generate_load_loop_body = [=] (int load_loop_blk) {
         generate_bcast_loop(load_loop_blk);
@@ -366,6 +412,7 @@ void jit_avx2_1x1_conv_kernel_f32::generate()
             assert(!"invalid prop_kind");
         }
         sub(reg_load_loop_work, load_loop_blk * jcp.load_loop_iter_step);
+        add(reg_oc_off, load_loop_blk * jcp.oc_block * sizeof(float));
     };
 
     Label load_loop_blk_8;
@@ -415,8 +462,8 @@ void jit_avx2_1x1_conv_kernel_f32::generate()
 
     postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    for (auto& inj : eltwise_injectors)
+        inj->prepare_table();
 }
 
 bool jit_avx2_1x1_conv_kernel_f32::post_ops_ok(
@@ -424,18 +471,22 @@ bool jit_avx2_1x1_conv_kernel_f32::post_ops_ok(
     const auto &p = attr.post_ops_;
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
     auto is_dw_conv = [&](int idx) { return p.entry_[idx].is_dw_conv(); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
     switch (p.len_) {
-    case 0: return true;
-    case 1: return is_eltwise(0) || is_sum(0) || is_dw_conv(0);
-    case 2: return (is_sum(0) && is_eltwise(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
-                   (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1));
-    case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
-                   (is_dw_conv(0) && is_sum(1) && is_eltwise(2));
-    case 4: return is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3);
-    default: return false;
+        case 0: return true;
+        case 1: return is_simple(0) || is_sum(0) || is_dw_conv(0);
+        case 2: return (is_sum(0) && is_simple(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
+                       (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1)) ||
+                       (is_simple(0) && is_simple(1));
+        case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
+                       (is_dw_conv(0) && is_sum(1) && is_eltwise(2)) ||
+                       (is_sum(0) && is_simple(1) && is_simple(2));
+        case 4: return (is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3));
+        default: return false;
     }
 
     return false;
@@ -501,12 +552,16 @@ status_t jit_avx2_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
     if (jcp.with_dw_conv && !mayiuse(avx2))
         return status::unimplemented;
 
-    const int eltwise_ind = p.find(primitive_kind::eltwise, 0, dw_conv_ind);
-    jcp.with_eltwise = eltwise_ind != -1;
-    if (jcp.with_eltwise) {
-        jcp.eltwise = p.entry_[eltwise_ind].eltwise;
-        if (!mayiuse(avx2) && jcp.eltwise.alg != alg_kind::eltwise_relu)
-            return status::unimplemented;
+    if (!mayiuse(avx2)) {
+        for (int i = 0; i < p.len_; i++) {
+            auto &post_op = p.entry_[i];
+            if (post_op.is_eltwise()) {
+                if (post_op.eltwise.alg != alg_kind::eltwise_relu)
+                    return status::unimplemented;
+            } else if (post_op.is_depthwise()) {
+                return status::unimplemented;
+            }
+        }
     }
 
     if (jcp.with_dw_conv) {

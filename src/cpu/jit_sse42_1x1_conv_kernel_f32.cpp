@@ -85,7 +85,7 @@ void jit_sse42_1x1_conv_kernel_f32::generate_reduce_loop(
     };
 
     auto reg_accum = [=](int i, int j, int n) {
-        return Xmm(2*j * load_loop_blk + 2*i + n + 1);
+        return Xmm(n*load_loop_blk*ur + i*ur + j + 1);
     };
 
     auto bias_ptr = [=](int i, int n) {
@@ -202,18 +202,45 @@ void jit_sse42_1x1_conv_kernel_f32::generate_reduce_loop(
 
         L(store_noadd);
 
-        if (jcp.with_eltwise) {
-            assert(ur * load_loop_blk < 14);
+        Label store_no_postops;
+        test(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
+        jz(store_no_postops, T_NEAR);
 
-            Label store_norelu;
-            test(reg_reduce_pos_flag, FLAG_REDUCE_LAST);
-            jz(store_norelu, T_NEAR);
+        int eltwise_inj_idx = 0;
+        int depthwise_inj_idx = 0;
+        const auto &p = attr_.post_ops_;
 
-            eltwise_injector_->compute_vector_range(1,
-                    2 * ur * load_loop_blk + 1);
+        int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+        for (int i = 0; i < end_idx; i++) {
+            auto& post_op = p.entry_[i];
+            if (post_op.is_eltwise()) {
+                eltwise_injectors[eltwise_inj_idx]->compute_vector_range(1, 2 * ur * load_loop_blk + 1);
+                eltwise_inj_idx++;
+            } else if (post_op.is_depthwise()) {
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
 
-            L(store_norelu);
+                add(reg_d_weights, reg_oc_off);
+                add(reg_d_bias, reg_oc_off);
+
+                for (int j = 0; j < load_loop_blk; ++j) {
+                    for (int k = 0; k < 2; k++) {
+                        int start_idx = reg_accum(j, 0, k).getIdx();
+                        int end_idx = reg_accum(j, ur, k).getIdx();
+
+                        depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                                start_idx, end_idx, reg_d_weights, reg_d_bias);
+
+                        add(reg_d_weights, 4 * sizeof(float));
+                        add(reg_d_bias, 4 * sizeof(float));
+                    }
+                }
+
+                depthwise_inj_idx++;
+            }
         }
+
+        L(store_no_postops);
 
         for (int j = 0; j < ur; ++j)
             for (int i = 0; i < load_loop_blk; ++i) {
@@ -342,6 +369,25 @@ void jit_sse42_1x1_conv_kernel_f32::generate_diff_bias_loop(int load_loop_blk)
 
 void jit_sse42_1x1_conv_kernel_f32::generate()
 {
+    const auto &p = attr_.post_ops_;
+    int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+    for (int i = 0; i < end_idx; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<sse42>(
+                    this,
+                    post_op.eltwise.alg,
+                    post_op.eltwise.alpha,
+                    post_op.eltwise.beta
+            ));
+        } else if (post_op.is_depthwise()) {
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<sse42>(
+                    this,
+                    post_op.depthwise.alg
+            ));
+        }
+    }
+
     preamble();
 
     mov(reg_bcast_data, ptr[param1 + GET_OFF(bcast_data)]);
@@ -362,6 +408,7 @@ void jit_sse42_1x1_conv_kernel_f32::generate()
     mov(reg_reduce_pos_flag, ptr[param1 + GET_OFF(first_last_flag)]);
     if (jcp.prop_kind == backward_weights)
         mov(reg_output_stride, ptr[param1 + GET_OFF(output_stride)]);
+    mov(reg_oc_off, ptr[param1 + GET_OFF(oc_off)]);
 
     auto generate_load_loop_body = [=] (int load_loop_blk) {
         generate_bcast_loop(load_loop_blk);
@@ -389,6 +436,7 @@ void jit_sse42_1x1_conv_kernel_f32::generate()
             assert(!"invalid prop_kind");
         }
         sub(reg_load_loop_work, load_loop_blk * jcp.load_loop_iter_step);
+        add(reg_oc_off, load_loop_blk * jcp.oc_block * sizeof(float));
     };
 
     Label load_loop_blk_8;
@@ -438,8 +486,8 @@ void jit_sse42_1x1_conv_kernel_f32::generate()
 
     postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    for (auto& inj : eltwise_injectors)
+        inj->prepare_table();
 }
 
 bool jit_sse42_1x1_conv_kernel_f32::post_ops_ok(
@@ -447,18 +495,22 @@ bool jit_sse42_1x1_conv_kernel_f32::post_ops_ok(
     const auto &p = attr.post_ops_;
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
     auto is_dw_conv = [&](int idx) { return p.entry_[idx].is_dw_conv(); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
     switch (p.len_) {
-    case 0: return true;
-    case 1: return is_eltwise(0) || is_sum(0) || is_dw_conv(0);
-    case 2: return (is_sum(0) && is_eltwise(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
-                   (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1));
-    case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
-                   (is_dw_conv(0) && is_sum(1) && is_eltwise(2));
-    case 4: return is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3);
-    default: return false;
+        case 0: return true;
+        case 1: return is_simple(0) || is_sum(0) || is_dw_conv(0);
+        case 2: return (is_sum(0) && is_simple(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
+                       (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1)) ||
+                       (is_simple(0) && is_simple(1));
+        case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
+                       (is_dw_conv(0) && is_sum(1) && is_eltwise(2)) ||
+                       (is_sum(0) && is_simple(1) && is_simple(2));
+        case 4: return (is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3));
+        default: return false;
     }
 
     return false;
@@ -521,11 +573,6 @@ status_t jit_sse42_1x1_conv_kernel_f32::init_conf(jit_1x1_conv_conf_t &jcp,
         jcp.dw_conv_weights = p.entry_[dw_conv_ind].dw_conv.weights_data;
         jcp.dw_conv_biases = p.entry_[dw_conv_ind].dw_conv.biases_data;
     }
-
-    const int eltwise_ind = p.find(primitive_kind::eltwise, 0, dw_conv_ind);
-    jcp.with_eltwise = eltwise_ind != -1;
-    if (jcp.with_eltwise)
-        jcp.eltwise = p.entry_[eltwise_ind].eltwise;
 
     if (jcp.with_dw_conv) {
         int dw_conv_eltwise_ind = p.find(primitive_kind::eltwise, dw_conv_ind);

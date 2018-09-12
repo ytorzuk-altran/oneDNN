@@ -37,6 +37,23 @@ template <typename T> inline T prelu_fwd(T s_val, T w_val) {
     return s_val >= 0 ? s_val : s_val*w_val;
 }
 
+ref_depthwise_scalar_fwd_t::ref_depthwise_scalar_fwd_t(const alg_kind_t alg_)
+        : alg(alg_) {
+    using namespace alg_kind;
+
+    assert(utils::one_of(alg, depthwise_scale_shift, depthwise_prelu));
+}
+
+float ref_depthwise_scalar_fwd_t::compute_scalar(float s, const float* weights, const float* bias) {
+    switch (alg) {
+        case depthwise_scale_shift: return scale_shift_fwd(s, *weights, *bias);
+        case depthwise_prelu: return prelu_fwd(s, *weights);
+        default: assert(!"unknown depthwise alg_kind");
+    }
+
+    return 0.0f;
+}
+
 template <impl::data_type_t data_type>
 void ref_depthwise_fwd_t<data_type>::execute_forward() const {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));

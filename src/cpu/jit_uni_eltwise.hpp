@@ -99,7 +99,6 @@ private:
     { return h->ptr[p_table + index * vlen]; }
 
     int aux_vecs_count(alg_kind_t alg);
-
     void compute_body(size_t start_idx, size_t end_idx);
     void injector_preamble(size_t start_idx, size_t end_idx);
     void injector_preamble_tail(size_t start_idx);

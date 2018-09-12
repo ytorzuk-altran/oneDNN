@@ -82,6 +82,7 @@ struct jit_conv_conf_t {
     int nthr, nthr_mb, nthr_g, nthr_oc_b, nthr_ic_b;
 
     int idp, ihp, iwp, ohp, owp;
+
     int dw_conv_in_h;
     int dw_conv_in_w;
     int dw_conv_ker_h;
@@ -337,6 +338,9 @@ struct jit_conv_call_s {
     const void *src_row0; /* hack, non-const for backward_data */
     const void *src_row1; /* hack, non-const for backward_data */
     const void *src_row2; /* hack, non-const for backward_data */
+
+    size_t oc_off;
+    size_t oc_off_prf;
 };
 
 struct jit_deconv_call_s {
@@ -504,6 +508,8 @@ struct jit_1x1_conv_call_s {
     // dw conv fusing
     const void *weights_dw;
     const void *bias_dw;
+
+    size_t oc_off;
 };
 
 /* pooling */

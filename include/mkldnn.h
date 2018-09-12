@@ -453,7 +453,28 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_eltwise(
         const_mkldnn_post_ops_t post_ops, int index, float *scale,
         mkldnn_alg_kind_t *alg, float *alpha, float *beta);
 
-/** @} */
+/** Appends depthwise post operation to the @p post_ops with given parameters
+ * @p kind, @p weights and @p bias (@sa mkldnn_depthwise_forward_desc_init and
+ * mkldnn_depthwise_desc_t).
+ *
+ * The kind of this post operation is #mkldnn_depthwise.
+ *
+ * In the simplest case when the depthwise is the only post operation, the
+ * computations would be:
+ * dst[] <- scale * depthwise_op ( op(...) ) // instead of dst[] <- op(...)
+ * where depthwise_op is configured with given parameters.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_depthwise(
+        mkldnn_post_ops_t post_ops, mkldnn_alg_kind_t alg,
+        const float* weights_data, const float* biases_data);
+
+/** Gets the depthwise parameters of the post operation with index @p index in
+ * the sequence of @p post_ops.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_depthwise(
+        const_mkldnn_post_ops_t post_ops, int index,
+        mkldnn_alg_kind_t *alg, const float** weights_data,
+        const float** biases_data);
 
 /** Appends DW convolution post operation to the @p post_ops with given parameters
  * @p weights and @p bias.

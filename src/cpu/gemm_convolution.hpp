@@ -25,6 +25,7 @@
 #include "gemm_convolution_utils.hpp"
 #include "gemm/gemm.hpp"
 #include "ref_eltwise.hpp"
+#include "ref_depthwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -106,14 +107,17 @@ struct gemm_convolution_fwd_t: public cpu_primitive_t {
 
         virtual bool is_gemm_conv_format() const {
             auto const &po = this->attr()->post_ops_;
-            auto is_eltwise = [&](int idx)
-            { return po.entry_[idx].is_eltwise(); };
+
+            auto is_eltwise = [&](int idx) { return po.entry_[idx].is_eltwise(); };
+            auto is_depthwise = [&](int idx) { return po.entry_[idx].is_depthwise(); };
             auto is_sum = [&](int idx) { return po.entry_[idx].is_sum(); };
+            auto is_simple = [&](int idx) { return (is_eltwise(idx) || is_depthwise(idx)); };
 
             switch (po.len_) {
-            case 0: return true; // no post_ops
-            case 1: return is_eltwise(0) || is_sum(0); // sum OR eltwise
-            case 2: return is_sum(0) && is_eltwise(1); // sum -> eltwise
+            case 0: return true;
+            case 1: return is_simple(0) || is_sum(0);
+            case 2: return (is_sum(0) && is_simple(1)) || (is_simple(0) && is_simple(1));
+            case 3: return is_sum(0) && is_simple(1) && is_simple(2);
             default: return false;
             }
             return false;
@@ -122,19 +126,45 @@ struct gemm_convolution_fwd_t: public cpu_primitive_t {
 
     gemm_convolution_fwd_t(const pd_t *apd, const input_vector &inputs,
            const output_vector &outputs)
-        : cpu_primitive_t(apd, inputs, outputs, true), eltwise_(nullptr)
+        : cpu_primitive_t(apd, inputs, outputs, true)
     {
         const auto &post_ops = pd()->attr()->post_ops_;
         const data_t one = 1.0, zero = 0.0;
         beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
 
-        const int entry_idx = post_ops.find(primitive_kind::eltwise);
-        if (entry_idx != -1) eltwise_ = new ref_eltwise_scalar_fwd_t(
-                post_ops.entry_[entry_idx].eltwise);
+        for (int i = 0; i < post_ops.len_; i++) {
+            auto &post_op = post_ops.entry_[i];
+            if (post_op.is_eltwise()) {
+                eltwise_injectors.push_back(new ref_eltwise_scalar_fwd_t(
+                        post_op.eltwise.alg,
+                        post_op.eltwise.alpha,
+                        post_op.eltwise.beta
+                ));
+            } else if (post_op.is_depthwise()) {
+                depthwise_injectors.push_back(new ref_depthwise_scalar_fwd_t(
+                        post_op.depthwise.alg
+                ));
+            }
+        }
+
+        use_fast_relu = false;
+        if (post_ops.len_ == 1 && post_ops.entry_[0].is_relu(true, false)) {
+            use_fast_relu = true;
+            fast_relu_ns = post_ops.entry_[0].eltwise.alpha;
+        } else if (post_ops.len_ == 2 && post_ops.entry_[0].is_sum() && post_ops.entry_[1].is_relu(true, false)) {
+            use_fast_relu = true;
+            fast_relu_ns = post_ops.entry_[1].eltwise.alpha;
+        }
     }
 
     ~gemm_convolution_fwd_t() {
-        delete eltwise_;
+        for (auto inj : eltwise_injectors)
+            delete inj;
+        eltwise_injectors.clear();
+
+        for (auto inj : depthwise_injectors)
+            delete inj;
+        depthwise_injectors.clear();
     }
 
     typedef typename prec_traits<data_type::f32>::type data_t;
@@ -150,7 +180,11 @@ private:
 
     data_t beta_;
 
-    ref_eltwise_scalar_fwd_t* eltwise_;
+    nstl::vector<ref_eltwise_scalar_fwd_t*> eltwise_injectors;
+    nstl::vector<ref_depthwise_scalar_fwd_t*> depthwise_injectors;
+
+    bool use_fast_relu;
+    float fast_relu_ns;
 };
 
 struct gemm_convolution_bwd_data_t: public cpu_primitive_t {

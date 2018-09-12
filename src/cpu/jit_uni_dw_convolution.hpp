@@ -107,7 +107,7 @@ struct _jit_uni_dw_convolution_fwd_t : public cpu_primitive_t {
     _jit_uni_dw_convolution_fwd_t(const pd_t *apd, const input_vector &inputs,
             const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs), kernel_(nullptr) {
-        kernel_ = new jit_uni_dw_conv_fwd_kernel<isa, src_type>(pd()->jcp_);
+        kernel_ = new jit_uni_dw_conv_fwd_kernel<isa, src_type>(pd()->jcp_, *pd()->attr());
     }
 
     ~_jit_uni_dw_convolution_fwd_t() { delete kernel_; }

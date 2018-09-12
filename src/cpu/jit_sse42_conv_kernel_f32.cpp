@@ -232,15 +232,42 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     L(skip_kh_loop);
 
-    if (jcp.with_eltwise) {
-        Label regular_store;
-        test(reg_ci_flag, FLAG_IC_LAST);
-        je(regular_store, T_NEAR);
+    Label done;
+    Label regular_store;
 
-        eltwise_injector_->compute_vector_range(1, oc_blocks * ur_w + 1);
+    test(reg_ci_flag, FLAG_IC_LAST);
+    je(regular_store, T_NEAR);
 
-        L(regular_store);
+    int eltwise_inj_idx = 0;
+    int depthwise_inj_idx = 0;
+    const auto &p = attr_.post_ops_;
+
+    int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+    for (int i = 0; i < end_idx; i++) {
+        auto& post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors[eltwise_inj_idx]->compute_vector_range(1, oc_blocks * ur_w + 1);
+            eltwise_inj_idx++;
+        } else if (post_op.is_depthwise()) {
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+
+            add(reg_d_weights, reg_oc_off);
+            add(reg_d_bias, reg_oc_off);
+
+            for (int ii = 0; ii < oc_blocks; ii++) {
+                depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                        ur_w * ii + 1, ur_w * ii + ur_w + 1, reg_d_weights, reg_d_bias);
+
+                add(reg_d_weights, oc_blk * sizeof(float));
+                add(reg_d_bias, oc_blk * sizeof(float));
+            }
+
+            depthwise_inj_idx++;
+        }
     }
+
+    L(regular_store);
 
     for (int ii = 0; ii < oc_blocks; ii++) {
         for (int jj = 0; jj < ur_w; jj++) {
@@ -260,6 +287,7 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
     add(aux_reg_kernel, sizeof(float) * 4);
     add(reg_output, sizeof(float) * 4);
     add(reg_bias,   sizeof(float) * 4);
+    add(reg_oc_off, sizeof(float) * 4);
 
     inc(simd_iter);
     cmp(simd_iter, 2);
@@ -267,6 +295,7 @@ void jit_sse42_conv_fwd_kernel_f32::width_blk_step(int ur_w,
 
     sub(reg_output, sizeof(float) * 8);
     sub(reg_bias,   sizeof(float) * 8);
+    sub(reg_oc_off, sizeof(float) * 8);
 }
 
 inline void jit_sse42_conv_fwd_kernel_f32::solve_common(int oc_blocks)
@@ -324,6 +353,25 @@ inline void jit_sse42_conv_fwd_kernel_f32::solve_common(int oc_blocks)
 
 void jit_sse42_conv_fwd_kernel_f32::generate()
 {
+    const auto &p = attr_.post_ops_;
+    int end_idx = jcp.with_dw_conv ? p.find(primitive_kind::convolution) : p.len_;
+    for (int i = 0; i < end_idx; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<sse42>(
+                    this,
+                    post_op.eltwise.alg,
+                    post_op.eltwise.alpha,
+                    post_op.eltwise.beta
+            ));
+        } else if (post_op.is_depthwise()) {
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<sse42>(
+                    this,
+                    post_op.depthwise.alg
+            ));
+        }
+    }
+
     this->preamble();
 
     mov(reg_input, ptr[this->param1 + GET_OFF(src)]);
@@ -334,6 +382,7 @@ void jit_sse42_conv_fwd_kernel_f32::generate()
     mov(reg_kh, ptr[this->param1 + GET_OFF(kh_padding)]);
     mov(reg_ci_flag, ptr[this->param1 + GET_OFF(flags)]);
     mov(reg_oc_blocks, ptr[this->param1 + GET_OFF(oc_blocks)]);
+    mov(reg_oc_off, ptr[param1 + GET_OFF(oc_off)]);
 
     int nb_oc_tail = jcp.nb_oc % jcp.nb_oc_blocking;
     Label tail, exit;
@@ -355,8 +404,8 @@ void jit_sse42_conv_fwd_kernel_f32::generate()
 
     this->postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    for (auto& inj : eltwise_injectors)
+        inj->prepare_table();
 }
 
 bool jit_sse42_conv_fwd_kernel_f32::post_ops_ok(
@@ -364,18 +413,22 @@ bool jit_sse42_conv_fwd_kernel_f32::post_ops_ok(
     const auto &p = attr.post_ops_;
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
     auto is_dw_conv = [&](int idx) { return p.entry_[idx].is_dw_conv(); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
     switch (p.len_) {
-    case 0: return true;
-    case 1: return is_eltwise(0) || is_sum(0) || is_dw_conv(0);
-    case 2: return (is_sum(0) && is_eltwise(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
-                   (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1));
-    case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
-                   (is_dw_conv(0) && is_sum(1) && is_eltwise(2));
-    case 4: return is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3);
-    default: return false;
+        case 0: return true;
+        case 1: return is_simple(0) || is_sum(0) || is_dw_conv(0);
+        case 2: return (is_sum(0) && is_simple(1)) || (is_dw_conv(0) && is_eltwise(1)) ||
+                       (is_eltwise(0) && is_dw_conv(1)) || (is_dw_conv(0) && is_sum(1)) ||
+                       (is_simple(0) && is_simple(1));
+        case 3: return (is_eltwise(0) && is_dw_conv(1) && is_eltwise(2)) ||
+                       (is_dw_conv(0) && is_sum(1) && is_eltwise(2)) ||
+                       (is_sum(0) && is_simple(1) && is_simple(2));
+        case 4: return (is_eltwise(0) && is_dw_conv(1) && is_sum(2) && is_eltwise(3));
+        default: return false;
     }
 
     return false;
@@ -454,11 +507,6 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
         jcp.dw_conv_weights = p.entry_[dw_conv_ind].dw_conv.weights_data;
         jcp.dw_conv_biases = p.entry_[dw_conv_ind].dw_conv.biases_data;
     }
-
-    const int eltwise_ind = p.find(primitive_kind::eltwise, 0, dw_conv_ind);
-    jcp.with_eltwise = eltwise_ind != -1;
-    if (jcp.with_eltwise)
-        jcp.eltwise = p.entry_[eltwise_ind].eltwise;
 
     if (jcp.with_dw_conv) {
         int dw_conv_eltwise_ind = p.find(primitive_kind::eltwise, dw_conv_ind);
