@@ -57,6 +57,7 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_shuffle.cpp
                               test_convolution_format_any.cpp
                               test_convolution_forward_f32.cpp
+                              test_convolution_forward_f32_3d.cpp
                               test_convolution_forward_s16s16s32.cpp
                               test_convolution_forward_u8s8s32.cpp
                               test_convolution_forward_u8s8fp.cpp

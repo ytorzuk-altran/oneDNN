@@ -530,6 +530,35 @@ struct test_convolution_sizes_t {
     int dilh, dilw;
 };
 
+struct test_convolution_sizes_t_3d {
+    test_convolution_sizes_t_3d(
+        int mb,
+        int ng,
+        int ic, int id, int ih, int iw,
+        int oc, int od, int oh, int ow,
+        int kd, int kh, int kw,
+        int padd, int padh, int padw,
+        int strd, int strh, int strw,
+        int dild=0, int dilh=0, int dilw=0
+    ) :
+        mb(mb),
+        ng(ng),
+        ic(ic), id(id), ih(ih), iw(iw),
+        oc(oc), od(od), oh(oh), ow(ow),
+        kd(kd), kh(kh), kw(kw),
+        padd(padd), padh(padh), padw(padw),
+        strd(strd), strh(strh), strw(strw),
+        dild(dild), dilh(dilh), dilw(dilw) {}
+    int mb;
+    int ng;
+    int ic, id, ih, iw;
+    int oc, od, oh, ow;
+    int kd, kh, kw;
+    int padd, padh, padw;
+    int strd, strh, strw;
+    int dild, dilh, dilw;
+};
+
 struct test_convolution_attr_t {
     struct scale_t {
         enum policy_t { NONE = 0, COMMON };
@@ -580,6 +609,16 @@ struct test_convolution_params_t {
     test_convolution_formats_t formats;
     test_convolution_attr_t attr;
     test_convolution_sizes_t sizes;
+    bool expect_to_fail;
+    mkldnn_status_t expected_status;
+};
+
+struct test_convolution_params_t_3d {
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::algorithm aalgorithm;
+    test_convolution_formats_t formats;
+    test_convolution_attr_t attr;
+    test_convolution_sizes_t_3d sizes;
     bool expect_to_fail;
     mkldnn_status_t expected_status;
 };
