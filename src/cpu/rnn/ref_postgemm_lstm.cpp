@@ -41,7 +41,10 @@ rnn_postgemm_sig(rnn_postgemm_fwd_f32_t::lstm_postgemm) {
     ws_states_aoc_t c_states_tm1_l(rnn, c_states_tm1_l_);
 
     parallel_nd(rnn.mb, [&](int i) {
+// WA. Loss of correctnes in case of simd loop unrolling with icc 18
+#if !defined(__INTEL_COMPILER)
         PRAGMA_OMP_SIMD()
+#endif
         for (int j = 0; j < rnn.dic; j++) {
             ws_gates(i, 0, j) = logistic_fwd(ws_gates(i, 0, j) + bias(0, j));
             ws_gates(i, 1, j) = logistic_fwd(ws_gates(i, 1, j) + bias(1, j));
