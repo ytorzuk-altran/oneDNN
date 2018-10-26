@@ -246,7 +246,7 @@ status_t jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::init_conf(
     const bool is_f32 = src_d.data_type() == data_type::f32;
     const bool ok_to_pad_channels = true && !is_data_layout_nxc
             && jcp.oc == jcp.ngroups && jcp.ic == jcp.ngroups
-            && one_of(isa, avx512_common, avx512_core, avx2);
+            && one_of(isa, avx512_common, avx512_core, avx2, sse41);
     if (ok_to_pad_channels) {
         jcp.oc = rnd_up(jcp.oc, simd_w);
         jcp.ic = rnd_up(jcp.oc, simd_w);
