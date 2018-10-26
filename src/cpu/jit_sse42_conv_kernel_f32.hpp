@@ -51,6 +51,8 @@ struct jit_sse42_conv_fwd_kernel_f32: public jit_generator {
             const convolution_desc_t &cd, const memory_desc_wrapper &src_d,
             const memory_desc_wrapper &weights_d,
             const memory_desc_wrapper &dst_d, const primitive_attr_t &attr);
+    static void init_scratchpad(memory_tracking::registrar_t &scratchpad,
+            const jit_conv_conf_t &jcp);
 
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sse42_conv_fwd_kernel_f32)
     jit_conv_conf_t jcp;

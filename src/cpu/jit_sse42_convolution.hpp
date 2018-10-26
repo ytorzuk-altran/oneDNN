@@ -59,9 +59,15 @@ struct jit_sse42_convolution_fwd_t: public cpu_primitive_t {
                         data_type::f32 == this->desc()->bias_desc.data_type);
             if (!ok) return status::unimplemented;
 
-            return jit_sse42_conv_fwd_kernel_f32::init_conf(jcp_, *this->desc(),
+            status_t status = jit_sse42_conv_fwd_kernel_f32::init_conf(jcp_, *this->desc(),
                     *this->src_pd_.desc(), *this->weights_pd_.desc(),
                     *this->dst_pd_.desc(), *this->attr());
+            if (status != status::success) return status;
+
+            auto scratchpad = scratchpad_registry().registrar();
+            jit_sse42_conv_fwd_kernel_f32::init_scratchpad(scratchpad, jcp_);
+
+            return status::success;
         }
 
         jit_conv_conf_t jcp_;

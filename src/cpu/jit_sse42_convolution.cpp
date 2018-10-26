@@ -26,6 +26,7 @@ namespace cpu {
 
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
+using namespace mkldnn::impl::memory_tracking::names;
 using namespace mkldnn::impl::utils;
 
 #define src_blk_off(f, n, c, h, w) \
@@ -58,6 +59,14 @@ void jit_sse42_convolution_fwd_t::execute_forward() const {
 
     int ocb_work = div_up(jcp.nb_oc, jcp.nb_oc_blocking);
     const size_t work_amount = MB * jcp.ngroups * ocb_work * jcp.oh;
+
+    if (pd()->wants_padded_bias()) {
+        auto padded_bias = scratchpad().get<data_t>(key_conv_padded_bias);
+        utils::array_copy(padded_bias, bias, jcp.oc_without_padding);
+        utils::array_set(padded_bias + jcp.oc_without_padding, 0.f,
+                jcp.oc - jcp.oc_without_padding);
+        bias = padded_bias;
+    }
 
     parallel(0, [&](const int ithr, const int nthr) {
         size_t start{ 0 }, end{ 0 };

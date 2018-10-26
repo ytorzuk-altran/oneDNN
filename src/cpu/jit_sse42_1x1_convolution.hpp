@@ -67,6 +67,9 @@ struct jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
                     *this->src_pd_.desc(), *this->weights_pd_.desc(),
                     *this->dst_pd_.desc(), *this->attr());
 
+            auto scratchpad = scratchpad_registry().registrar();
+            jit_sse42_1x1_conv_kernel_f32::init_scratchpad(scratchpad, jcp_);
+
             return result;
         }
 

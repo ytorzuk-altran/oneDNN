@@ -33,6 +33,7 @@ namespace cpu {
 
 using namespace mkldnn::impl::status;
 using namespace mkldnn::impl::memory_format;
+using namespace mkldnn::impl::memory_tracking::names;
 using namespace mkldnn::impl::utils;
 
 void jit_sse42_1x1_convolution_fwd_t::execute_forward() const {
@@ -50,6 +51,14 @@ void jit_sse42_1x1_convolution_fwd_t::execute_forward() const {
     int MB = pd()->MB();
 
     const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
+
+    if (pd()->wants_padded_bias()) {
+        auto padded_bias = scratchpad().get<data_t>(key_conv_padded_bias);
+        utils::array_copy(padded_bias, bias, jcp.oc_without_padding);
+        utils::array_set(padded_bias + jcp.oc_without_padding, 0.f,
+                jcp.oc - jcp.oc_without_padding);
+        bias = padded_bias;
+    }
 
     parallel(0, [&](const int ithr, const int nthr) {
         // TODO (Roma): remove this restriction
