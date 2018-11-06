@@ -77,6 +77,7 @@
 #include "cpu/jit_uni_x8s8s32x_convolution.hpp"
 #include "cpu/jit_uni_x8s8s32x_dw_convolution.hpp"
 #include "cpu/jit_sse42_i8i8_pooling.hpp"
+#include "cpu/jit_uni_planar_convolution.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -114,6 +115,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_rnn_fwd_u8s8_t),
     INSTANCE(ref_rnn_bwd_f32_t),
     /* conv */
+    INSTANCE(jit_avx512_common_planar_convolution_fwd_t),
     INSTANCE(jit_avx512_common_dw_convolution_fwd_t),
     INSTANCE(jit_avx512_common_dw_convolution_bwd_data_t),
     INSTANCE(jit_avx512_common_dw_convolution_bwd_weights_t),
@@ -132,6 +134,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_common_convolution_fwd_t<f32>),
     INSTANCE(jit_avx512_common_convolution_bwd_data_t<f32>),
     INSTANCE(jit_avx512_common_convolution_bwd_weights_t<f32>),
+    INSTANCE(jit_avx2_planar_convolution_fwd_t),
     INSTANCE(jit_avx2_dw_convolution_fwd_t),
     INSTANCE(jit_avx2_dw_convolution_bwd_data_t),
     INSTANCE(jit_avx2_dw_convolution_bwd_weights_t),

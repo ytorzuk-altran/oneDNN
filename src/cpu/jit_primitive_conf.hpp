@@ -146,6 +146,13 @@ struct jit_conv_conf_t {
     float wei_adj_scale;
 
     cpu_isa_t isa;
+
+    // planar conv
+    int nb_ow_blocking;
+
+    int oh_block;
+    int nb_oh_blocking;
+    int oh_block_step;
 };
 
 // calculates filter size taking into account dilation
@@ -326,6 +333,7 @@ struct jit_conv_call_s {
     size_t ch_work;
     size_t t_overflow;
     size_t b_overflow;
+    size_t oh_blocks;
     int flags;
 
     const void *src_row0; /* hack, non-const for backward_data */
