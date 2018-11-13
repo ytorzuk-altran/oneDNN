@@ -156,6 +156,9 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(f32, any, f32, gOIdhw16o16i),
     REG_SR_BIDIR(f32, any, f32, gOIdhw16i16o),
 
+    /* WA to prevent fallback on reference implementations */
+    REG_SR_DIRECT_COPY(u8, f32),
+
  /* fp32: blocked <-> blocked with tail */
     REG_SR_BIDIR(f32, nCw8c, f32, nCw16c),
     REG_SR_BIDIR(f32, nChw4c, f32, nChw16c),
@@ -163,6 +166,22 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(f32, nCdhw8c, f32, nCdhw16c),
 
     /* int: flat <-> blocked with tail */
+    REG_SR_BIDIR(f32, any, s32, nChw8c),
+    REG_SR_BIDIR(f32, any, s8, nChw8c),
+    REG_SR_BIDIR(f32, any, u8, nChw8c),
+    REG_SR_BIDIR(s32, any, f32, nChw8c),
+    REG_SR_BIDIR(s32, any, s32, nChw8c),
+    REG_SR_BIDIR(s32, any, s8, nChw8c),
+    REG_SR_BIDIR(s32, any, u8, nChw8c),
+    REG_SR_BIDIR(s8, any, f32, nChw8c),
+    REG_SR_BIDIR(s8, any, s32, nChw8c),
+    REG_SR_BIDIR(s8, any, s8, nChw8c),
+    REG_SR_BIDIR(s8, any, u8, nChw8c),
+    REG_SR_BIDIR(u8, any, f32, nChw8c),
+    REG_SR_BIDIR(u8, any, s32, nChw8c),
+    REG_SR_BIDIR(u8, any, s8, nChw8c),
+    REG_SR_BIDIR(u8, any, u8, nChw8c),
+
     REG_SR_BIDIR(f32, any, s32, nChw16c),
     REG_SR_BIDIR(f32, any, s8, nChw16c),
     REG_SR_BIDIR(f32, any, u8, nChw16c),
