@@ -65,6 +65,7 @@ struct jit_conv_conf_t {
     int ndims;
     int mb;
     int ngroups, ic, oc, oc_without_padding, ic_without_padding;
+    int oc_padded;
     int id, ih, iw, od, oh, ow;
     int f_pad, l_pad, t_pad;
     int back_pad, r_pad, b_pad;
@@ -83,20 +84,9 @@ struct jit_conv_conf_t {
 
     int idp, ihp, iwp, ohp, owp;
 
-    int dw_conv_in_h;
-    int dw_conv_in_w;
-    int dw_conv_ker_h;
-    int dw_conv_ker_w;
-    int dw_conv_str_h;
-    int dw_conv_str_w;
-    const float* dw_conv_weights;
-    const float* dw_conv_biases;
-
-    bool dw_conv_with_sum;
-    bool dw_conv_with_eltwise;
-    alg_kind_t dw_conv_eltwise_alg;
-    float dw_conv_eltwise_alpha;
-    float dw_conv_eltwise_beta;
+    const float* conv_weights;
+    const float* conv_biases;
+    int dw_conv_oh, dw_conv_ow;
 
     int nb_ic, ic_block;
     int nb_oc, oc_block;
@@ -132,6 +122,7 @@ struct jit_conv_conf_t {
     int oc_nb1;
     int ur_ow_max, ur_ow, ur_ow_tail;
     int ur_ow_nsteps;
+    data_type_t src_dt;
     data_type_t bia_dt;
     /* bf16 data-type for output */
     data_type_t dst_dt;
@@ -328,9 +319,11 @@ struct jit_conv_call_s {
     size_t channel;
     size_t channel_prf;
     size_t oc_blocks;
+    size_t oc_work;
     size_t ur_w;
     size_t ur_str_w;
     size_t ch_blocks;
+    size_t ch_work;
     size_t t_overflow;
     size_t b_overflow;
     int flags;
@@ -404,21 +397,6 @@ struct jit_1x1_conv_conf_t {
 
     post_ops_t::entry_t::eltwise_t eltwise;
 
-    int dw_conv_in_h;
-    int dw_conv_in_w;
-    int dw_conv_ker_h;
-    int dw_conv_ker_w;
-    int dw_conv_str_h;
-    int dw_conv_str_w;
-    const float* dw_conv_weights;
-    const float* dw_conv_biases;
-
-    bool dw_conv_with_sum;
-    bool dw_conv_with_eltwise;
-    alg_kind_t dw_conv_eltwise_alg;
-    float dw_conv_eltwise_alpha;
-    float dw_conv_eltwise_beta;
-
     int is, os;
     int ic_block, oc_block;
 
@@ -451,12 +429,24 @@ struct jit_1x1_conv_conf_t {
     int tr_is;
     int nthr, nthr_mb, nthr_g, nthr_oc_b, nthr_ic_b;
     int is_oc_scale;
+    data_type_t src_dt;
     data_type_t bia_dt;
     data_type_t dst_dt;
     bool signed_input;
     float wei_adj_scale;
+    int dw_conv_oh, dw_conv_ow;
 
     cpu_isa_t isa;
+
+    /* u8s8s32x */
+    int ic_dim, nb_ic, nb_ic_blocking, nb_ic_blocking_max;
+    int oc_dim, nb_oc, nb_oc_blocking, nb_oc_blocking_max;
+    int is_dim, os_block, nb_oh_blocking, nb_oh_blocking_max;
+    int ow_tail;
+
+    int ic_loop_unroll, ic_loop_src_step, ic_loop_wei_step;
+    int os_loop_dst_step, os_loop_src_step, os_loop_acc_step;
+    int os_loop_src_tail_step, os_loop_dst_tail_step, os_loop_acc_tail_step;
 };
 
 struct jit_gemm_conv_conf_t {
@@ -510,6 +500,14 @@ struct jit_1x1_conv_call_s {
     const void *bias_dw;
 
     size_t oc_off;
+
+    /* u8s8s32x */
+    size_t oc_dim;
+    size_t os_dim;
+    size_t ic_dim;
+    size_t ic_pos_flag;
+	const void *is_data;
+	const void *oc_data;
 };
 
 /* pooling */

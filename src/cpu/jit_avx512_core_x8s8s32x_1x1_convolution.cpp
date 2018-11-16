@@ -188,6 +188,8 @@ void jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t<src_type, dst_type>
         } else
             p.bcast_data = src + src_d.blk_off(n, _icb * jcp.ic_block, ih, iw);
 
+        p.oc_off = _ocb * jcp.oc_block * sizeof(float);
+
         kernel_->jit_ker(&p);
     };
 

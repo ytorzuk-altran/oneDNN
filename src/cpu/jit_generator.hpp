@@ -659,6 +659,16 @@ public:
         vpsrld(x, op, imm);
     }
 
+    void uni_vpsrldq(const Xbyak::Xmm &x, const Xbyak::Operand &op,
+                    const int imm) {
+        assert(x.getIdx() == op.getIdx());
+        psrldq(x, imm);
+    }
+    void uni_vpsrldq(const Xbyak::Ymm &x, const Xbyak::Operand &op,
+                    const int imm) {
+        vpsrldq(x, op, imm);
+    }
+
     void uni_vmaxps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
                     const Xbyak::Operand &op2 = Xbyak::Operand()) {
         assert(x.getIdx() == op1.getIdx());
@@ -771,6 +781,99 @@ public:
         vpackuswb(x1, x2, op);
     }
 
+    void uni_vpmovsxbd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+        pmovsxbd(x, op);
+    }
+    void uni_vpmovsxbd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
+        vpmovsxbd(x, op);
+    }
+
+    void uni_vpmovzxbd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+        pmovzxbd(x, op);
+    }
+    void uni_vpmovzxbd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
+        vpmovzxbd(x, op);
+    }
+
+    void uni_vpackusdw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        packusdw(x1, op);
+    }
+    void uni_vpackusdw(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpackusdw(x1, x2, op);
+    }
+
+    void uni_vpacksswb(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        packsswb(x1, op);
+    }
+    void uni_vpacksswb(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpacksswb(x1, x2, op);
+    }
+
+    void uni_vpmaxsd(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pmaxsd(x1, op);
+    }
+    void uni_vpmaxsd(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpmaxsd(x1, x2, op);
+    }
+
+    void uni_vpmaxsb(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pmaxsb(x1, op);
+    }
+    void uni_vpmaxsb(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpmaxsb(x1, x2, op);
+    }
+
+    void uni_vpmaxub(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pmaxub(x1, op);
+    }
+    void uni_vpmaxub(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpmaxub(x1, x2, op);
+    }
+
+    void uni_vpmaddubsw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pmaddubsw(x1, op);
+    }
+    void uni_vpmaddubsw(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpmaddubsw(x1, x2, op);
+    }
+
+    void uni_vpmaddwd(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pmaddwd(x1, op);
+    }
+    void uni_vpmaddwd(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpmaddwd(x1, x2, op);
+    }
+
+    void uni_vpmulld(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pmulld(x1, op);
+    }
+    void uni_vpmulld(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpmulld(x1, x2, op);
+    }
+
+    void uni_vpsubb(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        psubb(x1, op);
+    }
+    void uni_vpsubb(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpsubb(x1, x2, op);
+    }
+
+    void uni_vpslldq(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::uint8 &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pslldq(x1, op);
+    }
+    void uni_vpslldq(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::uint8 &op) {
+        vpslldq(x1, x2, op);
+    }
 
     void mul_by_const(const Xbyak::Reg &out,
             const Xbyak::Reg64 &tmp, int value) {

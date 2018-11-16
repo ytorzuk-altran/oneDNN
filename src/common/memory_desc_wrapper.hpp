@@ -96,6 +96,7 @@ struct memory_desc_wrapper: public c_compatible {
                 hwio_s8s8, hwigo_s8s8, gOIhw4o4i_s8s8,
                 gOIw4i16o4i_s8s8, OIw4i16o4i_s8s8, gOIhw4i16o4i_s8s8,
                 OIhw4i16o4i_s8s8, gOIhw2i8o4i_s8s8, Goiw16g_s8s8,
+                gOhIw8o4i_s8s8, OhIw8o4i_s8s8,
                 Goihw16g_s8s8))
             ? sizeof(int32_t) : 0;
     }
@@ -106,7 +107,8 @@ struct memory_desc_wrapper: public c_compatible {
         return (utils::one_of(format(),
                 hwio_s8s8, hwigo_s8s8, gOIhw4o4i_s8s8, gOIw4i16o4i_s8s8,
                 OIw4i16o4i_s8s8, gOIhw4i16o4i_s8s8, OIhw4i16o4i_s8s8,
-                gOIhw2i8o4i_s8s8, Goiw16g_s8s8, Goihw16g_s8s8))
+                gOIhw2i8o4i_s8s8, gOhIw8o4i_s8s8, OhIw8o4i_s8s8,
+                Goiw16g_s8s8, Goihw16g_s8s8))
             ? true : false;
     }
 
@@ -122,11 +124,13 @@ struct memory_desc_wrapper: public c_compatible {
             case gOIhw2i8o4i_s8s8:
             case gOIw4i16o4i_s8s8:
             case gOIhw4i16o4i_s8s8:
+            case gOhIw8o4i_s8s8:
                 return size_t(padding_dims[0]) * size_t(padding_dims[1])
                     * additional_buffer_data_size();
             case hwio_s8s8:
             case OIw4i16o4i_s8s8:
             case OIhw4i16o4i_s8s8:
+            case OhIw8o4i_s8s8:
                 return size_t(padding_dims[0]) * additional_buffer_data_size();
             default:
                 return 0;

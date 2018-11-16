@@ -66,14 +66,44 @@ using convolution_test_s8s8s32f32 =
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
     {__VA_ARGS__} }
 
-#define INST_TEST_CASE_P(test) \
+#define INST_TEST_CASE_P_UNSIGNED(test) \
 TEST_P(test, TestConvolutionEltwise) {} \
 INST_TEST_CASE(SimpleSmall_Blocked16, test, \
-PARAMS(nhwc, OIhw4i16o4i, x, nhwc, 2, 1, 32, 13, 13, 32, 12, 12, 3, 3, 0, 0, 1, 1), \
-PARAMS(nhwc, Goihw16g, x, nhwc, 2, 32, 32, 13, 13, 32, 13, 13, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, OIhw4i16o4i, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, Goihw16g, x, nhwc, 2, 32, 32, 13, 13, 32, 13, 13, 3, 3, 1, 1, 1, 1), \
 PARAMS(nhwc, OIhw4i16o4i, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 3, 3, 1, 1, 1, 1) \
+);\
+\
+INST_TEST_CASE(SimpleSmall_Blocked8, test, \
+PARAMS(nhwc, OhIw8o4i, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, Goihw8g, x, nhwc, 2, 32, 32, 13, 13, 32, 13, 13, 3, 3, 1, 1, 1, 1), \
+PARAMS(nhwc, OhIw8o4i, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 3, 3, 1, 1, 1, 1) \
+);\
+\
+INST_TEST_CASE(SimpleSmall_Blocked8_Tail, test, \
+PARAMS(nhwc, OhIw8o4i, x, nhwc, 2, 1, 47, 20, 20, 47, 20, 20, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, Goihw8g, x, nhwc, 2, 47, 47, 20, 20, 47, 20, 20, 3, 3, 1, 1, 1, 1), \
+PARAMS(nhwc, OhIw8o4i, x, nhwc, 2, 1, 47, 20, 20, 47, 20, 20, 3, 3, 1, 1, 1, 1) \
 );
 
-INST_TEST_CASE_P(convolution_test_s8s8s32f32);
-INST_TEST_CASE_P(convolution_test_u8s8s32f32);
+#define INST_TEST_CASE_P_SIGNED(test) \
+TEST_P(test, TestConvolutionEltwise) {} \
+INST_TEST_CASE(SimpleSmall_Blocked16, test, \
+PARAMS(nhwc, OIhw4i16o4i_s8s8, x, nhwc, 2, 1, 32, 13, 13, 32, 12, 12, 3, 3, 0, 0, 1, 1), \
+PARAMS(nhwc, Goihw16g_s8s8, x, nhwc, 2, 32, 32, 13, 13, 32, 13, 13, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, OIhw4i16o4i_s8s8, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 3, 3, 1, 1, 1, 1) \
+);\
+\
+INST_TEST_CASE(SimpleSmall_Blocked8, test, \
+PARAMS(nhwc, OhIw8o4i_s8s8, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, OhIw8o4i_s8s8, x, nhwc, 2, 1, 32, 13, 13, 32, 13, 13, 3, 3, 1, 1, 1, 1) \
+);\
+\
+INST_TEST_CASE(SimpleSmall_Blocked8_Tail, test, \
+PARAMS(nhwc, OhIw8o4i_s8s8, x, nhwc, 2, 1, 47, 20, 20, 47, 20, 20, 1, 1, 0, 0, 1, 1), \
+PARAMS(nhwc, OhIw8o4i_s8s8, x, nhwc, 2, 1, 47, 20, 20, 47, 20, 20, 3, 3, 1, 1, 1, 1) \
+);
+
+//INST_TEST_CASE_P_SIGNED(convolution_test_s8s8s32f32);
+INST_TEST_CASE_P_UNSIGNED(convolution_test_u8s8s32f32);
 }

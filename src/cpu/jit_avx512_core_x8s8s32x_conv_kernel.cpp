@@ -48,23 +48,6 @@ void pick_loop_order(jit_conv_conf_t &jcp, int nthr)
 }
 
 template<typename Vmm>
-bool _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::maybe_eltwise(int position)
-{
-    using namespace primitive_kind;
-    const auto &p = attr_.post_ops_;
-
-    if (position == 0) {
-        /* eltwise before sum */
-        return p.contain(eltwise, 0);
-    } else if (position == 1) {
-        /* eltwise after sum */
-        return p.contain(sum, 0) && p.contain(eltwise, 1);
-    }
-
-    return false;
-}
-
-template<typename Vmm>
 void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::prepare_output(int ur_w)
 {
     int nb_oc_block
@@ -116,18 +99,6 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::cvt2ps(data_type_t type_in,
     }
     if (type_in != data_type::f32)
         vcvtdq2ps(vmm_in, vmm_in);
-}
-
-template<typename Vmm>
-void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::compute_eltwise(int ur_w) {
-    int nb_oc_block
-            = jcp.is_depthwise ? jcp.nb_ch_blocking : jcp.nb_oc_blocking;
-    if (ur_w == jcp.ur_w)
-        eltwise_injector_->compute_vector_range(0, nb_oc_block * jcp.ur_w);
-    else
-        for (int k = 0; k < nb_oc_block; k++)
-            eltwise_injector_->compute_vector_range(k * jcp.ur_w,
-                k * jcp.ur_w + ur_w);
 }
 
 template<typename Vmm>
@@ -195,27 +166,53 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::store_output(
         }
     }
 
-    /* Do post-ops */
-    if (maybe_eltwise(0)) compute_eltwise(ur_w);
-    if (p_sum_scale) { // post_op: sum
-        for (int k = 0; k < nb_oc_block; k++) {
-            const bool mask_flag = last_oc_block_flag && k == nb_oc_block - 1;
-            for (int j = 0; j < ur_w; j++) {
-                int aux_output_offset
-                        = jcp.typesize_out
-                        * (k * oc_block
-                                  + j * jcp.oc_without_padding * jcp.ngroups);
-                auto addr = EVEX_compress_addr(reg_out, aux_output_offset);
-                Vmm vmm = vmm_out(j, k);
-                cvt2ps(jcp.dst_dt, vmm_prev_dst, addr, mask_flag);
-                if (*p_sum_scale == 1.f)
-                    vaddps(vmm, vmm_prev_dst);
-                else
-                    vfmadd231ps(vmm, vmm_prev_dst, zword_b[reg_ptr_sum_scale]);
+    int eltwise_inj_idx = 0;
+    int depthwise_inj_idx = 0;
+    for (int i = 0; i < p.len_; i++) {
+        auto& post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            if (ur_w == jcp.ur_w)
+               eltwise_injectors[eltwise_inj_idx]->compute_vector_range(0, nb_oc_block * jcp.ur_w);
+            else
+                for (int k = 0; k < nb_oc_block; k++)
+                    eltwise_injectors[eltwise_inj_idx]->compute_vector_range(k * jcp.ur_w, k * jcp.ur_w + ur_w);
+
+            eltwise_inj_idx++;
+        } else if (post_op.is_depthwise()) {
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+
+            add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+            add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+            for (int k = 0; k < nb_oc_block; k++) {
+                depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                        k * jcp.ur_w, k * jcp.ur_w + ur_w, reg_d_weights, reg_d_bias);
+
+                add(reg_d_weights, oc_block * sizeof(float));
+                add(reg_d_bias, oc_block * sizeof(float));
+            }
+
+            depthwise_inj_idx++;
+        } else if (post_op.is_sum(false)) {
+            for (int k = 0; k < nb_oc_block; k++) {
+                const bool mask_flag = last_oc_block_flag && k == nb_oc_block - 1;
+                for (int j = 0; j < ur_w; j++) {
+                    int aux_output_offset
+                            = jcp.typesize_out
+                            * (k * oc_block
+                                      + j * jcp.oc_without_padding * jcp.ngroups);
+                    auto addr = EVEX_compress_addr(reg_out, aux_output_offset);
+                    Zmm zmm = zmm_out(j, k);
+                    cvt2ps(jcp.dst_dt, vmm_prev_dst, addr, mask_flag);
+                    if (*p_sum_scale == 1.f)
+                        vaddps(zmm, vmm_prev_dst);
+                    else
+                        vfmadd231ps(zmm, vmm_prev_dst, zword_b[reg_ptr_sum_scale]);
+                }
             }
         }
     }
-    if (maybe_eltwise(1)) compute_eltwise(ur_w);
 
     /* write out register to output_addr */
     for (int k = 0; k < nb_oc_block; k++) {
@@ -620,6 +617,24 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::icb_loop(
 template<typename Vmm>
 void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::generate()
 {
+    const auto &p = attr_.post_ops_;
+    for (int i = 0; i < p.len_; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common>(
+                    this,
+                    post_op.eltwise.alg,
+                    post_op.eltwise.alpha,
+                    post_op.eltwise.beta
+            ));
+        } else if (post_op.is_depthwise()) {
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
+                    this,
+                    post_op.depthwise.alg
+            ));
+        }
+    }
+
     Label permute_index_table;
     int inp_shift_pad = jcp.typesize_in * (jcp.ur_w * jcp.stride_w - jcp.l_pad)
         * jcp.ic_without_padding * jcp.ngroups;
@@ -845,8 +860,8 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::generate()
     }
     postamble();
 
-    if (jcp.with_eltwise)
-        eltwise_injector_->prepare_table();
+    for (auto& inj : eltwise_injectors)
+        inj->prepare_table();
 
     if (jcp.is_fast_depthwise) {
         align(64);
@@ -865,13 +880,17 @@ bool jit_avx512_core_x8s8s32x_fwd_kernel::post_ops_ok(
     const auto &p = attr.post_ops_;
 
     auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
+    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
+    auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(false); };
+    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
 
     switch (p.len_) {
-    case 0: return true;
-    case 1: return is_eltwise(0) || p.contain(sum, 0);
-    case 2: return (p.contain(sum, 0) && is_eltwise(1)) ||
-                        (p.contain(sum, 1) && is_eltwise(0));
-    default: return false;
+        case 0: return true;
+        case 1: return is_simple(0) || is_sum(0);
+        case 2: return (is_sum(0) && is_simple(1)) || (is_simple(0) && is_sum(1)) ||
+                       (is_simple(0) && is_simple(1));
+        case 3: return (is_simple(0) && is_sum(1) && is_simple(2));
+        default: return false;
     }
 
     return false;
@@ -969,12 +988,6 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
 
     if (!post_ops_ok(jcp, attr))
         return status::unimplemented;
-
-    const auto &p = attr.post_ops_;
-    const int eltwise_ind = p.find(primitive_kind::eltwise);
-    jcp.with_eltwise = eltwise_ind != -1;
-    if (jcp.with_eltwise)
-        jcp.eltwise = p.entry_[eltwise_ind].eltwise;
 
     jcp.ver = mayiuse(avx512_core_vnni) ? ver_vnni : ver_avx512_core;
     jcp.is_fast_depthwise = true && jcp.is_depthwise && jcp.ver == ver_vnni

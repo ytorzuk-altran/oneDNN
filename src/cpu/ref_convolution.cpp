@@ -205,22 +205,30 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
 
     parallel_nd(G, MB, OC, OD, OH, OW,
         [&](int g, int mb, int oc, int od, int oh, int ow) {
-        float a = bias
+        float a_fp = bias
             ? get_bias(bias, bias_d.off(g * OC + oc),
                     pd()->desc()->bias_desc.data_type)
             : 0;
         if (src_d.is_plain() && weights_d.is_plain())
-            a += ker_plain(g, mb, oc, od, oh, ow);
+            a_fp += ker_plain(g, mb, oc, od, oh, ow);
         else
-            a += ker(g, mb, oc, od, oh, ow);
-        if (with_relu && a < 0)
-            a = a * nslope;
+            a_fp += ker(g, mb, oc, od, oh, ow);
+        if (with_relu && a_fp < 0)
+            a_fp = a_fp * nslope;
+
+        if (data_traits<dst_data_t>::data_type != data_type::f32) {
+            switch (pd()->attr()->round_mode_) {
+                case round_mode::down:    a_fp = floorf(a_fp); break;
+                case round_mode::nearest: a_fp = nearbyintf(a_fp); break;
+            }
+        }
+
         if (ndims == 5)
-            dst[dst_d.off(mb, g*OC + oc, od, oh, ow)] = saturate<dst_data_t>(a);
+            dst[dst_d.off(mb, g*OC + oc, od, oh, ow)] = saturate<dst_data_t>(a_fp);
         else if (ndims == 4)
-            dst[dst_d.off(mb, g*OC + oc, oh, ow)] = saturate<dst_data_t>(a);
+            dst[dst_d.off(mb, g*OC + oc, oh, ow)] = saturate<dst_data_t>(a_fp);
         else if (ndims == 3)
-            dst[dst_d.off(mb, g*OC + oc, ow)] = saturate<dst_data_t>(a);
+            dst[dst_d.off(mb, g*OC + oc, ow)] = saturate<dst_data_t>(a_fp);
         else
             assert(false);
    });

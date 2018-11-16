@@ -167,7 +167,7 @@ void jit_avx2_convolution_fwd_t::execute_forward() const {
         output_memory_primitive(0)->zero_pad();
 }
 
-void jit_avx2_convolution_fwd_t::execute_forward_fusing() const {
+void jit_avx2_convolution_fwd_t::execute_forward_with_dw_conv() const {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto weights = reinterpret_cast<const data_t *>(this->input_memory(1));
     auto bias = reinterpret_cast<const data_t *>(this->input_memory(2));
@@ -181,7 +181,7 @@ void jit_avx2_convolution_fwd_t::execute_forward_fusing() const {
     const auto &jcp_dw = kernel_dw_->jcp;
     const int MB = pd()->MB();
 
-    auto dw_bias = jcp.dw_conv_biases;
+    auto dw_bias = jcp_dw.conv_biases;
 
     int ocb_work = div_up(jcp.nb_oc, jcp.nb_oc_blocking);
     const size_t work_amount = MB * jcp.ngroups * ocb_work * jcp.oh;
@@ -191,8 +191,8 @@ void jit_avx2_convolution_fwd_t::execute_forward_fusing() const {
             for (int h = 0; h < num_rows; h++) {
                 if ((oh + h) < 0 || (oh + h) >= jcp.oh) {
                     for (int chb = ocb; chb < ocb + ocb_num; chb++) {
-                        memset(ws_p + (((oh + h) + 1) % jcp.dw_conv_ker_h) * jcp.ow * jcp.oc_block +
-                               (chb - ocb) * jcp.dw_conv_ker_h * jcp.ow * jcp.oc_block, 0, jcp.ow * jcp.oc_block * sizeof(float));
+                        memset(ws_p + (((oh + h) + 1) % jcp_dw.kh) * jcp.ow * jcp.oc_block +
+                               (chb - ocb) * jcp_dw.kh * jcp.ow * jcp.oc_block, 0, jcp.ow * jcp.oc_block * sizeof(float));
                     }
                 } else {
                     for (int icb = 0; icb < jcp.nb_ic; ++icb) {
@@ -213,7 +213,7 @@ void jit_avx2_convolution_fwd_t::execute_forward_fusing() const {
                         par_conv.src = &src[src_d.blk_off(n,
                                                           jcp.ic == 3 ? 0 : _ic, ih, 0)];
 
-                        par_conv.dst = &ws_p[(((oh + h) + 1) % jcp.dw_conv_ker_h) * jcp.ow *
+                        par_conv.dst = &ws_p[(((oh + h) + 1) % jcp_dw.kh) * jcp.ow *
                                              jcp.oc_block];
 
                         const int wh = div_up(i_t_overflow, (jcp.dilate_h + 1));
@@ -266,9 +266,11 @@ void jit_avx2_convolution_fwd_t::execute_forward_fusing() const {
                                        dst_idx/jcp_dw.stride_h*jcp_dw.ow*jcp_dw.ch_block];
 
                 par_conv_dw.kh_padding = jcp_dw.kh;
-                par_conv_dw.filt = &jcp.dw_conv_weights[chb * jcp_dw.kh * jcp_dw.kw * jcp_dw.ch_block];
+                par_conv_dw.filt = &jcp_dw.conv_weights[chb * jcp_dw.kh * jcp_dw.kw * jcp_dw.ch_block];
                 par_conv_dw.bias = &dw_bias[chb * jcp_dw.ch_block];
                 par_conv_dw.ur_w = (size_t)(jcp_dw.ow);
+                par_conv_dw.oc_work = nstl::min((chb + 1) * jcp_dw.ch_block, (int)jcp_dw.oc) - chb*jcp_dw.ch_block;
+                par_conv_dw.oc_off = chb * jcp_dw.ch_block * sizeof(float);
 
                 kernel_dw_->jit_ker(&par_conv_dw);
             }

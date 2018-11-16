@@ -75,7 +75,9 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_rnn_forward.cpp
                               test_roi_pooling_forward.cpp
                               test_convolution_depthwise_forward_f32.cpp
+                              test_convolution_depthwise_forward_x8s8f32s32.cpp
                               test_convolution_dw_conv_f32.cpp
+                              test_convolution_dw_conv_u8s8s32.cpp
                               ) #temporary
 
 foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})

@@ -21,7 +21,7 @@
 
 namespace mkldnn {
 
-using convolution_test = convolution_depthwise_test<float, float, float, float>;
+using convolution_test = convolution_depthwise_test<uint8_t, int8_t, int32_t, float>;
 
 TEST_P(convolution_test, TestConvolution)
 {
@@ -31,9 +31,9 @@ TEST_P(convolution_test, TestConvolution)
     { mkldnn::memory::format::src, mkldnn::memory::format::weights, \
     mkldnn::memory::format::bias, mkldnn::memory::format::dst }
 
-#define FMT_WEIGHTS_BLOCKED8 OIhw8i8o
+#define FMT_WEIGHTS_BLOCKED8 OhIw8o4i
 #define FMT_WEIGHTS_BLOCKED8_DW Goihw8g
-#define FMT_WEIGHTS_BLOCKED16 OIhw16i16o
+#define FMT_WEIGHTS_BLOCKED16 OIhw4i16o4i
 #define FMT_WEIGHTS_BLOCKED16_DW Goihw16g
 
 #define ENGINE mkldnn::engine::kind::cpu
@@ -61,35 +61,46 @@ TEST_P(convolution_test, TestConvolution)
     {__VA_ARGS__} }
 
     INST_TEST_CASE(SimpleSmall,
-        PARAMS(nchw, oihw, x, nchw,
+        PARAMS(nhwc, oihw, x, nhwc,
                2, 1, 32, 13, 13, 48, 11, 11, 3, 3, 0, 0, 1, 1),
-        PARAMS(nchw, oihw, x, nchw,
+        PARAMS(nhwc, oihw, x, nhwc,
                2, 1, 16, 13, 13, 48, 13, 13, 1, 1, 0, 0, 1, 1),
-        PARAMS(nchw, goihw, x, nchw,
+        PARAMS(nhwc, goihw, x, nhwc,
                2, 64, 64, 16, 16, 64, 16, 16, 3, 3, 0, 0, 1, 1),
-        PARAMS(nchw, goihw, x, nchw,
+        PARAMS(nhwc, goihw, x, nhwc,
                2, 32, 32, 9, 9, 32, 9, 9, 1, 1, 0, 0, 1, 1)
     );
 
     INST_TEST_CASE(SimpleSmall_Blocked8,
-        PARAMS(nChw8c, FMT_WEIGHTS_BLOCKED8, x, nChw8c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8, x, nhwc,
                2, 1, 32, 13, 13, 48, 11, 11, 3, 3, 0, 0, 1, 1),
-        PARAMS(nChw8c, FMT_WEIGHTS_BLOCKED8, x, nChw8c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8, x, nhwc,
                2, 1, 16, 13, 13, 48, 13, 13, 1, 1, 0, 0, 1, 1),
-        PARAMS(nChw8c, FMT_WEIGHTS_BLOCKED8_DW, x, nChw8c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8_DW, x, nhwc,
                2, 64, 64, 16, 16, 64, 16, 16, 3, 3, 0, 0, 1, 1),
-        PARAMS(nChw8c, FMT_WEIGHTS_BLOCKED8_DW, x, nChw8c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8_DW, x, nhwc,
                2, 32, 32, 9, 9, 32, 9, 9, 1, 1, 0, 0, 1, 1)
     );
 
+    INST_TEST_CASE(SimpleSmall_Blocked_Tail8,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8, x, nhwc,
+               2, 1, 15, 13, 13, 19, 11, 11, 3, 3, 0, 0, 1, 1),
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8, x, nhwc,
+               2, 1, 77, 13, 13, 91, 13, 13, 1, 1, 0, 0, 1, 1),
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8_DW, x, nhwc,
+               2, 21, 21, 16, 16, 21, 16, 16, 3, 3, 0, 0, 1, 1),
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED8_DW, x, nhwc,
+               2, 77, 77, 9, 9, 77, 9, 9, 1, 1, 0, 0, 1, 1)
+    );
+
     INST_TEST_CASE(SimpleSmall_Blocked16,
-        PARAMS(nChw16c, FMT_WEIGHTS_BLOCKED16, x, nChw16c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED16, x, nhwc,
                2, 1, 32, 13, 13, 48, 11, 11, 3, 3, 0, 0, 1, 1),
-        PARAMS(nChw16c, FMT_WEIGHTS_BLOCKED16, x, nChw16c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED16, x, nhwc,
                2, 1, 16, 13, 13, 48, 13, 13, 1, 1, 0, 0, 1, 1),
-        PARAMS(nChw16c, FMT_WEIGHTS_BLOCKED16_DW, x, nChw16c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED16_DW, x, nhwc,
                2, 64, 64, 16, 16, 64, 16, 16, 3, 3, 0, 0, 1, 1),
-        PARAMS(nChw16c, FMT_WEIGHTS_BLOCKED16_DW, x, nChw16c,
+        PARAMS(nhwc, FMT_WEIGHTS_BLOCKED16_DW, x, nhwc,
                2, 32, 32, 9, 9, 32, 9, 9, 1, 1, 0, 0, 1, 1)
     );
 }

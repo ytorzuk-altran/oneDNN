@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -23,18 +23,32 @@ using namespace mkldnn::impl::math;
 
 namespace mkldnn {
 
+template <typename T, typename U>
+inline typename std::remove_reference<T>::type div_up(const T a, const U b) {
+    assert(b);
+    return (a + b - 1) / b;
+}
+
+template <typename T, typename U>
+inline typename std::remove_reference<T>::type rnd_up(const T a, const U b) {
+    return div_up(a, b) * b;
+}
+
 template <typename data_t_src, typename data_t_wei,
           typename data_t_acc, typename data_t_dst>
-void compute_ref_conv_eltwise_fwd(const test_convolution_sizes_t &c,
+void compute_ref_conv_depthwise_fwd(const test_convolution_sizes_t &c,
         const memory &src, const memory &weights, const memory &bias,
-        const memory &dst, bool w_bias, algorithm elt_alg,
-        float elt_alpha, float elt_beta)
+        const memory &dst, bool w_bias, algorithm depthwise_alg,
+        const memory &depthwise_weights, const memory &depthwise_bias)
 {
     data_t_src *src_data = (data_t_src *)src.get_data_handle();
     data_t_wei *weights_data = (data_t_wei *)weights.get_data_handle();
     data_t_dst *bias_data
             = (data_t_dst *)(w_bias ? bias.get_data_handle() : nullptr);
     data_t_dst *dst_data = (data_t_dst *)dst.get_data_handle();
+
+    float *d_weights_data = (float *)depthwise_weights.get_data_handle();
+    float *d_bias_data = (float *)depthwise_bias.get_data_handle();
 
     const memory::desc src_d = src.get_primitive_desc().desc();
     const memory::desc weights_d = weights.get_primitive_desc().desc();
@@ -55,8 +69,9 @@ void compute_ref_conv_eltwise_fwd(const test_convolution_sizes_t &c,
                     + oc * c.oh * c.ow + oh * c.ow + ow;
 
             size_t didx = map_index(dst_d, oidx);
+            size_t bidx = g * c.oc / c.ng + oc;
             dst_data[didx] = bias_data
-                    ? bias_data[g * c.oc / c.ng + oc] : data_t_dst{0};
+                    ? bias_data[bidx] : data_t_dst{0};
 
             for (int ic = 0; ic < c.ic / c.ng; ic++)
             for (int kh = 0; kh < c.kh; kh++)
@@ -79,21 +94,14 @@ void compute_ref_conv_eltwise_fwd(const test_convolution_sizes_t &c,
                         * weights_data[map_index(weights_d, widx)];
             }
 
-            auto &d = dst_data[didx];
-            switch (elt_alg) {
-            case eltwise_relu: d = relu_fwd(d, elt_alpha); break;
-            case eltwise_tanh: d = tanh_fwd(d); break;
-            case eltwise_elu: d = elu_fwd(d, elt_alpha); break;
-            case eltwise_square: d = square_fwd(d); break;
-            case eltwise_abs: d = abs_fwd(d); break;
-            case eltwise_sqrt: d = sqrt_fwd(d); break;
-            case eltwise_linear: d = linear_fwd(d, elt_alpha, elt_beta); break;
-            case eltwise_bounded_relu: d = bounded_relu_fwd(d, elt_alpha); break;
-            case eltwise_soft_relu: d = soft_relu_fwd(d); break;
-            case eltwise_logistic: d = logistic_fwd(d); break;
-            case eltwise_exp: d = exp_fwd(d); break;
-            case eltwise_clamp: d = clamp_fwd(d, elt_alpha, elt_beta); break;
-            default: assert(!"unknown alg_kind");
+            switch (depthwise_alg) {
+                case depthwise_scale_shift:
+                    dst_data[didx] = scale_shift_fwd(dst_data[didx], d_weights_data[bidx], d_bias_data[bidx]);
+                    break;
+                case depthwise_prelu:
+                    dst_data[didx] = prelu_fwd(dst_data[didx], d_weights_data[bidx]);
+                    break;
+                default: assert(!"unknown alg_kind");
             }
         }
     );
@@ -101,19 +109,17 @@ void compute_ref_conv_eltwise_fwd(const test_convolution_sizes_t &c,
 
 template <typename data_t_src, typename data_t_wei,
           typename data_t_acc, typename data_t_dst>
-class convolution_eltwise_test
-    : public ::testing::TestWithParam<test_convolution_eltwise_params_t> {
+class convolution_depthwise_test
+    : public ::testing::TestWithParam<test_convolution_depthwise_params_t> {
 protected:
     virtual void SetUp() {
-        test_convolution_eltwise_params_t p
+        test_convolution_depthwise_params_t p
                 = ::testing::TestWithParam<
-                test_convolution_eltwise_params_t>::GetParam();
+                test_convolution_depthwise_params_t>::GetParam();
 
         ASSERT_TRUE(p.engine_kind == engine::kind::cpu);
         ASSERT_EQ(p.aalgorithm, convolution_direct);
         auto eng = engine(p.engine_kind, 0);
-        float eltwise_alpha = p.eltwise_alpha;
-        float eltwise_beta = p.eltwise_beta;
 
         memory::data_type data_type_src = data_traits<data_t_src>::data_type;
         memory::data_type data_type_dst = data_traits<data_t_dst>::data_type;
@@ -169,9 +175,24 @@ protected:
                 ++padR[1];
         }
 
+        auto c_depthwise_weights_desc = create_md({ rnd_up(cd.oc, 16) }, data_type_dst, memory::x);
+        auto c_depthwise_bias_desc = create_md({ rnd_up(cd.oc, 16) }, data_type_dst, memory::x);
+
+        auto c_depthwise_weights = memory({c_depthwise_weights_desc, eng});
+        auto c_depthwise_bias = memory({c_depthwise_bias_desc, eng});
+
+        fill_data<data_t_dst>(
+                c_depthwise_weights.get_primitive_desc().get_size() / sizeof(data_t_dst),
+                (data_t_dst *)c_depthwise_weights.get_data_handle(), 1., true);
+        fill_data<data_t_dst>(
+                c_depthwise_bias.get_primitive_desc().get_size() / sizeof(data_t_dst),
+                (data_t_dst *)c_depthwise_bias.get_data_handle(), 1., true);
+
+
         auto test = [&]() {
             mkldnn::post_ops ops;
-            ops.append_eltwise(1.0, p.alg, p.eltwise_alpha, p.eltwise_beta);
+            ops.append_depthwise(p.alg, static_cast<const float*>(c_depthwise_weights.get_data_handle()),
+                                        static_cast<const float*>(c_depthwise_bias.get_data_handle()));
 
             mkldnn::primitive_attr attr;
             attr.set_post_ops(ops);
@@ -203,9 +224,9 @@ protected:
         if (catch_expected_failures(test, p.expect_to_fail, p.expected_status))
             return;
 
-        compute_ref_conv_eltwise_fwd<data_t_src, data_t_wei, data_t_wei,
+        compute_ref_conv_depthwise_fwd<data_t_src, data_t_wei, data_t_wei,
             data_t_dst>(cd, c_src, c_weights, c_bias, dst_ref, with_bias,
-                        p.alg, eltwise_alpha, eltwise_beta);
+                        p.alg, c_depthwise_weights, c_depthwise_bias);
         check_zero_tail<data_t_dst>(1, dst_ref);
 
         compare_data<data_t_dst>(dst_ref, c_dst, 1e-2);

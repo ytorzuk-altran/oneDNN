@@ -21,25 +21,22 @@
 #include "test_convolution_dw_conv_common.hpp"
 namespace mkldnn {
 
-using convolution_test = convolution_dw_conv_test<float, float, float, float>;
+using convolution_test = convolution_dw_conv_test<uint8_t, int8_t, int32_t, uint8_t>;
 
 TEST_P(convolution_test, TestConvolutionDwConv)
 {
 }
 
 #define FMT_BIAS x
-#define FMT_DATA_BLOCKED nChw8c
-#define FMT_DATA_BLOCKED16 nChw16c
+#define FMT_DATA_BLOCKED nhwc
 
 #define EXPAND_FORMATS(src, conv1_weights, conv1_bias, conv2_weights, conv2_bias, dst) \
     { mkldnn::memory::format::src, mkldnn::memory::format::conv1_weights, mkldnn::memory::format::conv1_bias, \
     mkldnn::memory::format::conv2_weights, mkldnn::memory::format::conv2_bias, mkldnn::memory::format::dst }
 
-#define FMT_WEIGHTS_BLOCKED OIhw8i8o
-#define FMT_WEIGHTS_BLOCKED16 OIhw16i16o
+#define FMT_WEIGHTS_BLOCKED OhIw8o4i
 
 #define FMT_WEIGHTS_DW_BLOCKED Goihw8g
-#define FMT_WEIGHTS_DW_BLOCKED16 Goihw16g
 
 #define ENGINE mkldnn::engine::kind::cpu
 #define ALGORITHM mkldnn::convolution_direct
@@ -87,7 +84,6 @@ INST_TEST_CASE(Mobilenet_Blocked,
            2, 48, 75, 75,  48, 1, 1, 0, 0, 1, 1,  48, 3, 3, 1, 1, 2, 2),
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_WEIGHTS_DW_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED,
            2, 48, 75, 75,  48, 3, 3, 1, 1, 1, 1,  48, 3, 3, 1, 1, 2, 2)
-
 );
 
 }

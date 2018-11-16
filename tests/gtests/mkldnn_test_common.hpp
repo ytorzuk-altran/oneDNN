@@ -276,6 +276,9 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::IOhw16o16i:
     case f::Ohwi8o:
     case f::Ohwi16o:
+    case f::OhIw8o4i:
+    case f::OIhw4i16o4i_s8s8:
+    case f::OhIw8o4i_s8s8:
         ndims = 4; break;
     case f::ncdhw:
     case f::ndhwc:
@@ -304,6 +307,8 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::gOIhw8o8i:
     case f::gOIhw16o16i:
     case f::gIOhw16o16i:
+    case f::gOhIw8o4i:
+    case f::Goihw16g_s8s8:
         ndims = 5; break;
     case f::gOIdhw8i8o:
     case f::gOIdhw16i16o:
@@ -448,7 +453,8 @@ static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst,
     using data_type = mkldnn::memory::data_type;
 
     ASSERT_TRUE(data_traits<data_t>::data_type == data_type::f32 ||
-            data_traits<data_t>::data_type == data_type::s32);
+                data_traits<data_t>::data_type == data_type::s32 ||
+                data_traits<data_t>::data_type == data_type::u8);
 
     /* Note: size_t incompatible with MSVC++ */
     auto ref_desc = ref.get_primitive_desc().desc();

@@ -281,6 +281,18 @@ inline U not_fwd(T s) {
     return (U)(!s);
 }
 
+template <typename T, typename A,
+         typename U = typename utils::remove_reference<T>::type>
+inline U scale_shift_fwd(T s_val, A w_val, A b_val) {
+    return (U)(s_val*w_val + b_val);
+}
+
+template <typename T, typename A,
+         typename U = typename utils::remove_reference<T>::type>
+inline U prelu_fwd(T s_val, A w_val) {
+    return (U)(s_val >= 0 ? s_val : w_val*s_val);
+}
+
 inline bool eltwise_fwd_preserves_zero(alg_kind_t alg, bool jit_impl = false) {
     using namespace alg_kind;
     using namespace utils;

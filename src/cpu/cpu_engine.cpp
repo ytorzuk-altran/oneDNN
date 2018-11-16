@@ -74,6 +74,9 @@
 #include "cpu/ref_roi_pooling.hpp"
 #include "cpu/jit_uni_depthwise.hpp"
 #include "cpu/ref_depthwise.hpp"
+#include "cpu/jit_uni_x8s8s32x_convolution.hpp"
+#include "cpu/jit_uni_x8s8s32x_dw_convolution.hpp"
+#include "cpu/jit_sse42_i8i8_pooling.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -198,6 +201,30 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_avx512_core_x8s8s32x_convolution_fwd_t<s8,s8>),
     INSTANCE(jit_avx512_common_convolution_bwd_data_t<s16, s16, s32>),
     INSTANCE(jit_avx512_common_convolution_bwd_weights_t<s16, s16, s32>),
+    INSTANCE(jit_avx2_x8s8s32x_dw_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_avx2_x8s8s32x_dw_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_avx2_x8s8s32x_dw_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_avx2_x8s8s32x_dw_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_sse42_x8s8s32x_dw_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_sse42_x8s8s32x_dw_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_sse42_x8s8s32x_dw_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_sse42_x8s8s32x_dw_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<s8,f32>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<s8,s32>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<s8,u8>),
+    INSTANCE(jit_avx2_x8s8s32x_convolution_fwd_t<s8,s8>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<u8,f32>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<u8,s32>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<u8,u8>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<u8,s8>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<s8,f32>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<s8,s32>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<s8,u8>),
+    INSTANCE(jit_sse42_x8s8s32x_convolution_fwd_t<s8,s8>),
     INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, s32>),
     INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, u8>),
     INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, s8>),
@@ -305,6 +332,7 @@ static const pd_create_f cpu_impl_list[] = {
     /* pool (int) */
     INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx512_core>),
     INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx2>),
+    INSTANCE(jit_sse42_i8i8_pooling_fwd_t),
     INSTANCE(ref_pooling_fwd_t<s32>),
     INSTANCE(ref_pooling_fwd_t<s16, s32>),
     INSTANCE(ref_pooling_fwd_t<s8, s32>),

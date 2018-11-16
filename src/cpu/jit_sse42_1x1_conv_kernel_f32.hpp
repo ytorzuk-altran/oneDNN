@@ -29,9 +29,9 @@ namespace impl {
 namespace cpu {
 
 struct jit_sse42_1x1_conv_kernel_f32: public jit_generator {
-    jit_sse42_1x1_conv_kernel_f32(jit_1x1_conv_conf_t ajcp,
+    jit_sse42_1x1_conv_kernel_f32(jit_1x1_conv_conf_t ajcp, jit_conv_conf_t ajcp_dw,
             const primitive_attr_t &attr)
-        : jcp(ajcp), attr_(attr)
+        : jcp(ajcp), jcp_dw(ajcp_dw), attr_(attr)
     {
         this->generate();
         jit_ker = (void (*)(jit_1x1_conv_call_s *))this->getCode();
@@ -63,6 +63,7 @@ struct jit_sse42_1x1_conv_kernel_f32: public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_sse42_1x1_conv_kernel_f32)
 
     jit_1x1_conv_conf_t jcp;
+    jit_conv_conf_t jcp_dw;
     const primitive_attr_t &attr_;
     void (*jit_ker)(jit_1x1_conv_call_s *);
 

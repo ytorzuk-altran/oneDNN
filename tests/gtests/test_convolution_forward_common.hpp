@@ -50,6 +50,11 @@ void compute_ref_conv_fwd(const test_convolution_sizes_t &c,
     size_t padded_ic = src_d.data.layout_desc.blocking.padding_dims[1];
     size_t padded_oc = dst_d.data.layout_desc.blocking.padding_dims[1];
 
+    size_t padded_ic_w = weights_d.data.format == mkldnn_OhIw8o4i ? weights_d.data.layout_desc.blocking.padding_dims[1] :
+                                                                    src_d.data.layout_desc.blocking.padding_dims[1];
+    size_t padded_oc_w = weights_d.data.format == mkldnn_OhIw8o4i ? weights_d.data.layout_desc.blocking.padding_dims[0] :
+                                                                    dst_d.data.layout_desc.blocking.padding_dims[1];
+
     mkldnn::impl::parallel_nd(c.mb, c.ng, c.oc / c.ng, c.oh, c.ow,
         [&](int n, int g, int oc, int oh, int ow) {
             data_t_acc a = 0;
@@ -65,14 +70,17 @@ void compute_ref_conv_fwd(const test_convolution_sizes_t &c,
                         size_t iidx = n * padded_ic * c.ih * c.iw
                             + g * padded_ic / c.ng * c.ih * c.iw
                             + ic * c.ih * c.iw + ih * c.iw + iw;
-                        size_t widx = g * padded_oc / c.ng * padded_ic
+                        size_t widx = g * padded_oc_w / c.ng * padded_ic_w
                             / c.ng * c.kh * c.kw
-                            + oc * padded_ic / c.ng * c.kh * c.kw
+                            + oc * padded_ic_w / c.ng * c.kh * c.kw
                             + ic * c.kh * c.kw + kh * c.kw + kw;
+
+                        int iidx_ = map_index(src_d, iidx);
+                        int widx_ = map_index(weights_d, widx);
+
                         a += ((data_t_acc)
-                            src_data[map_index(src_d, iidx)])
-                            *  weights_data[map_index(
-                            weights_d, widx)];
+                            src_data[iidx_]
+                            *  weights_data[widx_]);
                     }
                 }
             }

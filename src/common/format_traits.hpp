@@ -39,6 +39,7 @@ enum class block_format_t {
     _8c, _8g, _8i, _8o,
     _4i4o, _4o4i, _4o4i_s8s8,
     _8i8o, _8o8i,
+    _8o4i, _8o4i_s8s8,
     _16c, _16g, _16g_s8s8, _16i, _16o,
     _16i16o, _16o16i,
     _8i16o2i, _8o16i2o,
@@ -62,6 +63,7 @@ template <block_format_t f> struct block_format_traits {
         : (utils::one_of(f, bf::_4c, bf::_4i, bf::_4o, bf::_4i4o, bf::_4o4i, bf::_4o4i_s8s8) ? 4
                 : (utils::one_of(f, bf::_8c, bf::_8g, bf::_8i, bf::_8o,
                         bf::_8i8o, bf::_8o8i,
+                        bf::_8o4i, bf::_8o4i_s8s8,
                         bf::_2i8o4i, bf::_2i8o4i_s8s8) ? 8 : 16));
 };
 
@@ -148,6 +150,8 @@ DECL_TRAITS(oIhw8i, wei, _8i, 4, 2);
 DECL_TRAITS(oIhw16i, wei, _16i, 4, 2);
 DECL_TRAITS(OIhw4i4o, wei, _4i4o, 4, 2);
 DECL_TRAITS(OIhw8i8o, wei, _8i8o, 4, 2);
+DECL_TRAITS(OhIw8o4i, wei, _8o4i, 4, 2);
+DECL_TRAITS(OhIw8o4i_s8s8, wei, _8o4i_s8s8, 4, 2);
 DECL_TRAITS(OIhw16i16o, wei, _16i16o, 4, 2);
 DECL_TRAITS(OIhw4i16o4i, wei, _4i16o4i, 4, 2);
 DECL_TRAITS(OIhw4i16o4i_s8s8, wei, _4i16o4i_s8s8, 4, 2);
@@ -212,6 +216,8 @@ DECL_TRAITS(giohw, gwei, _, 5, 2);
 DECL_TRAITS(hwigo_s8s8, gwei, _, 5, 2);
 DECL_TRAITS(gOIhw4i4o, gwei, _4i4o, 5, 2);
 DECL_TRAITS(gOIhw8i8o, gwei, _8i8o, 5, 2);
+DECL_TRAITS(gOhIw8o4i, gwei, _8o4i, 5, 2);
+DECL_TRAITS(gOhIw8o4i_s8s8, gwei, _8o4i_s8s8, 5, 2);
 DECL_TRAITS(gOIhw16i16o, gwei, _16i16o, 5, 2);
 DECL_TRAITS(gOIhw4i16o4i, gwei, _4i16o4i, 5, 2);
 DECL_TRAITS(gOIhw4i16o4i_s8s8, gwei, _4i16o4i_s8s8, 5, 2);
@@ -268,7 +274,8 @@ constexpr int OI_blk_off(int oc, int ic) {
                 bf::_8i8o, bf::_8o8i, bf::_16i16o,
                 bf::_16o16i, bf::_8i16o2i, bf::_8o16i2o,
                 bf::_4i16o4i, bf::_4i16o4i_s8s8,
-                bf::_2i8o4i, bf::_2i8o4i_s8s8),
+                bf::_2i8o4i, bf::_2i8o4i_s8s8,
+                bf::_8o4i, bf::_8o4i_s8s8),
             "unexpected blocked format");
 #   define blksize block_format_traits<f>::blk_size
     return f == bf::_8i16o2i
@@ -279,7 +286,10 @@ constexpr int OI_blk_off(int oc, int ic) {
         : f == bf::_8o16i2o
         ? (oc / 2) * blksize * 2 + 2 * ic + oc % 2
         : utils::one_of(f, bf::_4i4o, bf::_8i8o, bf::_16i16o)
-        ? ic * blksize + oc : oc * blksize + ic;
+        ? ic * blksize + oc
+        : (f == bf::_8o4i || f == bf::_8o4i_s8s8)
+        ? (ic / 4) * blksize * 4 + 4 * oc + ic % 4
+        : oc * blksize + ic;
 #   undef blksize // if only we program in C++14...
 }
 

@@ -570,6 +570,16 @@ status_t fill_OIhw4i16o4i(memory_desc_t &md) {
     return fill_contiguous_blocked(md, block_dims, perm);
 }
 
+status_t fill_OhIw8o4i(memory_desc_t &md) {
+    if (md.ndims != 4) return invalid_arguments;
+
+    const dims_t block_dims = {8, 4, 1, 1};
+    const int perm[] = {
+        0, 2, 1, 3,
+        4, 5, 6, 7};
+    return fill_contiguous_blocked(md, block_dims, perm);
+}
+
 status_t fill_OIhw8i16o2i(memory_desc_t &md) {
     if (md.ndims != 4) return invalid_arguments;
 
@@ -1138,6 +1148,16 @@ status_t fill_gOIhw2i8o4i(memory_desc_t &md) {
     return fill_contiguous_blocked(md, block_dims, perm);
 }
 
+status_t fill_gOhIw8o4i(memory_desc_t &md) {
+    if (md.ndims != 5) return invalid_arguments;
+
+    const dims_t block_dims = {1, 8, 4, 1, 1};
+    const int perm[] = {
+        0, 1, 3, 2, 4,
+        5, 6, 7, 8, 9};
+    return fill_contiguous_blocked(md, block_dims, perm);
+}
+
 status_t fill_Goihw8g(memory_desc_t &md) {
     if (md.ndims != 5) return invalid_arguments;
 
@@ -1381,6 +1401,8 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case OIw4i16o4i: return fill_OIw4i16o4i(memory_desc);
     case OIw4i16o4i_s8s8: return fill_OIw4i16o4i(memory_desc);
     case OIhw4i16o4i: return fill_OIhw4i16o4i(memory_desc);
+    case OhIw8o4i: return fill_OhIw8o4i(memory_desc);
+    case OhIw8o4i_s8s8: return fill_OhIw8o4i(memory_desc);
     case OIhw4i16o4i_s8s8: return fill_OIhw4i16o4i(memory_desc);
     case OIhw8i16o2i: return fill_OIhw8i16o2i(memory_desc);
     case IOhw8i16o2i: return fill_IOhw8i16o2i(memory_desc);
@@ -1422,6 +1444,8 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case gOIw4i16o4i: return fill_gOIw4i16o4i(memory_desc);
     case gOIw4i16o4i_s8s8: return fill_gOIw4i16o4i(memory_desc);
     case gOIhw4i16o4i: return fill_gOIhw4i16o4i(memory_desc);
+    case gOhIw8o4i: return fill_gOhIw8o4i(memory_desc);
+    case gOhIw8o4i_s8s8: return fill_gOhIw8o4i(memory_desc);
     case gOIhw4i16o4i_s8s8: return fill_gOIhw4i16o4i(memory_desc);
     case gOIhw2i8o4i: return fill_gOIhw2i8o4i(memory_desc);
     case gOIhw2i8o4i_s8s8: return fill_gOIhw2i8o4i(memory_desc);

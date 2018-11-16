@@ -25,6 +25,7 @@
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
+#include "jit_uni_depthwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -37,19 +38,20 @@ struct _jit_avx512_core_x8s8s32x_fwd_kernel : public jit_generator {
     enum { STATE_FIRST_DST_LOAD = 0x1U };
 
     _jit_avx512_core_x8s8s32x_fwd_kernel(jit_conv_conf_t ajcp,
-            const primitive_attr_t &attr) : jcp(ajcp), attr_(attr),
-            eltwise_injector_(nullptr)
+            const primitive_attr_t &attr) : jcp(ajcp), attr_(attr)
     {
-        if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
-                this, jcp.eltwise);
-
         generate();
         jit_ker_ = (void (*)(jit_conv_call_s *))getCode();
     }
 
     ~_jit_avx512_core_x8s8s32x_fwd_kernel() {
-        delete eltwise_injector_;
+        for (auto inj : eltwise_injectors)
+            delete inj;
+        eltwise_injectors.clear();
+
+        for (auto inj : depthwise_injectors)
+            delete inj;
+        depthwise_injectors.clear();
     }
 
     jit_conv_conf_t jcp;
@@ -57,7 +59,8 @@ struct _jit_avx512_core_x8s8s32x_fwd_kernel : public jit_generator {
     void (*jit_ker_)(jit_conv_call_s *);
 
 private:
-    jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
 
     enum {
         typesize = sizeof(float),
@@ -89,6 +92,9 @@ private:
     const Xbyak::Reg64 reg_kj = reg_ptr_scales;
     const Xbyak::Reg64 reg_overflow = reg_ptr_scales;
     const Xbyak::Reg64 reg_icb = reg_bias;
+
+    const Xbyak::Reg64 reg_d_weights = r15;
+    const Xbyak::Reg64 reg_d_bias = r13;
 
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
@@ -158,14 +164,12 @@ private:
                                            jcp.stride_w));
     }
 
-    bool maybe_eltwise(int position);
     void prepare_output(int ur_w);
     void store_output(int ur_w, bool last_oc_block_flag);
     void compute_ker_dw(
             int ur_w, int pad_l, int pad_r, ic_block_t last_ic_block_flag, bool h_padded);
     void compute_ker(int ur_w, int pad_l, int pad_r,
             ic_block_t last_ic_block_flag, bool h_padded = false);
-    void compute_eltwise(int ur_w);
     void kh_loop(int ur_w, int pad_l, int pad_r, ic_block_t last_ic_block_flag);
     void icb_loop(
             int ur_w, int pad_l, int pad_r, bool is_last_spatial_block);

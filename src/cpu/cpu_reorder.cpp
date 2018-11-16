@@ -158,6 +158,10 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
 
     /* WA to prevent fallback on reference implementations */
     REG_SR_DIRECT_COPY(u8, f32),
+    REG_SR_DIRECT_COPY(u8, s8),
+    REG_SR_DIRECT_COPY(s8, u8),
+    REG_SR_DIRECT_COPY(u8, u8),
+    REG_SR_DIRECT_COPY(s8, s8),
 
  /* fp32: blocked <-> blocked with tail */
     REG_SR_BIDIR(f32, nCw8c, f32, nCw16c),
@@ -166,6 +170,23 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(f32, nCdhw8c, f32, nCdhw16c),
 
     /* int: flat <-> blocked with tail */
+    REG_SR(f32, nChw8c, u8, nhwc, fmt_order::keep),
+    REG_SR(f32, nChw8c, s8, nhwc, fmt_order::keep),
+    REG_SR(u8, nhwc, f32, nChw8c, fmt_order::keep),
+    REG_SR(s8, nhwc, f32, nChw8c, fmt_order::keep),
+    REG_SR(f32, nhwc, u8, nhwc, fmt_order::keep),
+    REG_SR(f32, nhwc, s8, nhwc, fmt_order::keep),
+    REG_SR(u8, nhwc, f32, nhwc, fmt_order::keep),
+    REG_SR(s8, nhwc, f32, nhwc, fmt_order::keep),
+    REG_SR(s8, nhwc, u8, nhwc, fmt_order::keep),
+    REG_SR(u8, nhwc, s8, nhwc, fmt_order::keep),
+    REG_SR(u8, nhwc, s8, nhwc, fmt_order::keep),
+    REG_SR(f32, nchw, u8, nhwc, fmt_order::keep),
+    REG_SR(f32, nchw, s8, nhwc, fmt_order::keep),
+    REG_SR(u8, nchw, u8, nhwc, fmt_order::keep),
+    REG_SR(s8, nchw, s8, nhwc, fmt_order::keep),
+    REG_SR(u8, nhwc, f32, nchw, fmt_order::keep),
+
     REG_SR_BIDIR(f32, any, s32, nChw8c),
     REG_SR_BIDIR(f32, any, s8, nChw8c),
     REG_SR_BIDIR(f32, any, u8, nChw8c),
@@ -206,6 +227,19 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR_BIDIR(s8, any, f32, gOIhw4i16o4i),
     REG_SR_BIDIR(f32, any, f32, gOIhw4i16o4i),
     REG_SR_BIDIR(s8, any, s8, gOIhw4i16o4i),
+
+    REG_SR(f32, any, f32, OhIw8o4i, fmt_order::keep),
+    REG_SR(f32, any, s8, OhIw8o4i, fmt_order::keep),
+    REG_SR(s8, any, f32, OhIw8o4i, fmt_order::keep),
+    REG_SR(s8, any, s8, OhIw8o4i, fmt_order::keep),
+    REG_SR(f32, any, s8, gOhIw8o4i, fmt_order::keep),
+    REG_SR(s8, any, f32, gOhIw8o4i, fmt_order::keep),
+    REG_SR(f32, any, f32, gOhIw8o4i, fmt_order::keep),
+    REG_SR(s8, any, s8, gOhIw8o4i, fmt_order::keep),
+    REG_SR(f32, oihw, s8, OhIw8o4i_s8s8, fmt_order::keep),
+    REG_SR(s8, oihw, s8, OhIw8o4i_s8s8, fmt_order::keep),
+    REG_SR(f32, goihw, s8, gOhIw8o4i_s8s8, fmt_order::keep),
+    REG_SR(s8, goihw, s8, gOhIw8o4i_s8s8, fmt_order::keep),
 
     REG_SR(f32, any, s8, hwio_s8s8, fmt_order::keep),
     REG_SR(f32, any, s8, hwigo_s8s8, fmt_order::keep),

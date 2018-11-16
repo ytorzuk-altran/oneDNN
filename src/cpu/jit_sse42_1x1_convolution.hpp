@@ -38,7 +38,7 @@ struct jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
                 const primitive_attr_t *attr,
                 const typename pd_t::base_class *hint_fwd_pd)
             : cpu_convolution_fwd_pd_t(engine, adesc, attr, hint_fwd_pd)
-            , jcp_(), jcp_dw() {}
+            , jcp_(), jcp_dw_() {}
 
         DECLARE_COMMON_PD_T(
                 JIT_IMPL_NAME_HELPER("jit_1x1:", sse42, ""),
@@ -70,26 +70,18 @@ struct jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
             if (sts_1x1 != status::success) return sts_1x1;
 
             if (jcp_.with_dw_conv) {
-                int dw_conv_oh = (jcp_.oh - ((jcp_.dw_conv_ker_h - 1) + 1) + 2) / jcp_.dw_conv_str_h + 1;
-                int dw_conv_ow = (jcp_.ow - ((jcp_.dw_conv_ker_w - 1) + 1) + 2) / jcp_.dw_conv_str_w + 1;
-
-                status_t sts_dw = jit_uni_dw_conv_row_f32<sse42>::init_conf(jcp_dw,
-                                                                           jcp_.oc, jcp_.oh, jcp_.ow, dw_conv_oh, dw_conv_ow,
-                                                                           jcp_.dw_conv_ker_h, jcp_.dw_conv_ker_w,
-                                                                           jcp_.dw_conv_str_h, jcp_.dw_conv_str_w,
-                                                                           jcp_.dw_conv_eltwise_alg, jcp_.dw_conv_eltwise_alpha,
-                                                                           jcp_.dw_conv_eltwise_beta, jcp_.dw_conv_with_sum);
+                status_t sts_dw = jit_uni_dw_conv_row_f32<sse42>::init_conf(jcp_, jcp_dw_, *this->attr());
                 if (sts_dw != status::success) return sts_dw;
             }
 
             auto scratchpad = scratchpad_registry().registrar();
-            jit_sse42_1x1_conv_kernel_f32::init_scratchpad(scratchpad, jcp_, jcp_dw);
+            jit_sse42_1x1_conv_kernel_f32::init_scratchpad(scratchpad, jcp_, jcp_dw_);
 
             return status::success;
         }
 
         jit_1x1_conv_conf_t jcp_;
-        jit_conv_conf_t jcp_dw;
+        jit_conv_conf_t jcp_dw_;
 
     protected:
         virtual status_t set_default_params() override {
@@ -116,10 +108,10 @@ struct jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
             const input_vector &inputs, const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs)
     {
-        kernel_ = new jit_sse42_1x1_conv_kernel_f32(pd()->jcp_, *pd()->attr());
+        kernel_ = new jit_sse42_1x1_conv_kernel_f32(pd()->jcp_, pd()->jcp_dw_, *pd()->attr());
 
         if (pd()->jcp_.with_dw_conv) {
-            kernel_dw_ = new jit_uni_dw_conv_row_f32<sse42>(pd()->jcp_dw);
+            kernel_dw_ = new jit_uni_dw_conv_row_f32<sse42>(pd()->jcp_dw_, *pd()->attr(), pd()->jcp_dw_.ch_block);
         }
     }
 
@@ -135,7 +127,7 @@ struct jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
 
     virtual void execute(event_t *e) const {
         if (pd()->jcp_.with_dw_conv)
-            execute_forward_fusing();
+            execute_forward_with_dw_conv();
         else
             execute_forward();
 
@@ -144,7 +136,7 @@ struct jit_sse42_1x1_convolution_fwd_t: public cpu_primitive_t {
 
 private:
     void execute_forward() const;
-    void execute_forward_fusing() const;
+    void execute_forward_with_dw_conv() const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
 
     jit_sse42_1x1_conv_kernel_f32 *kernel_;
