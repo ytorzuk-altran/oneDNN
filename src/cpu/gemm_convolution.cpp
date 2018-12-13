@@ -249,8 +249,11 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
     const int MB = pd()->MB();
 
     const int M = jcp.os * jcp.od;
-    const size_t src_step = jcp.ic * jcp.ih * jcp.iw * jcp.id;
-    const size_t dst_step = jcp.oc * M;
+    const size_t src_step_to_clean = jcp.ic * jcp.ih * jcp.iw * jcp.id;
+    const memory_desc_wrapper diff_src_d(pd()->diff_src_pd());
+    const memory_desc_wrapper diff_dst_d(pd()->diff_dst_pd());
+    const size_t src_step = diff_src_d.blk_off(1) / jcp.ngroups;
+    const size_t dst_step = diff_dst_d.blk_off(1) / jcp.ngroups;
     const size_t weights_g_size = jcp.ic * jcp.oc * jcp.ks;
 
     const int m = jcp.os;
@@ -274,7 +277,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
             if (is_problem_3d && jcp.im2col_sz > 0) {
                 // jit_gemm_convolution_utils::col2im_3d() assumes that the
                 // accumulator is initialized by zeroes
-                for (size_t i = 0; i < src_step; i++)
+                for (size_t i = 0; i < src_step_to_clean; i++)
                     _diff_src[i] = (data_t)0;
             }
 
