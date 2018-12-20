@@ -84,6 +84,8 @@ typedef enum {
     mkldnn_u8 = 6,
     /** bfloat 16-bit. */
     mkldnn_bf16 = 7,
+    /** 1-bit integer. */
+    mkldnn_bin = 8,
 } mkldnn_data_type_t;
 
 /** Rounding mode */
@@ -337,6 +339,8 @@ typedef enum {
      * and containing the values:
      * O[i:0,OC] = -128 * SUM(j:0,IC;h:0,H;w:0,W)(weights(i,j,h,w))*/
     mkldnn_OhIw8o4i_s8s8,
+    mkldnn_OhIw8o32i /** blocked weights format */,
+    mkldnn_OhIw16o32i /** blocked weights format */,
 
     /* weights, 5D */
     mkldnn_oIdhw8i /** blocked weights format */,
@@ -533,6 +537,10 @@ typedef enum {
     mkldnn_roi_pooling,
     /** An channel-wise primitive. */
     mkldnn_depthwise,
+    /** A binary convolution primitive. */
+    mkldnn_binary_convolution,
+    /** A binarization primitive. */
+    mkldnn_binarization,
 } mkldnn_primitive_kind_t;
 
 /** Kinds of algorithms. */
@@ -610,6 +618,10 @@ typedef enum {
     mkldnn_depthwise_scale_shift = 0x1ffff,
     /** Depthwise: prelu */
     mkldnn_depthwise_prelu = 0x2ffff,
+    /** Direct binary convolution */
+    mkldnn_binary_convolution_direct = 0x1fffff,
+    /** Depthwise binarization */
+    mkldnn_binarization_depthwise = 0xafffff
 } mkldnn_alg_kind_t;
 
 /** Flags for batch-normalization primititve. */
@@ -1142,6 +1154,58 @@ typedef struct {
     mkldnn_alg_kind_t alg_kind;
 } mkldnn_roi_pooling_desc_t;
 
+/** A descriptor of a binary convolution operation. */
+typedef struct {
+    /** The kind of primitive. Used for self identifying the primitive
+     * descriptor. Must be #mkldnn_binary_convolution. */
+    mkldnn_primitive_kind_t primitive_kind;
+    /** The kind of propagation. Possible values: #mkldnn_forward_training,
+     * #mkldnn_forward_inference */
+    mkldnn_prop_kind_t prop_kind;
+    /** The kind of the binary convolution algorithm. Possible values:
+     * #mkldnn_binary_convolution_direct. */
+    mkldnn_alg_kind_t alg_kind;
+    /** Source memory descriptor. */
+    mkldnn_memory_desc_t src_desc;
+    /** Weights memory descriptor. */
+    mkldnn_memory_desc_t weights_desc;
+    /** Destination memory descriptor. */
+    mkldnn_memory_desc_t dst_desc;
+    /** Convolution strides in each spatial dimension. */
+    mkldnn_dims_t strides;
+    /** Convolution dilates in each spatial dimension. */
+    mkldnn_dims_t dilates;
+    /** Padding in each spatial dimension. padding[0] is a padding in the
+     * beginning (@p padding_l), padding[1] is a padding in the end (@p
+     * padding_r). */
+    mkldnn_dims_t padding[2];
+    /** The accumulator data type. Initialized automatically. */
+    mkldnn_data_type_t accum_data_type;
+    /** Logic value of elements in padding area */
+    float pad_value;
+} mkldnn_binary_convolution_desc_t;
+
+/** A descriptor of a binarization operation. */
+typedef struct {
+    /** The kind of primitive. Used for self identifying the primitive
+     * descriptor. Must be #mkldnn_binarization. */
+    mkldnn_primitive_kind_t primitive_kind;
+    /** The kind of propagation. Possible values: #mkldnn_forward_training,
+     * #mkldnn_forward_inference, #mkldnn_backward, and #mkldnn_backward_data.
+     */
+    mkldnn_prop_kind_t prop_kind;
+    /** The kind of binarization algorithm. Possible values: #mkldnn_binarization_depthwise */
+    mkldnn_alg_kind_t alg_kind;
+    /** Source memory descriptor. */
+    mkldnn_memory_desc_t src_desc;
+    /** Destination memory descriptor. */
+    mkldnn_memory_desc_t dst_desc;
+    /** Weights memory descriptor. */
+    mkldnn_memory_desc_t weights_desc;
+    /** Weights memory descriptor. */
+    mkldnn_memory_desc_t output_mask_desc;
+} mkldnn_binarization_desc_t;
+
 /** @} */
 
 /** @addtogroup c_api_engine_types Engine
@@ -1331,6 +1395,8 @@ typedef enum {
     mkldnn_query_rnn_d, /**< rnn descriptor */
     mkldnn_query_roi_pooling_d, /**< roi descriptor */
     mkldnn_query_depthwise_d, /**< eltwise descriptor */
+    mkldnn_query_binary_convolution_d, /**< binary convolution descriptor */
+    mkldnn_query_binarization_d, /**< binarization descriptor */
 
     /* (memory) primitive descriptor section */
     mkldnn_query_some_pd = 128, /**< stub */

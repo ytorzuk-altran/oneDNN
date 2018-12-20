@@ -875,6 +875,48 @@ public:
         vpslldq(x1, x2, op);
     }
 
+    void uni_vpand(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+                   const Xbyak::Operand &op = Xbyak::Operand()) {
+        assert(x1.getIdx() == x2.getIdx());
+        pand(x1, op);
+    }
+    void uni_vpand(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
+                    const Xbyak::Operand &op = Xbyak::Operand()) {
+        vpand(x1, x2, op);
+    }
+
+    void uni_vpaddb(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+                    const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        paddb(x2, op);
+    }
+    void uni_vpaddb(const Xbyak::Ymm &x1, const Xbyak::Xmm &x2,
+                    const Xbyak::Operand &op) {
+        vpaddb(x1, x2, op);
+    }
+
+    void uni_vpshufb(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+                     const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pshufb(x1, op);
+    }
+
+    void uni_vpshufb(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
+                     const Xbyak::Operand &op) {
+        vpshufb(x1, x2, op);
+    }
+
+    void uni_vpcmpeqd(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+                      const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pcmpeqd(x1, op);
+    }
+
+    void uni_vpcmpeqd(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
+                      const Xbyak::Operand &op) {
+        vpcmpeqd(x1, x2, op);
+    }
+
     void mul_by_const(const Xbyak::Reg &out,
             const Xbyak::Reg64 &tmp, int value) {
         // Generates a shift + add sequence for multiplicating contents of the

@@ -404,6 +404,7 @@ status_t cpu_memory_t::zero_pad() const {
         case bf16: return typed_zero_pad<s16>();
         case s8: return typed_zero_pad<s8>();
         case u8: return typed_zero_pad<u8>();
+        case bin: return typed_zero_pad<u8>();
         default: assert(!"memory is undefined"); return unimplemented;
     }
     return unimplemented;

@@ -129,6 +129,8 @@ public:
         batch_normalization = mkldnn_batch_normalization,
         inner_product = mkldnn_inner_product,
         rnn = mkldnn_rnn,
+        binary_convolution = mkldnn_binary_convolution,
+        binarization = mkldnn_binarization,
     };
 
     /// A wrapper structure to specify a particular output of a primitive.
@@ -287,7 +289,9 @@ enum algorithm {
     vanilla_gru = mkldnn_vanilla_gru,
     gru_linear_before_reset = mkldnn_gru_linear_before_reset,
     roi_pooling_max = mkldnn_roi_pooling_max,
-    roi_pooling_bilinear = mkldnn_roi_pooling_bilinear
+    roi_pooling_bilinear = mkldnn_roi_pooling_bilinear,
+    binary_convolution_direct = mkldnn_binary_convolution_direct,
+    binarization_depthwise = mkldnn_binarization_depthwise,
 };
 
 inline mkldnn_alg_kind_t convert_to_c(algorithm aalgorithm) {
@@ -344,6 +348,8 @@ enum query {
     batch_normalization_d = mkldnn_query_batch_normalization_d,
     inner_product_d = mkldnn_query_inner_product_d,
     rnn_d = mkldnn_query_rnn_d,
+    binary_convolution_d = mkldnn_query_binary_convolution_d,
+    binarization_d = mkldnn_query_binarization_d,
 
     input_pd = mkldnn_query_input_pd,
     output_pd = mkldnn_query_output_pd,
@@ -446,6 +452,18 @@ struct post_ops: public handle<mkldnn_post_ops_t> {
         error::wrap_c_api(mkldnn_post_ops_get_params_dw_conv(get(), index,
                 &in_h, &in_w, &ker_h, &ker_w, &str_h, &str_w, weights_data, biases_data),
                           "could not get dw conv params");
+    }
+
+    void append_binarization(algorithm alg, const float* weights_data, const float* output_mask) {
+        error::wrap_c_api(mkldnn_post_ops_append_binarization(get(), convert_to_c(alg), weights_data, output_mask),
+                "could not append binarization");
+    }
+
+    void get_params_binarization(int index, algorithm &alg, const float** weights_data, const float** output_mask) const {
+        mkldnn_alg_kind_t c_alg;
+        error::wrap_c_api(mkldnn_post_ops_get_params_binarization(get(), index, &c_alg, weights_data, output_mask),
+                "could not get binarization params");
+        alg = static_cast<algorithm>(c_alg);
     }
 };
 
@@ -639,6 +657,7 @@ struct memory: public primitive  {
         s16 = mkldnn_s16,
         s8 = mkldnn_s8,
         u8 = mkldnn_u8,
+        bin = mkldnn_bin,
     };
 
     /// Memory format specification. See #mkldnn_memory_format_t
@@ -729,6 +748,8 @@ struct memory: public primitive  {
         Ohwi16o = mkldnn_Ohwi16o,
         OhIw16o4i = mkldnn_OhIw16o4i,
         OhIw8o4i = mkldnn_OhIw8o4i,
+        OhIw8o32i = mkldnn_OhIw8o32i,
+        OhIw16o32i = mkldnn_OhIw16o32i,
         OhIw8o4i_s8s8 = mkldnn_OhIw8o4i_s8s8,
         goiw = mkldnn_goiw,
         gOwi4o = mkldnn_gOwi4o,
@@ -3446,6 +3467,111 @@ struct shuffle_backward : public primitive {
         error::wrap_c_api(mkldnn_primitive_create(&result,
             aprimitive_desc.get(), inputs, outputs),
             "could not create a shuffle backward primitive");
+        reset(result);
+    }
+};
+
+/// @}
+
+/// @addtogroup cpp_api_binary_convolution Binary convolution
+/// A primitive to compute binary convolution using different algorithms.
+///
+/// @sa @ref c_api_binary_convolution in @ref c_api
+/// @{
+
+struct binary_convolution_forward: public primitive {
+    struct desc {
+        mkldnn_binary_convolution_desc_t data;
+        desc(prop_kind aprop_kind, algorithm aalgorithm,
+                const memory::desc &src_desc,
+                const memory::desc &weights_desc,
+                const memory::desc &dst_desc,
+                const memory::dims strides,
+                const memory::dims dilates,
+                const memory::dims padding_l,
+                const memory::dims padding_r,
+                const float pad_value) {
+            memory::validate_dims(strides);
+            memory::validate_dims(dilates);
+            memory::validate_dims(padding_l);
+            memory::validate_dims(padding_r);
+            error::wrap_c_api(
+                mkldnn_dilated_binary_convolution_forward_desc_init(&data,
+                    mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm),
+                        &src_desc.data, &weights_desc.data, &dst_desc.data,
+                        &strides[0], &dilates[0], &padding_l[0], &padding_r[0],
+                        pad_value),
+                    "could not create a dilated binary convolution forward descriptor");
+        }
+    };
+
+    struct primitive_desc : public mkldnn::primitive_desc {
+        primitive_desc(const desc &desc, const engine &e)
+            : mkldnn::primitive_desc(&desc.data, nullptr, e, nullptr) {}
+
+        primitive_desc(const desc &desc, const primitive_attr &attr, const engine &e)
+            : mkldnn::primitive_desc(&desc.data, &attr, e, nullptr) {}
+
+        REG_QUERY_MPD(src, src, 0);
+        REG_QUERY_MPD(weights, weights, 0);
+        REG_QUERY_MPD(dst, dst, 0);
+    };
+
+    binary_convolution_forward(const primitive_desc &aprimitive_desc,
+            const primitive::at &src, const primitive::at &weights, const memory &dst) {
+        mkldnn_primitive_t result;
+        mkldnn_primitive_at_t inputs[] = { src.data, weights.data };
+        const_mkldnn_primitive_t outputs[] = { dst.get() };
+        check_num_parameters(aprimitive_desc.get(), 2, 1,
+            "binary convolution forward");
+        error::wrap_c_api(mkldnn_primitive_create(&result,
+                    aprimitive_desc.get(), inputs, outputs),
+                "could not create a binary convolution forward primitive");
+        reset(result);
+    }
+};
+
+/// @}
+
+/// @addtogroup cpp_api_binarization Binarization
+/// @{
+
+struct binarization_forward : public primitive {
+    struct desc {
+        mkldnn_binarization_desc_t data;
+
+        desc(prop_kind aprop_kind, algorithm alg_kind,
+             const memory::desc &src_desc, const memory::desc &weights_desc, const memory::desc &output_mask_desc,
+             const memory::desc &dst_desc) {
+            error::wrap_c_api(mkldnn_binarization_forward_desc_init(&data,
+                                                                 mkldnn::convert_to_c(aprop_kind),
+                                                                 mkldnn::convert_to_c(alg_kind),
+                                                                 &src_desc.data, &dst_desc.data,
+                                                                 &weights_desc.data, &output_mask_desc.data),
+                              "could not create a binarization forward descriptor");
+        }
+    };
+
+    struct primitive_desc : public handle<mkldnn_primitive_desc_t> {
+        primitive_desc(const desc &adesc, const engine &aengine) {
+            mkldnn_primitive_desc_t result;
+            error::wrap_c_api(mkldnn_primitive_desc_create(
+                    &result, &adesc.data, aengine.get(), nullptr),
+                              "could not create a binarization forward primitive descriptor");
+            reset(result);
+        }
+
+        engine get_engine() { return engine::query(*this); }
+    };
+
+    binarization_forward(const primitive_desc &aprimitive_desc,
+                      const primitive::at &src, const primitive::at &weights, const primitive::at &output_mask,
+                      const memory &dst) {
+        mkldnn_primitive_t result;
+        mkldnn_primitive_at_t inputs[] = { src.data, weights.data, output_mask.data};
+        const_mkldnn_primitive_t outputs[] = { dst.get() };
+        error::wrap_c_api(mkldnn_primitive_create(&result, aprimitive_desc.get(), inputs, outputs),
+                          "could not create a binarization forward primitive");
         reset(result);
     }
 };

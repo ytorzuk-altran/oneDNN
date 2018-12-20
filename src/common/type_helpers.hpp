@@ -65,6 +65,7 @@ inline size_t data_type_size(data_type_t data_type) {
     case s8: return sizeof(prec_traits<s8>::type);
     case u8: return sizeof(prec_traits<u8>::type);
     case bf16: return sizeof(prec_traits<bf16>::type);
+    case bin: return sizeof(prec_traits<u8>::type);
     case data_type::undef:
     default: assert(!"unknown data_type");
     }
@@ -167,6 +168,8 @@ inline memory_format_t format_normalize(const memory_format_t fmt) {
             IOdhw8o16i2o,
             OIhw8o8i,
             OhIw8o4i,
+            OhIw8o32i,
+            OhIw16o32i,
             OhIw8o4i_s8s8,
             OIhw16o16i,
             IOhw16o16i,
@@ -349,6 +352,7 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
     if (one_of(f32, src_dt, dst_dt)) return f32;
     if (one_of(s32, src_dt, dst_dt)) return s32;
     if (one_of(s16, src_dt, dst_dt)) return s32;
+    if (one_of(bin, src_dt, dst_dt)) return s32;
 
     if (one_of(s8, src_dt, dst_dt) || one_of(u8, src_dt, dst_dt)) return s32;
 
@@ -375,6 +379,8 @@ inline data_type_t default_accum_data_type(data_type_t src_dt,
             return s32;
         if ((src_dt == bf16) && (wei_dt == bf16) && one_of(dst_dt, f32, bf16))
             return f32;
+        if (src_dt == bin && wei_dt == bin && (dst_dt == f32 || dst_dt == bin))
+            return s32;
     } else if (prop_kind == backward_data) {
         if (src_dt == s32 && wei_dt == s16 && dst_dt == s16)
             return s32;

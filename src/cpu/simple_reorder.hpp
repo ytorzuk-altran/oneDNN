@@ -873,7 +873,7 @@ typename utils::enable_if<fmt_i == nhwc && fmt_o == nChw8c>::type>
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
-typename utils::enable_if<fmt_i == nhwc && fmt_o == nhwc>::type>
+typename utils::enable_if<fmt_i == nhwc && fmt_o == nhwc && type_o != mkldnn_bin>::type>
 {
     static bool is_applicable(const memory_desc_wrapper &input_d,
         const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
@@ -916,7 +916,7 @@ typename utils::enable_if<fmt_i == nhwc && fmt_o == nhwc>::type>
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
-typename utils::enable_if<fmt_i == nchw && fmt_o == nhwc>::type>
+typename utils::enable_if<fmt_i == nchw && fmt_o == nhwc && type_i != mkldnn_bin && type_o != mkldnn_bin>::type>
 {
     static bool is_applicable(const memory_desc_wrapper &input_d,
         const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
@@ -961,6 +961,59 @@ typename utils::enable_if<fmt_i == nchw && fmt_o == nhwc>::type>
             [&](int n, int h, int w) {
                 auto i = &input[input_d.blk_off(n, 0, h, w)];
                 auto o = &output[output_d.blk_off(n, 0, h, w)];
+                ker(i, o);
+        });
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+typename utils::enable_if<(fmt_i == nchw || fmt_i == nhwc) && fmt_o == nhwc && (type_i == mkldnn_bin || type_o == mkldnn_bin)>::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+        const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
+        int smask = attr ? attr->output_scales_.mask_ : 0;
+        return smask == 0 && order_keep && (input_d._md->format == nchw || input_d._md->format == nhwc) && output_d._md->format == nhwc;
+    }
+
+    GET_SCRATCHPAD_SIZE_ZERO();
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output,
+        const memory_tracking::grantor_t &scratchpad) {
+        DECLARE_COMMON_PARAMS();
+
+        const auto &dims = input_d.dims();
+        const int C = dims[1];
+        const int H = dims[2];
+        const int W = dims[3];
+
+        int nbits = 8;
+        const int CB = div_up(C, nbits);
+
+        auto ker = [&](const data_t<type_i> *i, data_t<type_o> *o) {
+            for (int cb = 0; cb < CB; ++cb) {
+                uint8_t bin_val = 0x00;
+                for (int c = cb * nbits, shift = 0; c < std::min(C, (cb + 1) * nbits); c++, shift++) {
+                    const ptrdiff_t flat_off = c * input_d.blocking_desc().strides[0][1];
+
+                    auto bit = uint8_t((i[flat_off] > 0) ? 0x01 : 0x00);
+                    bin_val |= (bit << shift);
+                }
+
+                o[cb] = bin_val;
+            }
+        };
+
+        parallel_nd(dims[0], H, W,
+            [&](int n, int h, int w) {
+                auto iidx = input_d.blk_off(n, 0, h, w);
+                auto oidx = output_d.blk_off(n, 0, h, w);
+
+                auto i = &input[iidx];
+                auto o = &output[oidx / nbits];
                 ker(i, o);
         });
 
@@ -1407,8 +1460,80 @@ typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o4i || fmt_o == gOhIw8o
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o32i || fmt_o == OhIw16o32i) && type_i == mkldnn_bin && type_o == mkldnn_bin>::type>
+{
+    PLAIN_TO_BLOCKED_IS_APPLICABLE();
+
+    GET_SCRATCHPAD_SIZE_ZERO();
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output,
+        const memory_tracking::grantor_t &scratchpad) {
+        DECLARE_COMMON_PARAMS();
+
+        static constexpr bool w_groups
+            = format_traits<fmt_o>::data_kind == dk::gwei;
+        constexpr int is_1d = format_traits<fmt_o>::ndims_sp == 1;
+        constexpr int is_3d = format_traits<fmt_o>::ndims_sp == 3;
+        constexpr int blksize_o = fmt_o == OhIw8o32i ? 8 : 16;
+        constexpr int blksize_i = 32;
+
+        const auto &dims = input_d.dims();
+        const auto &pdims = order_keep
+            ? output_d.blocking_desc().padding_dims
+            : input_d.blocking_desc().padding_dims;
+
+        const int G = w_groups ? dims[0] : 1;
+        const int OC = dims[w_groups + 0];
+        const int NB_OC = pdims[w_groups + 0] / blksize_o;
+        const int IC = dims[w_groups + 1];
+        const int NB_IC = pdims[w_groups + 1] / blksize_i;
+        const int H = is_1d ? 1 : dims[w_groups + 2 + is_3d];
+        const int W = dims[w_groups + 3 + is_3d - is_1d];
+
+        constexpr int i_mult_o = blksize_o;
+        constexpr int i_mult_i = blksize_i;
+        constexpr int nbits = 8;
+
+        auto extract_bit = [](uint8_t val, uint8_t bit) -> uint8_t {
+            return (uint8_t) ((val >> bit) & 0x0001);
+        };
+
+        parallel_nd(G, NB_OC, NB_IC, H, W,
+            [&](int g, int nb_oc, int nb_ic, int h, int w) {
+                const int oc_block = nstl::min(blksize_o, OC - nb_oc * blksize_o);
+                const int ic_block = nstl::min(blksize_i, IC - nb_ic * blksize_i);
+
+                for (int oc = 0; oc < oc_block; ++oc) {
+                    for (int icb = 0; icb < div_up(ic_block, nbits); ++icb) {
+
+                        uint8_t bin_val = 0x00;
+                        for (int ic = icb*nbits, shift = 0; ic < std::min(IC, (icb + 1)*nbits); ic++, shift++) {
+                            size_t iidx = (i_mult_o * nb_oc + oc) * input_d.blocking_desc().strides[0][0] +
+                                          (i_mult_i * nb_ic + ic) * input_d.blocking_desc().strides[0][1] +
+                                                                h * input_d.blocking_desc().strides[0][2] +
+                                                                w;
+
+                            uint8_t bit = extract_bit(input[iidx / nbits], (uint8_t)(iidx % nbits));
+                            bin_val |= (bit << shift);
+                        }
+
+                        size_t oidx = wei_blk_off_like_gwei3D<fmt_o>(output_d, g, nb_oc, nb_ic, 0, h, w) + oc * blksize_i + icb * nbits;
+                        output[oidx / nbits] = bin_val;
+
+                    }
+                }
+            });
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 typename utils::enable_if<fmt_i == any
-&& block_format_traits<format_traits<fmt_o>::blk_fmt>::blk_ndims == 2 && fmt_o != OhIw8o4i && fmt_o != gOhIw8o4i>::type>
+&& block_format_traits<format_traits<fmt_o>::blk_fmt>::blk_ndims == 2
+&& fmt_o != OhIw8o4i && fmt_o != gOhIw8o4i && fmt_o != OhIw8o32i && fmt_o != OhIw16o32i>::type>
 {
     PLAIN_TO_BLOCKED_IS_APPLICABLE();
 

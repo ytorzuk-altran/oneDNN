@@ -73,10 +73,12 @@ struct jit_conv_conf_t {
     int stride_d, stride_h, stride_w;
     int dilate_d, dilate_h, dilate_w;
     memory_format_t src_fmt;
+    memory_format_t dst_fmt;
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
     bool with_dw_conv;
+    bool with_binarization;
 
     post_ops_t::entry_t::eltwise_t eltwise;
 
@@ -296,6 +298,47 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     winograd_sched_t sched_policy;
 };
 
+struct jit_bin_conv_conf_t {
+    prop_kind_t prop_kind;
+    conv_version_t ver;
+    conv_loop_order_t loop_order;
+
+    int ndims;
+    int mb;
+    int ngroups, ic, oc, oc_padded, ic_padded;
+    int id, ih, iw, od, oh, ow;
+    int f_pad, l_pad, t_pad;
+    int back_pad, r_pad, b_pad;
+    int kd, kh, kw;
+    int stride_d, stride_h, stride_w;
+    int dilate_d, dilate_h, dilate_w;
+    memory_format_t src_fmt;
+    bool with_bias;
+    bool with_sum;
+    bool with_eltwise;
+    bool with_dw_conv;
+    bool with_binarization;
+
+    float pad_value;
+    bool exclude_pad;
+
+    int dw_conv_oh;
+    int dw_conv_ow;
+
+    int nb_ic, ic_block;
+    int nb_oc, oc_block;
+    int nb_ic_blocking, nb_oc_blocking; // blocking of nb_ic and nb_ic
+    int ur_h, ur_w;
+    int ur_w_tail;
+    int typesize_in;
+    int typesize_out;
+    int typesize_bia;
+    int typesize_acc;
+    data_type_t src_dt;
+    data_type_t bia_dt;
+    data_type_t dst_dt;
+};
+
 struct jit_conv_call_s {
     const void *src; /* hack, non-const for backward_data */
     const void *dst; /* hack, non-const for forward */
@@ -398,6 +441,7 @@ struct jit_1x1_conv_conf_t {
     int kh, kw;
     int stride_h, stride_w;
     memory_format_t src_fmt;
+    memory_format_t dst_fmt;
     bool with_bias;
     bool with_sum;
     bool with_eltwise;

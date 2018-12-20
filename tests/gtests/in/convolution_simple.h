@@ -150,7 +150,7 @@ INST_TEST_CASE(SimpleSmall_Blocked_1x1,
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_G, FMT_BIAS, FMT_DATA_BLOCKED,
         2, 4, 16, 10, 10, 32, 10, 10, 1, 1, 0, 0, 1, 1),
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_G, FMT_BIAS, FMT_DATA_BLOCKED,
-        2, 8, 32, 10, 10, 256, 10, 10, 1, 1, 0, 0, 1, 1)
+        1, 8, 32, 1, 1, 128, 1, 1, 1, 1, 0, 0, 1, 1)
 );
 
 INST_TEST_CASE(Simple_Dilated_Blocked,

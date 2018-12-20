@@ -43,6 +43,7 @@ const char *mkldnn_dt2str(mkldnn_data_type_t v) {
     if (v == mkldnn_s16) return "s16";
     if (v == mkldnn_s8) return "s8";
     if (v == mkldnn_u8) return "u8";
+    if (v == mkldnn_bin) return "bin";
     assert(!"unknown dt");
     return "unknown dt";
 }
@@ -140,6 +141,8 @@ const char *mkldnn_fmt2str(mkldnn_memory_format_t v) {
     if (v == mkldnn_OhIw16o4i) return "OhIw16o4i";
     if (v == mkldnn_OhIw8o4i) return "OhIw8o4i";
     if (v == mkldnn_OhIw8o4i_s8s8) return "OhIw8o4i_s8s8";
+    if (v == mkldnn_OhIw8o32i) return "OhIw8o32i";
+    if (v == mkldnn_OhIw16o32i) return "OhIw16o32i";
     if (v == mkldnn_oIdhw8i) return "oIdhw8i";
     if (v == mkldnn_oIdhw16i) return "oIdhw16i";
     if (v == mkldnn_OIdhw4i4o) return "OIdhw4i4o";
@@ -256,6 +259,8 @@ const char *mkldnn_prim_kind2str(mkldnn_primitive_kind_t v) {
     if (v == mkldnn_inner_product) return "inner_product";
     if (v == mkldnn_rnn) return "rnn";
     if (v == mkldnn_roi_pooling) return "roi_pooling";
+    if (v == mkldnn_binary_convolution) return "binary_convolution";
+    if (v == mkldnn_binarization) return "binarization";
     assert(!"unknown prim_kind");
     return "unknown prim_kind";
 }
@@ -296,6 +301,8 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_depthwise_prelu) return "depthwise_prelu";
     if (v == mkldnn_roi_pooling_max) return "roi_pooling_max";
     if (v == mkldnn_roi_pooling_bilinear) return "roi_pooling_bilinear";
+    if (v == mkldnn_binary_convolution_direct) return "binary_convolution_direct";
+    if (v == mkldnn_binarization_depthwise) return "binarization_depthwise";
     assert(!"unknown alg_kind");
     return "unknown alg_kind";
 }

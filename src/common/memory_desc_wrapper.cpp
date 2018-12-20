@@ -72,10 +72,26 @@ status_t fill_nonblocked(memory_desc_t &md, const int perm[]) {
     blocking_desc_t &blk = md.layout_desc.blocking;
     array_set(blk.block_dims, 1, ndims);
     array_set(blk.strides[1], 1, ndims);
-    set_default_strides(blk.strides[0], md.dims, ndims, perm);
-    array_copy(blk.padding_dims, md.dims, ndims);
+
+    if (md.format == mkldnn_nhwc && md.data_type == mkldnn_bin) {
+        dims_t padding_dims;
+
+        const dims_t block_dims = {1, 8, 1, 1};
+        for (int d = 0; d < ndims; ++d) {
+            padding_dims[d] = rnd_up(md.dims[d], block_dims[d]);
+        }
+
+        set_default_strides(blk.strides[0], padding_dims, ndims, perm);
+        array_copy(blk.padding_dims, padding_dims, ndims);
+
+    } else {
+        set_default_strides(blk.strides[0], md.dims, ndims, perm);
+        array_copy(blk.padding_dims, md.dims, ndims);
+    }
+
     array_set(blk.offset_padding_to_data, 0, ndims);
     blk.offset_padding = 0;
+
     return success;
 }
 
@@ -574,6 +590,26 @@ status_t fill_OhIw8o4i(memory_desc_t &md) {
     if (md.ndims != 4) return invalid_arguments;
 
     const dims_t block_dims = {8, 4, 1, 1};
+    const int perm[] = {
+        0, 2, 1, 3,
+        4, 5, 6, 7};
+    return fill_contiguous_blocked(md, block_dims, perm);
+}
+
+status_t fill_OhIw8o32i(memory_desc_t &md) {
+    if (md.ndims != 4) return invalid_arguments;
+
+    const dims_t block_dims = {8, 32, 1, 1};
+    const int perm[] = {
+        0, 2, 1, 3,
+        4, 5, 6, 7};
+    return fill_contiguous_blocked(md, block_dims, perm);
+}
+
+status_t fill_OhIw16o32i(memory_desc_t &md) {
+    if (md.ndims != 4) return invalid_arguments;
+
+    const dims_t block_dims = {16, 32, 1, 1};
     const int perm[] = {
         0, 2, 1, 3,
         4, 5, 6, 7};
@@ -1402,6 +1438,8 @@ status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc)
     case OIw4i16o4i_s8s8: return fill_OIw4i16o4i(memory_desc);
     case OIhw4i16o4i: return fill_OIhw4i16o4i(memory_desc);
     case OhIw8o4i: return fill_OhIw8o4i(memory_desc);
+    case OhIw8o32i: return fill_OhIw8o32i(memory_desc);
+    case OhIw16o32i: return fill_OhIw16o32i(memory_desc);
     case OhIw8o4i_s8s8: return fill_OhIw8o4i(memory_desc);
     case OIhw4i16o4i_s8s8: return fill_OIhw4i16o4i(memory_desc);
     case OIhw8i16o2i: return fill_OIhw8i16o2i(memory_desc);

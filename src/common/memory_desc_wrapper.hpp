@@ -171,7 +171,8 @@ struct memory_desc_wrapper: public c_compatible {
                     max_size = nstl::max(max_size,
                             size_t(block * strides[1][d]));
             }
-            return max_size * data_type_size() + additional_buffer_size();;
+
+            return max_size * data_type_size() + additional_buffer_size();
         }
     }
 

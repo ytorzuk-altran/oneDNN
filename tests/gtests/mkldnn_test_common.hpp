@@ -279,6 +279,8 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::OhIw8o4i:
     case f::OIhw4i16o4i_s8s8:
     case f::OhIw8o4i_s8s8:
+    case f::OhIw8o32i:
+    case f::OhIw16o32i:
         ndims = 4; break;
     case f::ncdhw:
     case f::ndhwc:
@@ -406,6 +408,10 @@ static void fill_data(const size_t size, data_t *data, double sparsity = 1.,
     });
 }
 
+int div_up(const int a, const int b) {
+    return (a + b - 1) / b;
+}
+
 template <typename data_t>
 inline void fill_data(const size_t size, data_t *data, const int init_range)
 {
@@ -448,7 +454,7 @@ static inline void fill_data_bf16(const size_t size,
 
 template <typename data_t>
 static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst,
-        data_t threshold = (data_t)1e-4)
+        data_t threshold = (data_t)1e-4, bool isBinary = false)
 {
     using data_type = mkldnn::memory::data_type;
 
@@ -472,21 +478,27 @@ static void compare_data(mkldnn::memory& ref, mkldnn::memory& dst,
 
     ptrdiff_t num = 1;
     for (auto d = 0; d < ndims; ++d) {
-        num *= dims[d];
+        if (isBinary && d == 1) {
+            num *= div_up(dims[d], 8);
+        } else {
+            num *= dims[d];
+        }
     }
 
     data_t *ref_data = (data_t *)ref.get_data_handle();
     data_t *dst_data = (data_t *)dst.get_data_handle();
 
     mkldnn::impl::parallel_nd(num, [&](ptrdiff_t i) {
-        data_t ref = ref_data[map_index(ref_desc, i)];
-        data_t got = dst_data[map_index(dst_desc, i)];
+        int divider = isBinary ? 8 : 1;
+
+        data_t ref = ref_data[map_index(ref_desc, i) / divider];
+        data_t got = dst_data[map_index(dst_desc, i) / divider];
 
         if (data_traits<data_t>::data_type == data_type::f32) {
             data_t diff = got - ref;
             data_t e = (std::abs(ref) > threshold) ? diff / ref : diff;
-            EXPECT_NEAR(e, (data_t)0.0, threshold)
-                << "Index: " << i << " Total: " << num;
+            EXPECT_NEAR(e, (data_t) 0.0, threshold)
+                                << "Index: " << i << " Total: " << num;
         } else {
             EXPECT_EQ(ref, got) << "Index: " << i << " Total: " << num;
         }
@@ -724,6 +736,33 @@ struct roi_pool_test_params {
     mkldnn::memory::format roi_format;
     mkldnn::memory::format dst_format;
     test_roi_pool_desc_t test_pd;
+};
+
+struct test_binary_convolution_params_t {
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::algorithm aalgorithm;
+    float pad_value;
+    mkldnn::algorithm eltwise_algorithm;
+    const float eltwise_alpha;
+    const float eltwise_beta;
+    mkldnn::algorithm depthwise_algorithm;
+    bool with_sum;
+    mkldnn::algorithm binarization_algorithm;
+    test_convolution_formats_t formats;
+    test_convolution_sizes_t sizes;
+};
+
+struct test_binary_convolution_dw_conv_params_t {
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::algorithm aalgorithm;
+    mkldnn::algorithm eltwise_algorithm;
+    const float eltwise_alpha;
+    const float eltwise_beta;
+    mkldnn::algorithm depthwise_algorithm;
+    bool with_sum;
+    mkldnn::algorithm binarization_algorithm;
+    test_convolution_dw_conv_formats_t formats;
+    test_convolution_dw_conv_sizes_t sizes;
 };
 
 std::ostream &operator<<(std::ostream &stream,

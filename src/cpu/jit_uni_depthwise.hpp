@@ -138,6 +138,7 @@ struct jit_uni_dw_conv_row_f32: public jit_generator {
             const primitive_attr_t &attr);
     static status_t init_conf(jit_1x1_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw, const primitive_attr_t &attr);
     static status_t init_conf(jit_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw, const primitive_attr_t &attr);
+    static status_t init_conf(jit_bin_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw, const primitive_attr_t &attr);
 
     jit_conv_conf_t jcp;
     const primitive_attr_t &attr_;
@@ -149,6 +150,7 @@ private:
         isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
     using reg64_t = const Xbyak::Reg64;
     using reg32_t = const Xbyak::Reg32;
+    using reg16_t = const Xbyak::Reg16;
     using reg8_t = const Xbyak::Reg8;
     const Xbyak::AddressFrame &vmmword = (isa == sse42)
         ? xword : (isa == avx2) ? yword : zword;
@@ -174,11 +176,17 @@ private:
     reg64_t reg_d_weights = aux_reg_input0;
     reg64_t reg_d_bias = aux_reg_input1;
 
+    reg64_t reg_b_weights = r15;
+    reg64_t reg_b_mask = reg_d_bias;
+    reg64_t reg_b_out_mask = rbx;
+
     reg32_t reg_tmp_32 = r11d;
     reg64_t reg_tmp_64 = r11;
     reg8_t reg_tmp_8 = r11b;
+    reg16_t reg_tmp_16 = r11w;
 
-    reg64_t imm_addr64 = aux_reg_input0;
+    reg32_t reg_tmp2_32 = r13d;
+    reg64_t reg_tmp2_64 = r13;
 
     inline Vmm get_ker_reg(int idx) { return Vmm(idx + 0); }
     inline Vmm get_src_reg(int idx) { return Vmm(idx + 1); }
@@ -188,6 +196,14 @@ private:
     Vmm vmm_tmp = Vmm(0);
     Vmm vmm_sum = Vmm(0);
     Vmm vmm_bias = Vmm(0);
+    Vmm vmm_thr = Vmm(0);
+    Vmm vmm_out_mask = Vmm(1);
+
+    const unsigned char _cmp_gt_os = 6;
+
+    Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
+    Xbyak::Opmask bin_mask0 = Xbyak::Opmask(5);
+    Xbyak::Opmask bin_mask1 = Xbyak::Opmask(6);
 
     inline void load_src(int ur_w);
     inline void apply_filter(int ur_w, int kw_size);

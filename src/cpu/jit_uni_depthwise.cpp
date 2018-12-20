@@ -799,23 +799,32 @@ void jit_uni_dw_conv_row_f32<isa>::apply_postprocessing(int ur_w, int oc_step) {
 
     if (jcp.with_sum) {
         for (int r = 0; r < repeats; r++) {
-            int tail_size = isa == avx2 ? oc_step : nstl::min(jcp.ch_block / 2, oc_step - r * jcp.ch_block / 2);
-            bool is_scalar_store = isa == avx2 ? tail_size < jcp.ch_block : tail_size < jcp.ch_block / 2;
+            int tail_size = isa == sse42 ? nstl::min(jcp.ch_block / 2, oc_step - r * jcp.ch_block / 2) : oc_step;
+            bool is_scalar_store = isa == sse42 ? tail_size < jcp.ch_block / 2 : tail_size < jcp.ch_block;
 
             for (int ow = 0; ow < ur_w; ow++) {
                 if (is_scalar_store) {
-                    for (int oc = 0; oc < tail_size; oc++) {
-                        int o_off = ow * ow_stride_ + r * (jcp.ch_block / 2) + oc;
+                    if (isa == avx512_common) {
+                        int o_off = ow * ow_stride_;
 
-                        uni_vpxor(vmm_sum, vmm_sum, vmm_sum);
-                        cvt2ps(jcp.dst_dt, vmm_sum, ptr[reg_output + o_off * jcp.typesize_out], true);
+                        Vmm vmm_in = vmm_sum | ktail_mask | T_z;
 
-                        if (oc >= jcp.ch_block / 2) {
-                            vperm2i128(Ymm(vmm_sum.getIdx()), Ymm(vmm_sum.getIdx()), Ymm(vmm_sum.getIdx()), 0x01);
-                        }
-                        uni_vpslldq(vmm_sum, vmm_sum, jcp.typesize_out * (oc % (jcp.ch_block / 2)));
-
+                        cvt2ps(jcp.dst_dt, vmm_in, ptr[reg_output + o_off * jcp.typesize_out], false);
                         uni_vaddps(get_acc_reg(r * ur_w + ow), get_acc_reg(r * ur_w + ow), vmm_sum);
+                    } else {
+                        for (int oc = 0; oc < tail_size; oc++) {
+                            int o_off = ow * ow_stride_ + r * (jcp.ch_block / 2) + oc;
+
+                            uni_vpxor(vmm_sum, vmm_sum, vmm_sum);
+                            cvt2ps(jcp.dst_dt, vmm_sum, ptr[reg_output + o_off * jcp.typesize_out], true);
+
+                            if (oc >= jcp.ch_block / 2) {
+                                vperm2i128(Ymm(vmm_sum.getIdx()), Ymm(vmm_sum.getIdx()), Ymm(vmm_sum.getIdx()), 0x01);
+                            }
+                            uni_vpslldq(vmm_sum, vmm_sum, jcp.typesize_out * (oc % (jcp.ch_block / 2)));
+
+                            uni_vaddps(get_acc_reg(r * ur_w + ow), get_acc_reg(r * ur_w + ow), vmm_sum);
+                        }
                     }
                 } else {
                     int o_off = ow * ow_stride_ + r * (jcp.ch_block / 2);
@@ -893,6 +902,7 @@ void jit_uni_dw_conv_row_f32<isa>::store_dst_typed(const Xbyak::Address &op, Vmm
             }
             break;
         case data_type::u8:
+        case data_type::bin:
             uni_vpackusdw(vmm_dst, vmm_dst, vmm_dst);
 
             if (isa != sse42 && !scalar_store)
@@ -917,15 +927,19 @@ void jit_uni_dw_conv_row_f32<isa>::store_dst_typed(const Xbyak::Address &op, Vmm
 
 template <cpu_isa_t isa>
 void jit_uni_dw_conv_row_f32<isa>::store_dst(int ur_w, int oc_step) {
+    int nbits = 8;
     int repeats = isa == sse42 && oc_step > (jcp.ch_block / 2) ? 2 : 1;
 
-    for (int i = 0; i < repeats; i++) {
-        int tail_size = isa == avx2 ? oc_step : nstl::min(jcp.ch_block / 2, oc_step - i * jcp.ch_block / 2);
-        bool is_scalar_store = isa == avx2 ? tail_size < jcp.ch_block : tail_size < jcp.ch_block / 2;
+    if (isa == avx512_common && oc_step != jcp.ch_block) {
+        int mask = (1 << oc_step) - 1;
+        mov(reg_tmp_32, mask);
+        kmovw(ktail_mask, reg_tmp_32);
+    }
 
+    for (int i = 0; i < repeats; i++) {
         for (int ow = 0; ow < ur_w; ow++) {
             Vmm vmm_dst = get_acc_reg(i * ur_w + ow);
-            if (jcp.dst_dt != data_type::f32) {
+            if (jcp.dst_dt != data_type::f32 && jcp.dst_dt != data_type::bin) {
                 if (attr_.round_mode_ == round_mode::nearest)
                     uni_vcvtps2dq(vmm_dst, vmm_dst);
                 else if (attr_.round_mode_ == round_mode::down) {
@@ -935,30 +949,100 @@ void jit_uni_dw_conv_row_f32<isa>::store_dst(int ur_w, int oc_step) {
                     assert(!"unimplemented");
             }
         }
+    }
 
-        if (is_scalar_store) {
-            for (int ow = 0; ow < ur_w; ow++) {
+    if (jcp.with_binarization) {
+        int output_step = div_up(ow_stride_, nbits);
+
+        const auto &p = attr_.post_ops_;
+        int binarization_idx = p.find(primitive_kind::binarization);
+
+        push(reg_bias);
+
+        mov(reg_b_weights, reinterpret_cast<size_t>(p.entry_[binarization_idx].binarization.weights_data));
+        mov(reg_b_out_mask, reinterpret_cast<size_t>(p.entry_[binarization_idx].binarization.output_mask_data));
+        add(reg_b_weights, reg_oc_off);
+        add(reg_b_out_mask, reg_oc_off);
+
+        for (int ow = 0; ow < ur_w; ow++) {
+            for (int i = 0; i < repeats; i++) {
+                int tail_size = isa == sse42 ? nstl::min(jcp.ch_block / 2, oc_step - i * jcp.ch_block / 2) : oc_step;
+                mov(reg_b_mask, (1 << tail_size) - 1);
+                uni_vmovups(vmm_thr, ptr[reg_b_weights + i * (jcp.ch_block / 2) * sizeof(float)]);
+                uni_vmovups(vmm_out_mask, ptr[reg_b_out_mask + i * (jcp.ch_block / 2) * sizeof(float)]);
+
                 Vmm vmm_dst = get_acc_reg(i * ur_w + ow);
-                Ymm ymm_dst = Ymm(vmm_dst.getIdx());
 
-                for (int oc = 0; oc < tail_size; oc++) {
-                    int o_off = ow * ow_stride_ + i * (jcp.ch_block / 2) + oc;
-                    store_dst_typed(ptr[reg_output + o_off * jcp.typesize_out], vmm_dst, true);
+                if (isa == avx512_common) {
+                    vcmpps(bin_mask0, vmm_dst, vmm_thr, _cmp_gt_os);
+                    vptestmd(bin_mask1, vmm_out_mask, vmm_out_mask);
+                    kxnorw(bin_mask0, bin_mask0, bin_mask1);
+                } else {
+                    uni_vcmpgtps(vmm_dst, vmm_dst, vmm_thr);
+                    uni_vpcmpeqd(vmm_dst, vmm_dst, vmm_out_mask);
+                }
 
-                    if (isa == avx2) {
-                        vperm2i128(ymm_tmp, ymm_dst, ymm_dst, 0x01);
-                        vpalignr(ymm_dst, vmm_tmp, ymm_dst, jcp.typesize_out);
+                if (i == 0) {
+                    if (isa == avx512_common) {
+                        kmovw(reg_tmp_32, bin_mask0);
                     } else {
-                        psrldq(vmm_dst, jcp.typesize_out);
+                        uni_vmovmskps(reg_tmp_32, vmm_dst);
+                    }
+                    and_(reg_tmp_64, reg_b_mask);
+                } else {
+                    uni_vmovmskps(reg_tmp2_32, vmm_dst);
+                    and_(reg_tmp2_64, reg_b_mask);
+                    shl(reg_tmp2_32, 4);
+                    or_(reg_tmp_32, reg_tmp2_32);
+                }
+
+                if (i == repeats - 1) {
+                    const size_t o_off = ow * output_step;
+                    if (isa == avx512_common && oc_step > nbits) {
+                        mov(ptr[reg_output + o_off * jcp.typesize_out], reg_tmp_16);
+                    } else {
+                        mov(ptr[reg_output + o_off * jcp.typesize_out], reg_tmp_8);
                     }
                 }
             }
-        } else {
-            for (int ow = 0; ow < ur_w; ow++) {
-                int o_off = ow * ow_stride_+ i * (jcp.ch_block / 2);
-                Vmm vmm_dst = get_acc_reg(i * ur_w + ow);
+        }
 
-                store_dst_typed(ptr[reg_output + o_off * jcp.typesize_out], vmm_dst, false);
+        pop(reg_bias);
+    } else {
+        for (int i = 0; i < repeats; i++) {
+            int tail_size = isa == sse42 ? nstl::min(jcp.ch_block / 2, oc_step - i * jcp.ch_block / 2) : oc_step;
+            bool is_scalar_store = isa == sse42 ? tail_size < jcp.ch_block / 2 : tail_size < jcp.ch_block;
+            if (is_scalar_store) {
+                for (int ow = 0; ow < ur_w; ow++) {
+                    Vmm vmm_dst = get_acc_reg(i * ur_w + ow);
+
+                    if (isa == avx512_common) {
+                        int o_off = ow * ow_stride_;
+
+                        store_dst_typed(ptr[reg_output + o_off * jcp.typesize_out], vmm_dst | ktail_mask, false);
+                    } else {
+                        for (int oc = 0; oc < tail_size; oc++) {
+                            int o_off = ow * ow_stride_ + i * (jcp.ch_block / 2) + oc;
+                            store_dst_typed(ptr[reg_output + o_off * jcp.typesize_out], vmm_dst, true);
+
+                            if (isa == sse42) {
+                                psrldq(vmm_dst, jcp.typesize_out);
+                            } else {
+                                Ymm ymm_dst = Ymm(vmm_dst.getIdx());
+
+                                vperm2i128(ymm_tmp, ymm_dst, ymm_dst, 0x01);
+                                vpalignr(ymm_dst, vmm_tmp, ymm_dst, jcp.typesize_out);
+                            }
+                        }
+                    }
+                }
+            } else {
+                for (int ow = 0; ow < ur_w; ow++) {
+                    int o_off = ow * ow_stride_ + i * (jcp.ch_block / 2);
+                    Vmm vmm_dst = get_acc_reg(i * ur_w + ow);
+
+                    store_dst_typed(ptr[reg_output + o_off * jcp.typesize_out], vmm_dst, false);
+                }
             }
         }
     }
@@ -972,7 +1056,7 @@ void jit_uni_dw_conv_row_f32<isa>::loop_body(int oc_step) {
     Label tail_w_label;
     Label exit_label;
 
-    int output_step = ow_stride_;
+    int output_step = jcp.with_binarization ? div_up(ow_stride_, 8) : ow_stride_;
 
     L(left_pad_label); {
         int ur_w = 1;
@@ -1139,13 +1223,15 @@ bool jit_uni_dw_conv_row_f32<isa>::post_ops_ok(jit_conv_conf_t &jcp, const primi
     auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
     auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
     auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
+    auto is_binarization = [&](int idx) { return p.entry_[idx].is_binarization(); };
 
     int start_idx = p.find(primitive_kind::convolution) + 1;
 
     switch (p.len_ - start_idx) {
     case 0: return true; // no post_ops
-    case 1: return is_simple(start_idx) || is_sum(start_idx);
-    case 2: return (is_sum(start_idx) && is_simple(start_idx+1)) || (is_simple(start_idx) && is_simple(start_idx+1));
+    case 1: return is_simple(start_idx) || is_sum(start_idx) || is_binarization(start_idx);
+    case 2: return (is_sum(start_idx) && is_simple(start_idx+1)) || (is_simple(start_idx) && is_simple(start_idx+1)) ||
+                   (is_simple(start_idx) && is_binarization(start_idx+1));
     case 3: return (is_sum(start_idx) && is_simple(start_idx+1) && is_simple(start_idx+2));
     default: return false;
     }
@@ -1242,6 +1328,55 @@ status_t jit_uni_dw_conv_row_f32<isa>::init_conf(jit_conv_conf_t &jcp, jit_conv_
     jcp_dw.typesize_in = (int)types::data_type_size(jcp.src_dt);
     jcp_dw.typesize_bia = (int)types::data_type_size(jcp.bia_dt);
     jcp_dw.typesize_out = (int)types::data_type_size(jcp.dst_dt);
+
+    if (jcp_dw.src_dt != mkldnn_f32 && jcp_dw.src_dt != mkldnn_u8)
+        return status::unimplemented;
+
+    return status::success;
+}
+
+template <cpu_isa_t isa>
+status_t jit_uni_dw_conv_row_f32<isa>::init_conf(jit_bin_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw,
+        const primitive_attr_t &attr) {
+    if (!mayiuse(isa)) return status::unimplemented;
+    const int simd_w = isa == avx512_common ? 16 : 8;
+
+    const auto &p = attr.post_ops_;
+
+    int dw_conv_ind = p.find(primitive_kind::convolution);
+    jcp_dw.with_sum = p.find(primitive_kind::sum, dw_conv_ind) != -1;
+    jcp_dw.with_binarization = p.find(primitive_kind::binarization, dw_conv_ind) != -1;
+
+    jcp_dw.ch_block = simd_w;
+    jcp_dw.with_bias = true;
+
+    jcp_dw.kh = p.entry_[dw_conv_ind].dw_conv.ker_h;
+    jcp_dw.kw = p.entry_[dw_conv_ind].dw_conv.ker_w;
+    jcp_dw.ic = jcp.oc;
+    jcp_dw.oc = jcp.oc;
+    jcp_dw.ih = p.entry_[dw_conv_ind].dw_conv.in_h;
+    jcp_dw.iw = p.entry_[dw_conv_ind].dw_conv.in_w;
+    jcp_dw.oh = jcp.dw_conv_oh;
+    jcp_dw.ow = jcp.dw_conv_ow;
+    jcp_dw.stride_h = p.entry_[dw_conv_ind].dw_conv.str_h;
+    jcp_dw.stride_w = p.entry_[dw_conv_ind].dw_conv.str_w;
+    jcp_dw.conv_weights = p.entry_[dw_conv_ind].dw_conv.weights_data;
+    jcp_dw.conv_biases = p.entry_[dw_conv_ind].dw_conv.biases_data;
+
+    if (jcp_dw.kh != 3 || jcp_dw.kw != 3)
+        return status::unimplemented;
+
+    if (!post_ops_ok(jcp_dw, attr))
+        return status::unimplemented;
+
+    jcp_dw.ur_w = 4;
+
+    jcp_dw.src_dt = mkldnn_f32;
+    jcp_dw.dst_dt = jcp_dw.with_binarization ? mkldnn_bin : mkldnn_f32;
+    jcp_dw.bia_dt = mkldnn_f32;
+    jcp_dw.typesize_in = (int)types::data_type_size(jcp_dw.src_dt);
+    jcp_dw.typesize_bia = (int)types::data_type_size(jcp_dw.bia_dt);
+    jcp_dw.typesize_out = (int)types::data_type_size(jcp_dw.dst_dt);
 
     if (jcp_dw.src_dt != mkldnn_f32 && jcp_dw.src_dt != mkldnn_u8)
         return status::unimplemented;

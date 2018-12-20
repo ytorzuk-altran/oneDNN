@@ -493,6 +493,27 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_dw_conv(
         int* ker_h, int* ker_w, int* str_h, int* str_w, const float** weights_data,
         const float** biases_data);
 
+/** Appends binarization post operation to the @p post_ops with given parameters
+ * @p kind and @p weights (@sa mkldnn_binarization_forward_desc_init and
+ * mkldnn_binarization_desc_t).
+ *
+ * The kind of this post operation is #mkldnn_binarization.
+ *
+ * In the simplest case when the binarization is the only post operation, the
+ * computations would be:
+ * dst[] <- binarization_op ( op(...) ) // instead of dst[] <- op(...)
+ * where binarization_op is configured with given parameters.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_binarization(
+        mkldnn_post_ops_t post_ops, mkldnn_alg_kind_t alg, const float* weights_data, const float* output_mask);
+
+/** Gets the binarization parameters of the post operation with index @p index in
+ * the sequence of @p post_ops.
+ */
+mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_binarization(
+        const_mkldnn_post_ops_t post_ops, int index,
+        mkldnn_alg_kind_t *alg, const float** weights_data, const float** output_mask);
+
 /** @} */
 
 /** @} */
@@ -1757,6 +1778,51 @@ mkldnn_status_t MKLDNN_API mkldnn_roi_pooling_forward_desc_init(
         int pooled_h, int pooled_w, double spatial_scale);
 
 /** @} */
+
+/** @addtogroup c_api_binary_convolution Binary convolution
+ * A primitive to compute binary convolution using different algorithms.
+ * @{ */
+
+/** Initializes a dilated binary convolution descriptor @p bin_conv_desc for forward
+ * propagation using @p prop_kind (possible values are #mkldnn_forward_training
+ * or #mkldnn_forward_inference), @p alg_kind, memory descriptors, @p strides,
+ * @p dilates, @p padding_l, @p padding_r, and @p padding_kind.
+ *
+ * @note if @p padding_r is @c NULL, the padding is supposed to be symmetric
+ *
+ * @note memory descriptors are allowed to be initialized with #mkldnn_any
+ * value of @p format_kind.
+ *
+ * Order of inputs:
+ *  - src (#mkldnn_query_src_pd, 0)
+ *  - weights (#mkldnn_query_weights_pd, 0)
+ *
+ * Order of outputs:
+ *  - dst (#mkldnn_query_dst_pd, 0)
+ */
+mkldnn_status_t MKLDNN_API mkldnn_dilated_binary_convolution_forward_desc_init(
+        mkldnn_binary_convolution_desc_t *bin_conv_desc, mkldnn_prop_kind_t prop_kind,
+        mkldnn_alg_kind_t alg_kind, const mkldnn_memory_desc_t *src_desc,
+        const mkldnn_memory_desc_t *weights_desc,
+        const mkldnn_memory_desc_t *dst_desc, const mkldnn_dims_t strides,
+        const mkldnn_dims_t dilates, const mkldnn_dims_t padding_l,
+        const mkldnn_dims_t padding_r, float pad_value);
+
+/** @} */
+
+/** @addtogroup c_api_binarization Binarization
+ * A primitive to binarize input using different approaches
+ * @{ */
+
+/** Initializes a @p binarization_desc for forward propagation using @p prop_kind
+ * (possible values are #mkldnn_forward_training or #mkldnn_forward_inference),
+ * @p alg_kind algorithm and memory descriptors.
+ * @sa mkldnn_binarization_desc_t for details */
+mkldnn_status_t MKLDNN_API mkldnn_binarization_forward_desc_init(
+        mkldnn_binarization_desc_t *binarization_desc, mkldnn_prop_kind_t prop_kind,
+        mkldnn_alg_kind_t alg_kind, const mkldnn_memory_desc_t *src_desc,
+        const mkldnn_memory_desc_t *dst_desc, const mkldnn_memory_desc_t *weights_desc,
+        const mkldnn_memory_desc_t *output_mask_desc);
 
 /** @} */
 

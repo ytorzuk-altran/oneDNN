@@ -78,6 +78,10 @@
 #include "cpu/jit_uni_x8s8s32x_dw_convolution.hpp"
 #include "cpu/jit_sse42_i8i8_pooling.hpp"
 #include "cpu/jit_uni_planar_convolution.hpp"
+#include "cpu/jit_uni_binary_convolution.hpp"
+#include "cpu/ref_binary_convolution.hpp"
+#include "cpu/jit_uni_binarization.hpp"
+#include "cpu/ref_binarization.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -414,6 +418,16 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_roi_pooling_fwd_t<avx2>),
     INSTANCE(jit_uni_roi_pooling_fwd_t<sse42>),
     INSTANCE(ref_roi_pooling_fwd_t<data_type::f32>),
+    /* binary convolution */
+    INSTANCE(jit_uni_binary_convolution_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_binary_convolution_fwd_t<avx2>),
+    INSTANCE(jit_uni_binary_convolution_fwd_t<sse42>),
+    INSTANCE(ref_binary_convolution_fwd_t),
+    /* binarization */
+    INSTANCE(jit_uni_binarization_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_binarization_fwd_t<avx2>),
+    INSTANCE(jit_uni_binarization_fwd_t<sse42>),
+    INSTANCE(ref_binarization_fwd_t<f32>),
     /* eol */
     nullptr,
 };

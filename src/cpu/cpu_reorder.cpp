@@ -89,6 +89,11 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
 
     /* fp32: flat <-> blocked with tail */
     REG_SR_BIDIR(f32, any, f32, nCw4c),
+
+    REG_SR_BIDIR(f32, nchw, bin, nhwc),
+    REG_SR_BIDIR(f32, nhwc, bin, nhwc),
+    REG_SR_DIRECT_COPY(bin, bin),
+
     REG_SR_BIDIR(f32, any, f32, nCw8c),
     REG_SR_BIDIR(f32, any, f32, OIw4i4o),
     REG_SR_BIDIR(f32, any, f32, OIw8i8o),
@@ -240,6 +245,9 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR(s8, oihw, s8, OhIw8o4i_s8s8, fmt_order::keep),
     REG_SR(f32, goihw, s8, gOhIw8o4i_s8s8, fmt_order::keep),
     REG_SR(s8, goihw, s8, gOhIw8o4i_s8s8, fmt_order::keep),
+
+    REG_SR(bin, any, bin, OhIw8o32i, fmt_order::keep),
+    REG_SR(bin, any, bin, OhIw16o32i, fmt_order::keep),
 
     REG_SR(f32, any, s8, hwio_s8s8, fmt_order::keep),
     REG_SR(f32, any, s8, hwigo_s8s8, fmt_order::keep),

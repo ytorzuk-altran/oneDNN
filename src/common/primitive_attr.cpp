@@ -129,6 +129,25 @@ status_t post_ops_t::append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, in
     return success;
 }
 
+status_t post_ops_t::append_binarization(alg_kind_t alg, const float* weights_data, const float* output_mask_data) {
+    using namespace mkldnn::impl::alg_kind;
+    bool known_alg = one_of(alg, binarization_depthwise);
+    if (!known_alg)
+        return invalid_arguments;
+
+    if (len_ == capacity)
+        return out_of_memory;
+
+    entry_[len_].kind = primitive_kind::binarization;
+    entry_[len_].binarization.alg = alg;
+    entry_[len_].binarization.weights_data = weights_data;
+    entry_[len_].binarization.output_mask_data = output_mask_data;
+
+    len_++;
+
+    return success;
+}
+
 status_t primitive_attr_t::set_round_mode(round_mode_t round_mode) {
     using namespace mkldnn::impl::round_mode;
 
@@ -383,6 +402,30 @@ status_t mkldnn_post_ops_get_params_dw_conv(const post_ops_t *post_ops,
     *str_w = e.str_w;
     *weights_data = e.weights_data;
     *biases_data = e.biases_data;
+
+    return success;
+}
+
+status_t mkldnn_post_ops_append_binarization(post_ops_t *post_ops, alg_kind_t kind, const float* weights_data,
+        const float* output_mask_data) {
+    if (post_ops == nullptr)
+        return invalid_arguments;
+
+    return post_ops->append_binarization(kind, weights_data, output_mask_data);
+}
+
+status_t mkldnn_post_ops_get_params_binarization(const post_ops_t *post_ops, int index, alg_kind_t *alg,
+        const float** weights_data, const float** output_mask_data) {
+    bool ok = true
+        && simple_get_params_check(post_ops, index, primitive_kind::binarization)
+        && !any_null(alg, weights_data, output_mask_data);
+    if (!ok)
+        return invalid_arguments;
+
+    const auto &e = post_ops->entry_[index].binarization;
+    *alg = e.alg;
+    *weights_data = e.weights_data;
+    *output_mask_data = e.output_mask_data;
 
     return success;
 }

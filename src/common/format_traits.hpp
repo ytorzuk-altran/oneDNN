@@ -40,6 +40,7 @@ enum class block_format_t {
     _4i4o, _4o4i, _4o4i_s8s8,
     _8i8o, _8o8i,
     _8o4i, _8o4i_s8s8,
+    _8o32i, _16o32i,
     _16c, _16g, _16g_s8s8, _16i, _16o,
     _16i16o, _16o16i,
     _8i16o2i, _8o16i2o,
@@ -64,7 +65,8 @@ template <block_format_t f> struct block_format_traits {
                 : (utils::one_of(f, bf::_8c, bf::_8g, bf::_8i, bf::_8o,
                         bf::_8i8o, bf::_8o8i,
                         bf::_8o4i, bf::_8o4i_s8s8,
-                        bf::_2i8o4i, bf::_2i8o4i_s8s8) ? 8 : 16));
+                        bf::_2i8o4i, bf::_2i8o4i_s8s8,
+                        bf::_8o32i) ? 8 : 16));
 };
 
 template <memory_format_t> struct format_traits {
@@ -150,6 +152,8 @@ DECL_TRAITS(oIhw8i, wei, _8i, 4, 2);
 DECL_TRAITS(oIhw16i, wei, _16i, 4, 2);
 DECL_TRAITS(OIhw4i4o, wei, _4i4o, 4, 2);
 DECL_TRAITS(OIhw8i8o, wei, _8i8o, 4, 2);
+DECL_TRAITS(OhIw8o32i, wei, _8o32i, 4, 2);
+DECL_TRAITS(OhIw16o32i, wei, _16o32i, 4, 2);
 DECL_TRAITS(OhIw8o4i, wei, _8o4i, 4, 2);
 DECL_TRAITS(OhIw8o4i_s8s8, wei, _8o4i_s8s8, 4, 2);
 DECL_TRAITS(OIhw16i16o, wei, _16i16o, 4, 2);
@@ -275,7 +279,8 @@ constexpr int OI_blk_off(int oc, int ic) {
                 bf::_16o16i, bf::_8i16o2i, bf::_8o16i2o,
                 bf::_4i16o4i, bf::_4i16o4i_s8s8,
                 bf::_2i8o4i, bf::_2i8o4i_s8s8,
-                bf::_8o4i, bf::_8o4i_s8s8),
+                bf::_8o4i, bf::_8o4i_s8s8,
+                bf::_8o32i, bf::_16o32i),
             "unexpected blocked format");
 #   define blksize block_format_traits<f>::blk_size
     return f == bf::_8i16o2i
@@ -289,6 +294,8 @@ constexpr int OI_blk_off(int oc, int ic) {
         ? ic * blksize + oc
         : (f == bf::_8o4i || f == bf::_8o4i_s8s8)
         ? (ic / 4) * blksize * 4 + 4 * oc + ic % 4
+        : (f == bf::_8o32i || f == bf::_16o32i)
+        ? 32 * oc + 32
         : oc * blksize + ic;
 #   undef blksize // if only we program in C++14...
 }

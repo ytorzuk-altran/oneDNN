@@ -40,6 +40,7 @@ template <> struct prec_traits<data_type::s16> { typedef int16_t type; };
 template <> struct prec_traits<data_type::s8> { typedef int8_t type; };
 template <> struct prec_traits<data_type::u8> { typedef uint8_t type; };
 template <> struct prec_traits<data_type::bf16> { typedef uint16_t type; };
+template <> struct prec_traits<data_type::bin> { typedef uint8_t type; };
 
 template <> struct data_traits<float>
 { static constexpr data_type_t data_type = data_type::f32; };
@@ -76,6 +77,8 @@ PKIND_TRAITS_INST(batch_normalization);
 PKIND_TRAITS_INST(inner_product);
 PKIND_TRAITS_INST(rnn);
 PKIND_TRAITS_INST(roi_pooling);
+PKIND_TRAITS_INST(binary_convolution);
+PKIND_TRAITS_INST(binarization);
 #undef PKIND_TRAITS_INST
 
 }

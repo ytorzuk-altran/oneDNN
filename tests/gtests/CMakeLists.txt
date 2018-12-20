@@ -78,6 +78,17 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_convolution_depthwise_forward_x8s8f32s32.cpp
                               test_convolution_dw_conv_f32.cpp
                               test_convolution_dw_conv_u8s8s32.cpp
+                              test_binary_convolution_forward.cpp
+                              test_binary_convolution_eltwise_forward.cpp
+                              test_binary_convolution_depthwise_forward.cpp
+                              test_binary_convolution_sum_forward.cpp
+                              test_binary_convolution_binarization_forward.cpp
+                              test_binarization.cpp
+                              test_binary_convolution_dw_conv_forward.cpp
+                              test_binary_convolution_dw_conv_eltwise_forward.cpp
+                              test_binary_convolution_dw_conv_depthwise_forward.cpp
+                              test_binary_convolution_dw_conv_sum_forward.cpp
+                              test_binary_convolution_dw_conv_binarization_forward.cpp
                               ) #temporary
 
 foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})

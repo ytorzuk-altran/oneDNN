@@ -116,6 +116,11 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
                 const float* weights_data;
                 const float* biases_data;
             } dw_conv;
+            struct {
+                mkldnn::impl::alg_kind_t alg;
+                const float* weights_data;
+                const float* output_mask_data;
+            } binarization;
         };
 
         bool is_eltwise(bool require_scale_one = true) const {
@@ -147,6 +152,10 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
             using namespace mkldnn::impl;
             return kind == primitive_kind::convolution;
         }
+        bool is_binarization() const {
+            using namespace mkldnn::impl;
+            return kind == primitive_kind::binarization;
+        }
     };
 
     mkldnn_post_ops(): len_(0) {}
@@ -159,6 +168,8 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
     mkldnn::impl::status_t append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
                                           const float* weights_data,
                                           const float* biases_data);
+    mkldnn::impl::status_t append_binarization(mkldnn::impl::alg_kind_t alg, const float* weights_data,
+                                               const float* output_mask_data);
 
     int find(mkldnn::impl::primitive_kind_t kind, int start = 0,
             int stop = -1) const {

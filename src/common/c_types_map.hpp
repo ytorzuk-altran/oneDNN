@@ -93,6 +93,8 @@ namespace alg_kind {
     const alg_kind_t gru_linear_before_reset = mkldnn_gru_linear_before_reset;
     const alg_kind_t roi_pooling_max = mkldnn_roi_pooling_max;
     const alg_kind_t roi_pooling_bilinear = mkldnn_roi_pooling_bilinear;
+    const alg_kind_t binary_convolution_direct = mkldnn_binary_convolution_direct;
+    const alg_kind_t binarization_depthwise = mkldnn_binarization_depthwise;
 }
 
 using data_type_t = mkldnn_data_type_t;
@@ -104,6 +106,7 @@ namespace data_type {
     const data_type_t s8 = mkldnn_s8;
     const data_type_t u8 = mkldnn_u8;
     const data_type_t bf16 = mkldnn_bf16;
+    const data_type_t bin = mkldnn_bin;
 }
 
 using round_mode_t = mkldnn_round_mode_t;
@@ -207,6 +210,8 @@ namespace memory_format {
     const memory_format_t Ohwi4o = mkldnn_Ohwi4o;
     const memory_format_t Ohwi16o = mkldnn_Ohwi16o;
     const memory_format_t OhIw8o4i = mkldnn_OhIw8o4i;
+    const memory_format_t OhIw8o32i = mkldnn_OhIw8o32i;
+    const memory_format_t OhIw16o32i = mkldnn_OhIw16o32i;
     const memory_format_t OhIw8o4i_s8s8 = mkldnn_OhIw8o4i_s8s8;
     const memory_format_t goiw = mkldnn_goiw;
     const memory_format_t gOwi4o = mkldnn_gOwi4o;
@@ -313,6 +318,8 @@ namespace primitive_kind {
     const primitive_kind_t inner_product = mkldnn_inner_product;
     const primitive_kind_t rnn = mkldnn_rnn;
     const primitive_kind_t roi_pooling = mkldnn_roi_pooling;
+    const primitive_kind_t binary_convolution = mkldnn_binary_convolution;
+    const primitive_kind_t binarization = mkldnn_binarization;
 }
 
 using query_t = mkldnn_query_t;
@@ -345,6 +352,8 @@ namespace query {
     const query_t inner_product_d = mkldnn_query_inner_product_d;
     const query_t rnn_d = mkldnn_query_rnn_d;
     const query_t roi_pooling_d = mkldnn_query_roi_pooling_d;
+    const query_t binary_convolution_d = mkldnn_query_binary_convolution_d;
+    const query_t binarization_d = mkldnn_query_binarization_d;
 
     const query_t some_pd = mkldnn_query_some_pd;
     const query_t input_pd = mkldnn_query_input_pd;
@@ -374,6 +383,8 @@ using batch_normalization_desc_t = mkldnn_batch_normalization_desc_t;
 using inner_product_desc_t = mkldnn_inner_product_desc_t;
 using roi_pooling_desc_t = mkldnn_roi_pooling_desc_t;
 using depthwise_desc_t = mkldnn_depthwise_desc_t;
+using binary_convolution_desc_t = mkldnn_binary_convolution_desc_t;
+using binarization_desc_t = mkldnn_binarization_desc_t;
 
 using rnn_direction_t = mkldnn_rnn_direction_t;
 using rnn_cell_desc_t = mkldnn_rnn_cell_desc_t;
@@ -399,6 +410,8 @@ struct op_desc_t {
         rnn_desc_t rnn;
         roi_pooling_desc_t roi_pooling;
         depthwise_desc_t depthwise;
+        binary_convolution_desc_t binary_convolution;
+        binarization_desc_t binarization;
     };
 
     op_desc_t(const primitive_kind_t &_): kind(_) {}
@@ -422,6 +435,8 @@ struct op_desc_t {
     DECL_CTOR_AND_CONVERTERS(inner_product_desc_t, inner_product);
     DECL_CTOR_AND_CONVERTERS(rnn_desc_t, rnn);
     DECL_CTOR_AND_CONVERTERS(roi_pooling_desc_t, roi_pooling);
+    DECL_CTOR_AND_CONVERTERS(binary_convolution_desc_t, binary_convolution);
+    DECL_CTOR_AND_CONVERTERS(binarization_desc_t, binarization);
 
 #   undef DECL_CTOR_AND_CONVERTERS
 };
