@@ -183,7 +183,7 @@ private:
         };
         void(*ker_)(const ker_args *args);
 
-        const jit_gemm_conv_conf_t &jcp_;
+        const jit_gemm_conv_conf_t jcp_;
         size_t OC_;
         size_t OS_;
         data_type_t bias_data_type_;
