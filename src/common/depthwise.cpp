@@ -39,7 +39,7 @@ status_t depthwise_desc_init(depthwise_desc_t *depthwise_desc, prop_kind_t prop_
         && one_of(alg_kind, depthwise_scale_shift, depthwise_prelu);
     if (!args_ok) return invalid_arguments;
 
-    depthwise_desc_t dd = {};
+    auto dd = depthwise_desc_t();
     dd.primitive_kind = primitive_kind::depthwise;
     dd.prop_kind = prop_kind;
     dd.alg_kind = alg_kind;

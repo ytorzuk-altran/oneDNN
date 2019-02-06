@@ -56,7 +56,7 @@ void _jit_uni_x8s8s32x_dw_convolution_fwd_t<isa, src_type, dst_type>::execute_fo
 
     auto kernel_params = [&](int ur_w_step, int ow, int oh, int ih, int kh,
             int kh_padding, int ch, int ch_num, int n) {
-        jit_conv_call_s par_conv = {};
+        auto par_conv = jit_conv_call_s();
 
         const int i_l_overflow = nstl::max(0, (jcp.l_pad - ow * str_w));
         const int i_r_overflow = nstl::max(jcp.iw, (ow * str_w

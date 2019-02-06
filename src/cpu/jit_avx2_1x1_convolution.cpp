@@ -71,8 +71,8 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward() const {
         // TODO (Roma): remove this restriction
         assert(jcp.stride_w == 1 && jcp.stride_h == 1);
 
-	    jit_1x1_conv_call_s p = {};
-	    rtus_driver_t<avx2>::call_params_t rp = {};
+	    auto p = jit_1x1_conv_call_s();
+	    auto rp = rtus_driver_t<avx2>::call_params_t();
 
         const int nb_oc = jcp.nb_load;
         const int nb_ic = jcp.nb_reduce;

@@ -68,7 +68,7 @@ void jit_uni_roi_pooling_fwd_t<isa>::execute_forward() const {
         utils::nd_iterator_init(start, n, MB, cbb, cb_work, oh, jpp.oh, ow, jpp.ow);
 
         for (int iwork = start; iwork < end; iwork++) {
-            jit_roi_pool_call_s arg = {};
+            auto arg = jit_roi_pool_call_s();
 
             int cb = cbb * jpp.nb_c_blocking;
             int cb_num = jpp.nb_c_blocking;

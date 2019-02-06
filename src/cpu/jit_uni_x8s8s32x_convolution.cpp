@@ -91,7 +91,7 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
             int ocb = ocbb * jcp.nb_oc_blocking;
             int ocb_num = jcp.nb_oc_blocking;
 
-            jit_conv_call_s par_conv = {};
+            auto par_conv = jit_conv_call_s();
 
             const int ij = oh * jcp.stride_h;
             const int i_t_overflow = nstl::min(jcp.kh, div_up(nstl::max(0, jcp.t_pad - ij), (jcp.dilate_h+1)));
