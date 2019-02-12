@@ -176,7 +176,7 @@ struct eltwise_test_params {
 
 size_t n_elems(const memory::desc &md) {
     size_t p = 1;
-    const int *pdims = md.data.layout_desc.blocking.padding_dims;
+    const ptrdiff_t *pdims = md.data.layout_desc.blocking.padding_dims;
     for (int i = 0; i < md.data.ndims; ++i)
         p *= (size_t)(pdims[i]);
     return p;

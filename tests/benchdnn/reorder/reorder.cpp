@@ -266,7 +266,7 @@ int check_reorder(const prb_t *p, res_t *res) {
 
     const reorder_conf_t &r = p->reorder;
     const int ndims = (int)r.dims.size();
-    const int *dims = &r.dims[0];
+    const ptrdiff_t *dims = &r.dims[0];
 
     mkldnn_memory_format_t fmt_ref;
     const bool is_data = fmt2data_kind(r.fmt_in) == DATA;

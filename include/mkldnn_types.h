@@ -662,7 +662,7 @@ typedef enum {
 #define TENSOR_MAX_DIMS 12
 
 /** A type to describe tensor dimensions. */
-typedef int mkldnn_dims_t[TENSOR_MAX_DIMS];
+typedef ptrdiff_t mkldnn_dims_t[TENSOR_MAX_DIMS];
 /** A type to describe strides within a tensor. */
 typedef ptrdiff_t mkldnn_strides_t[TENSOR_MAX_DIMS];
 

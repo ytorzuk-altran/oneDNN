@@ -203,9 +203,6 @@ void jit_uni_planar_conv_fwd_kernel_f32<isa>::apply_postprocess_scalar(int ur_h)
     int eltwise_inj_idx = 0;
     const auto &p = attr_.post_ops_;
 
-    if (p.len_ == 0 && eltwise_injectors.size() == 1) {
-        eltwise_injectors[0]->compute_vector_range(0, ur_h);
-    }
 
     for (int i = 0; i < p.len_; i++) {
         auto& post_op = p.entry_[i];
@@ -434,10 +431,6 @@ void jit_uni_planar_conv_fwd_kernel_f32<isa>::apply_postprocess(int ur_h, int ur
 
     int eltwise_inj_idx = 0;
     const auto &p = attr_.post_ops_;
-
-    if (p.len_ == 0 && eltwise_injectors.size() == 1) {
-        eltwise_injectors[0]->compute_vector_range(0, ur_w * ur_h);
-    }
 
     for (int i = 0; i < p.len_; i++) {
         auto& post_op = p.entry_[i];

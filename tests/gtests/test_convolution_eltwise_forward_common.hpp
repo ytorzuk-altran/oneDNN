@@ -159,7 +159,7 @@ protected:
                     (data_t_dst *)c_bias.get_data_handle(), 1., true);
         }
 
-        std::vector<int> padR = { cd.padh, cd.padw };
+        std::vector<ptrdiff_t> padR = { cd.padh, cd.padw };
         for (int i = 0; i < 2; ++i) {
             if ((cd.ih - ((cd.kh - 1) * (cd.dilh + 1) + 1) + cd.padh + padR[0])
                 / cd.strh + 1 != cd.oh)

@@ -133,7 +133,7 @@ protected:
         int conv2_oh = (conv1_oh - ((cd.conv2_kh - 1) + 1) + 2 * cd.conv2_padh) / cd.conv2_strh + 1;
         int conv2_ow = (conv1_ow - ((cd.conv2_kw - 1) + 1) + 2 * cd.conv2_padw) / cd.conv2_strw + 1;
 
-        std::vector<int> conv1_padR = { cd.conv1_padh, cd.conv1_padw };
+        std::vector<ptrdiff_t> conv1_padR = { cd.conv1_padh, cd.conv1_padw };
         conv1_padR[0] += conv2_oh - conv1_oh;
         conv1_padR[1] += conv2_ow - conv1_ow;
 

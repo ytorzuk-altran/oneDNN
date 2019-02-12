@@ -566,8 +566,9 @@ static int cvt_mask_to_ws(const prb_t *p, const dnn_mem_t &mask_fp,
         is_bnorm_3d(p) ? data_dims_3d : data_dims, mkldnn_f32, p->fmt);
     SAFE(data.reorder(mask_fp), WARN);
 
-    dnn_mem_t mean(1, &p->ic, mkldnn_f32, mkldnn_x);
-    dnn_mem_t var(1, &p->ic, mkldnn_f32, mkldnn_x);
+    ptrdiff_t ic = p->ic;
+    dnn_mem_t mean(1, &ic, mkldnn_f32, mkldnn_x);
+    dnn_mem_t var(1, &ic, mkldnn_f32, mkldnn_x);
     for (int c = 0; c < p->ic; ++c) ((float *)mean)[c] = 0.5;
     for (int c = 0; c < p->ic; ++c) ((float *)var)[c] = 1;
 

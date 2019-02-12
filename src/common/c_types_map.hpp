@@ -28,7 +28,7 @@ using dims_t = mkldnn_dims_t;
 using strides_t = mkldnn_strides_t;
 
 /* FIXME: to inference from correspoding types */
-using dim_t = int;
+using dim_t = ptrdiff_t;
 using stride_t = ptrdiff_t;
 
 using status_t = mkldnn_status_t;

@@ -94,13 +94,13 @@ protected:
 
         bias_extra_gate = p.aalgorithm == gru_linear_before_reset ? 1 : 0;
 
-        auto weights_layer_dims = {l, d, slc, g, dic};
-        auto weights_iter_dims = {l, d, sic, g, dic};
-        auto bias_dims = {l, d, g + bias_extra_gate, dic};
-        auto src_layer_dims = {t, mb, slc};
-        auto src_iter_dims = {l, d, s, mb, sic};
-        auto dst_layer_dims = {t, mb, dlc};
-        auto dst_iter_dims = {l, d, s, mb, dic};
+        mkldnn::memory::dims weights_layer_dims = {l, d, slc, g, dic};
+        mkldnn::memory::dims weights_iter_dims = {l, d, sic, g, dic};
+        mkldnn::memory::dims bias_dims = {l, d, g + bias_extra_gate, dic};
+        mkldnn::memory::dims src_layer_dims = {t, mb, slc};
+        mkldnn::memory::dims src_iter_dims = {l, d, s, mb, sic};
+        mkldnn::memory::dims dst_layer_dims = {t, mb, dlc};
+        mkldnn::memory::dims dst_iter_dims = {l, d, s, mb, dic};
 
         auto weights_layer_md_any = memory::desc({weights_layer_dims}, prec, memory::format::any);
         auto weights_iter_md_any = memory::desc({weights_iter_dims}, prec, memory::format::any);

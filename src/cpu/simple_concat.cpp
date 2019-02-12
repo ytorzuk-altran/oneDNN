@@ -33,7 +33,7 @@ void simple_concat_t<data_type>::execute() const {
     auto is = scratchpad.template get<strides_t>(key_concat_istrides);
 
     const int num_arrs = pd()->n_inputs();
-    const int *perm = pd()->perm_, *iperm = pd()->iperm_;
+    const ptrdiff_t *perm = pd()->perm_, *iperm = pd()->iperm_;
     const int concat_dim = pd()->concat_dim();
     auto o_base_ptr = reinterpret_cast<data_t *>(this->memory());
 

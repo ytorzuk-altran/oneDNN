@@ -133,9 +133,9 @@ inline size_t map_index(const mkldnn::memory::desc &md, size_t index,
                       || (md.data.format == bwd_weights_qvnni);
 
     const int ndims = md.data.ndims;
-    const int *dims = md.data.dims;
-    const int *pdims = md.data.layout_desc.blocking.padding_dims;
-    const int *optd = md.data.layout_desc.blocking.offset_padding_to_data;
+    const ptrdiff_t *dims = md.data.dims;
+    const ptrdiff_t *pdims = md.data.layout_desc.blocking.padding_dims;
+    const ptrdiff_t *optd = md.data.layout_desc.blocking.offset_padding_to_data;
 
     auto *strides_block = md.data.layout_desc.blocking.strides[0];
     auto *strides_within_block = md.data.layout_desc.blocking.strides[1];
@@ -200,8 +200,8 @@ void check_zero_tail(int set_zero_flag, mkldnn::memory &src) {
 
     const mkldnn::memory::desc src_d = src.get_primitive_desc().desc();
     const int ndims = src_d.data.ndims;
-    const int *dims = src_d.data.dims;
-    const int *pdims = src_d.data.layout_desc.blocking.padding_dims;
+    const ptrdiff_t *dims = src_d.data.dims;
+    const ptrdiff_t *pdims = src_d.data.layout_desc.blocking.padding_dims;
 
     size_t idx[MAX_NDIMS] = {}, str[MAX_NDIMS] = {};
     size_t nelems = 1;

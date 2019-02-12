@@ -126,7 +126,7 @@ void ncsp_batch_normalization_fwd_t<data_type>::execute_forward() const {
                 SP_N_nthr = N_nthr * S_nthr;
             }
             size_t C_off = it * C_blks_per_iter;
-            const auto S_chunk = nstl::max(dim_t(0), S_e - S_s);
+            const auto S_chunk = nstl::max(int(0), S_e - S_s);
             // On the last iteration the access pattern to ws_reduce
             // might change (due to re-balance on C). Since sync is not always
             // possible (in case of TBB) use different parts of ws for each
@@ -341,7 +341,7 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
                 SP_N_nthr = N_nthr * S_nthr;
             }
             size_t C_off = it * C_blks_per_iter;
-            const auto S_chunk = nstl::max(dim_t(0), S_e - S_s);
+            const auto S_chunk = nstl::max(int(0), S_e - S_s);
             // On the last iteration the access pattern to ws_reduce
             // might change (due to re-balance on C). Since sync is not always
             // possible (in case of TBB) use different parts of ws for each

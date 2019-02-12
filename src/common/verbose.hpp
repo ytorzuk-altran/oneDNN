@@ -62,8 +62,8 @@ inline void format_mem_desc_str_generic(char *str, int len,
     auto dims = md->dims;
     int l = 0;
     for (int d = 0; d < ndims - 1; ++d)
-        l += snprintf(str + l, len - l, "%dx", dims[d]);
-    snprintf(str + l, len - l, "%d", dims[ndims - 1]);
+        l += snprintf(str + l, len - l, "%tdx", dims[d]);
+    snprintf(str + l, len - l, "%td", dims[ndims - 1]);
 }
 
 // XXX: Outputs strings corresponding to memory formats used for data tensors.
@@ -71,16 +71,16 @@ inline void format_mem_desc_str(char *str, int len, const memory_desc_t *md) {
     auto ndims = md->ndims;
     auto dims = md->dims;
     if (ndims == 1)
-        snprintf(str, len, "x%d", dims[0]);
+        snprintf(str, len, "x%td", dims[0]);
     else if (ndims == 2)
-        snprintf(str, len, "mb%dic%d", dims[0], dims[1]);
+        snprintf(str, len, "mb%tdic%td", dims[0], dims[1]);
     else if (ndims == 3)
-        snprintf(str, len, "mb%dic%diw%d", dims[0], dims[1], dims[2]);
+        snprintf(str, len, "mb%tdic%tdiw%td", dims[0], dims[1], dims[2]);
     else if (ndims == 4)
-        snprintf(str, len, "mb%dic%dih%diw%d",
+        snprintf(str, len, "mb%tdic%tdih%tdiw%td",
                 dims[0], dims[1], dims[2], dims[3]);
     else if (ndims == 5)
-        snprintf(str, len, "mb%dic%did%dih%diw%d",
+        snprintf(str, len, "mb%tdic%tdid%tdih%tdiw%td",
                 dims[0], dims[1], dims[2], dims[3], dims[4]);
     else
         format_mem_desc_str_generic(str, len, md);

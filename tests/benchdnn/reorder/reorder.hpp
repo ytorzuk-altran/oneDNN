@@ -32,7 +32,7 @@ enum alg_t { ALG_REF, ALG_BOOT };
 alg_t str2alg(const char *str);
 const char *alg2str(alg_t alg);
 
-using dims_t = std::vector<int>;
+using dims_t = std::vector<ptrdiff_t>;
 
 struct dt_conf_s {
     mkldnn_data_type_t dt;

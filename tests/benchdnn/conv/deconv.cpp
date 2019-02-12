@@ -33,8 +33,9 @@ using namespace conv;
 
 namespace deconv {
 
-inline static void swap(int &a, int &b) {
-    int temp = a;
+template <typename T>
+inline static void swap(T &a, T &b) {
+    T temp = a;
     a = b;
     b = temp;
 }
@@ -87,23 +88,23 @@ inline int init_pd(const prb_t *p, mkldnn_deconvolution_desc_t &cd,
                      p->cfg[DST].dt, mkldnn_any),
             WARN);
 
-    int strides_nd[] = {p->sd, p->sh, p->sw};
-    int dilates_nd[] = {p->dd, p->dh, p->dw};
-    int padding_nd[] = {p->pd, p->ph, p->pw};
+    ptrdiff_t strides_nd[] = {p->sd, p->sh, p->sw};
+    ptrdiff_t dilates_nd[] = {p->dd, p->dh, p->dw};
+    ptrdiff_t padding_nd[] = {p->pd, p->ph, p->pw};
 
     auto bph = [&](int ih, int oh, int kh, int sh, int ph, int dh) {
         return (oh - 1) * sh - ih + ((kh - 1) * (dh + 1) + 1) - ph;
     };
 
-    int padding_r_nd[] = {
+    ptrdiff_t padding_r_nd[] = {
         bph(p->od, p->id, p->kd, p->sd, p->pd, p->dd),
         bph(p->oh, p->ih, p->kh, p->sh, p->ph, p->dh),
         bph(p->ow, p->iw, p->kw, p->sw, p->pw, p->dw)};
 
-    int *strides = strides_nd + (5 - ndims);
-    int *dilates = dilates_nd + (5 - ndims);
-    int *padding = padding_nd + (5 - ndims);
-    int *padding_r = padding_r_nd + (5 - ndims);
+    ptrdiff_t *strides = strides_nd + (5 - ndims);
+    ptrdiff_t *dilates = dilates_nd + (5 - ndims);
+    ptrdiff_t *padding = padding_nd + (5 - ndims);
+    ptrdiff_t *padding_r = padding_r_nd + (5 - ndims);
 
     mkldnn_alg_kind_t alg = mkldnn_deconvolution_direct;
     if (p->alg == WINO) alg = mkldnn_deconvolution_winograd;
