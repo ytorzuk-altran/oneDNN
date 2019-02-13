@@ -49,7 +49,7 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
     auto w = const_cast<wei_data_t *>(weights);
     int32_t* compensation = (jcp.signed_input) ? reinterpret_cast<int32_t *>(&w[offset]) : 0;
 
-    if (jcp.oc != jcp.oc_padded) {
+    if (bias && jcp.oc != jcp.oc_padded) {
         auto padded_bias = this->scratchpad().template get<bia_data_t>(key_conv_padded_bias);
         utils::array_copy(padded_bias, (bia_data_t*)bias, jcp.oc);
         utils::array_set(padded_bias + jcp.oc, 0, jcp.oc_padded - jcp.oc);

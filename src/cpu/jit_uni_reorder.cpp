@@ -921,6 +921,12 @@ struct jit_uni_reorder_t : public cpu_primitive_t {
 
             auto prb = tr::prb_t();
 
+            if (imd->format == mkldnn_OhIw8o4i || imd->format == mkldnn_gOhIw8o4i ||
+                imd->format == mkldnn_OhIw8o4i_s8s8 || imd->format == mkldnn_gOhIw8o4i_s8s8 ||
+                omd->format == mkldnn_OhIw8o4i || omd->format == mkldnn_gOhIw8o4i ||
+                omd->format == mkldnn_OhIw8o4i_s8s8 || omd->format == mkldnn_gOhIw8o4i_s8s8)
+                return status::unimplemented;
+
             status_t prb_init_status = prb_init(prb, *imd, *omd, attr);
             if (prb_init_status != success) return prb_init_status;
             DEBUG({ printf("init : "); prb_dump(prb); });
