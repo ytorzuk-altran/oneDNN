@@ -1277,12 +1277,12 @@ status_t jit_uni_dw_conv_row_f32<isa>::init_conf(jit_1x1_conv_conf_t &jcp, jit_c
 
     jcp_dw.ur_w = 4;
 
-    jcp_dw.src_dt = jcp.src_dt;
-    jcp_dw.dst_dt = jcp.dst_dt;
+    jcp_dw.src_dt = jcp.dst_dt;
+    jcp_dw.dst_dt = jcp.dw_conv_dst_dt;
     jcp_dw.bia_dt = jcp.bia_dt;
-    jcp_dw.typesize_in = (int)types::data_type_size(jcp.src_dt);
-    jcp_dw.typesize_bia = (int)types::data_type_size(jcp.bia_dt);
-    jcp_dw.typesize_out = (int)types::data_type_size(jcp.dst_dt);
+    jcp_dw.typesize_in = (int)types::data_type_size(jcp_dw.src_dt);
+    jcp_dw.typesize_bia = (int)types::data_type_size(jcp_dw.bia_dt);
+    jcp_dw.typesize_out = (int)types::data_type_size(jcp_dw.dst_dt);
 
     if (jcp_dw.src_dt != mkldnn_f32 && jcp_dw.src_dt != mkldnn_u8)
         return status::unimplemented;
@@ -1326,11 +1326,11 @@ status_t jit_uni_dw_conv_row_f32<isa>::init_conf(jit_conv_conf_t &jcp, jit_conv_
     jcp_dw.ur_w = 4;
 
     jcp_dw.src_dt = jcp.dst_dt;
-    jcp_dw.dst_dt = jcp.dst_dt;
+    jcp_dw.dst_dt = jcp.dw_conv_dst_dt;
     jcp_dw.bia_dt = jcp.bia_dt;
-    jcp_dw.typesize_in = (int)types::data_type_size(jcp.src_dt);
-    jcp_dw.typesize_bia = (int)types::data_type_size(jcp.bia_dt);
-    jcp_dw.typesize_out = (int)types::data_type_size(jcp.dst_dt);
+    jcp_dw.typesize_in = (int)types::data_type_size(jcp_dw.src_dt);
+    jcp_dw.typesize_bia = (int)types::data_type_size(jcp_dw.bia_dt);
+    jcp_dw.typesize_out = (int)types::data_type_size(jcp_dw.dst_dt);
 
     if (jcp_dw.src_dt != mkldnn_f32 && jcp_dw.src_dt != mkldnn_u8)
         return status::unimplemented;

@@ -15,6 +15,7 @@
 *******************************************************************************/
 
 #include <common/memory_tracking.hpp>
+#include <common/primitive_attr.hpp>
 #include "c_types_map.hpp"
 #include "nstl.hpp"
 #include "type_helpers.hpp"
@@ -773,6 +774,10 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
             return status::unimplemented;
     }
 
+    jcp.src_dt = cd.src_desc.data_type;
+    jcp.bia_dt = jcp.with_bias ? cd.bias_desc.data_type : data_type::undef;
+    jcp.dst_dt = cd.dst_desc.data_type;
+
     if (!post_ops_ok(jcp, attr))
         return status::unimplemented;
 
@@ -785,6 +790,9 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
         jcp.dw_conv_ow = jcp.ow;
         jcp.oh = p.entry_[dw_conv_ind].dw_conv.in_h;
         jcp.ow = p.entry_[dw_conv_ind].dw_conv.in_w;
+
+        jcp.dw_conv_dst_dt = jcp.dst_dt;
+        jcp.dst_dt = p.entry_[dw_conv_ind].dw_conv.in_dt;
     }
 
     auto desired_act_fmt = nhwc;
@@ -812,10 +820,6 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
         if (bias_d.format() != x)
             return status::unimplemented;
     }
-
-    jcp.src_dt = cd.src_desc.data_type;
-    jcp.bia_dt = jcp.with_bias ? cd.bias_desc.data_type : data_type::undef;
-    jcp.dst_dt = cd.dst_desc.data_type;
 
     jcp.typesize_in = types::data_type_size(src_d.data_type());
     jcp.typesize_out = types::data_type_size(dst_d.data_type());

@@ -833,8 +833,6 @@ status_t jit_uni_bin_conv_fwd_kernel<isa>::init_conf(jit_bin_conv_conf_t &jcp,
 
     jcp.prop_kind = cd.prop_kind;
 
-    jcp.dst_dt = cd.dst_desc.data_type;
-
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
 
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
@@ -876,6 +874,10 @@ status_t jit_uni_bin_conv_fwd_kernel<isa>::init_conf(jit_bin_conv_conf_t &jcp,
     jcp.pad_value = cd.pad_value;
     jcp.exclude_pad = jcp.pad_value == 0.0f;
 
+    jcp.src_dt = cd.src_desc.data_type;
+    jcp.bia_dt = mkldnn_f32;
+    jcp.dst_dt = cd.dst_desc.data_type;
+
     const auto &p = attr.post_ops_;
     int dw_conv_ind = p.find(primitive_kind::convolution);
     jcp.with_dw_conv = dw_conv_ind != -1;
@@ -884,6 +886,9 @@ status_t jit_uni_bin_conv_fwd_kernel<isa>::init_conf(jit_bin_conv_conf_t &jcp,
         jcp.dw_conv_ow = jcp.ow;
         jcp.oh = p.entry_[dw_conv_ind].dw_conv.in_h;
         jcp.ow = p.entry_[dw_conv_ind].dw_conv.in_w;
+
+        jcp.dw_conv_dst_dt = jcp.dst_dt;
+        jcp.dst_dt = p.entry_[dw_conv_ind].dw_conv.in_dt;
     }
     jcp.with_sum = p.find(primitive_kind::sum, 0, dw_conv_ind) != -1;
     jcp.with_binarization = p.find(primitive_kind::binarization, 0, dw_conv_ind) != -1;
@@ -912,10 +917,6 @@ status_t jit_uni_bin_conv_fwd_kernel<isa>::init_conf(jit_bin_conv_conf_t &jcp,
 
     jcp.nb_ic_blocking = 1;
     jcp.nb_oc_blocking = nstl::min(isa == sse42 ? 2 : isa == avx2 ? 4 : 6, jcp.nb_oc);
-
-    jcp.src_dt = cd.src_desc.data_type;
-    jcp.bia_dt = mkldnn_f32;
-    jcp.dst_dt = jcp.with_binarization ? mkldnn_bin : mkldnn_f32;
 
     jcp.typesize_in = types::data_type_size(jcp.src_dt);
     jcp.typesize_out = types::data_type_size(jcp.dst_dt);

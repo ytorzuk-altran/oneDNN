@@ -89,6 +89,7 @@ struct jit_conv_conf_t {
     const float* conv_weights;
     const float* conv_biases;
     int dw_conv_oh, dw_conv_ow;
+    data_type_t dw_conv_dst_dt;
 
     int nb_ic, ic_block;
     int nb_oc, oc_block;
@@ -324,6 +325,7 @@ struct jit_bin_conv_conf_t {
 
     int dw_conv_oh;
     int dw_conv_ow;
+    data_type_t dw_conv_dst_dt;
 
     int nb_ic, ic_block;
     int nb_oc, oc_block;
@@ -519,6 +521,7 @@ struct jit_1x1_conv_conf_t {
     bool signed_input;
     float wei_adj_scale;
     int dw_conv_oh, dw_conv_ow;
+    data_type_t dw_conv_dst_dt;
 
     cpu_isa_t isa;
 

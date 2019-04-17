@@ -443,17 +443,17 @@ struct post_ops: public handle<mkldnn_post_ops_t> {
         alg = static_cast<algorithm>(c_alg);
     }
 
-    void append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+    void append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w, mkldnn_data_type_t in_dt,
             const float* weights_data, const float* biases_data) {
         error::wrap_c_api(mkldnn_post_ops_append_dw_conv(get(),
-                in_h, in_w, ker_h, ker_w, str_h, str_w, weights_data, biases_data),
+                in_h, in_w, ker_h, ker_w, str_h, str_w, in_dt, weights_data, biases_data),
                           "could not append dw conv");
     }
 
-    void get_params_dw_conv(int index, int &in_h, int &in_w, int &ker_h, int &ker_w, int &str_h, int &str_w,
+    void get_params_dw_conv(int index, int &in_h, int &in_w, int &ker_h, int &ker_w, int &str_h, int &str_w, mkldnn_data_type_t& in_dt,
             const float** weights_data, const float** biases_data) const {
         error::wrap_c_api(mkldnn_post_ops_get_params_dw_conv(get(), index,
-                &in_h, &in_w, &ker_h, &ker_w, &str_h, &str_w, weights_data, biases_data),
+                &in_h, &in_w, &ker_h, &ker_w, &str_h, &str_w, &in_dt, weights_data, biases_data),
                           "could not get dw conv params");
     }
 

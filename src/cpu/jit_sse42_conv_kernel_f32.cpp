@@ -489,6 +489,10 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
     if (ndims > 4)
         return status::unimplemented;
 
+    jcp.src_dt = cd.src_desc.data_type;
+    jcp.bia_dt = jcp.with_bias ? cd.bias_desc.data_type : data_type::undef;
+    jcp.dst_dt = cd.dst_desc.data_type;
+
     if (!post_ops_ok(jcp, attr))
         return status::unimplemented;
 
@@ -501,13 +505,12 @@ status_t jit_sse42_conv_fwd_kernel_f32::init_conf(jit_conv_conf_t &jcp,
         jcp.dw_conv_ow = jcp.ow;
         jcp.oh = p.entry_[dw_conv_ind].dw_conv.in_h;
         jcp.ow = p.entry_[dw_conv_ind].dw_conv.in_w;
+
+        jcp.dw_conv_dst_dt = jcp.dst_dt;
+        jcp.dst_dt = p.entry_[dw_conv_ind].dw_conv.in_dt;
     }
 
     jcp.with_sum = p.find(primitive_kind::sum, 0, dw_conv_ind) != -1;
-
-    jcp.src_dt = cd.src_desc.data_type;
-    jcp.bia_dt = jcp.with_bias ? cd.bias_desc.data_type : data_type::undef;
-    jcp.dst_dt = cd.dst_desc.data_type;
 
     const bool flat = jcp.ic == 3 || jcp.ic == 1;
     const bool mimo = !flat;

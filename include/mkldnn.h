@@ -482,7 +482,7 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_depthwise(
  * The kind of this post operation is #mkldnn_convolution.
  */
 mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_dw_conv(
-        mkldnn_post_ops_t post_ops, int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+        mkldnn_post_ops_t post_ops, int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w, mkldnn_data_type_t in_dt,
         const float* weights_data, const float* biases_data);
 
 /** Gets the DW convolution parameters of the post operation with index @p index in
@@ -490,8 +490,8 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_dw_conv(
  */
 mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_dw_conv(
         const_mkldnn_post_ops_t post_ops, int index, int* in_h, int* in_w,
-        int* ker_h, int* ker_w, int* str_h, int* str_w, const float** weights_data,
-        const float** biases_data);
+        int* ker_h, int* ker_w, int* str_h, int* str_w, mkldnn_data_type_t* in_dt,
+        const float** weights_data, const float** biases_data);
 
 /** Appends binarization post operation to the @p post_ops with given parameters
  * @p kind and @p weights (@sa mkldnn_binarization_forward_desc_init and
