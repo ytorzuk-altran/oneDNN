@@ -202,7 +202,7 @@ void jit_avx512_core_x8s8s32x_convolution_fwd_t<src_type,
     int nb_groups = jcp.nb_ch;
     int work_amount = jcp.mb * nb_groups * oc_chunks * jcp.oh * jcp.nb_ow;
 
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)work_amount, [&](const int ithr, const int nthr) {
 
         int start{0}, end{0};
         balance211(work_amount, nthr, ithr, start, end);

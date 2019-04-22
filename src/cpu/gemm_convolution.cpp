@@ -264,7 +264,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
     const size_t work_amount = (size_t)jcp.ngroups * MB;
     const bool is_problem_3d = pd()->ndims() == 5;
 
-    parallel(jcp.nthr, [&](const int ithr, const int nthr) {
+    parallel(jcp.nthr, work_amount, [&](const int ithr, const int nthr) {
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
 
         int g{0}, n{0};
@@ -327,7 +327,7 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() const {
     const int LDA = jcp.im2col_sz ? k : K;
     const bool is_problem_3d = pd()->ndims() == 5;
 
-    parallel(jcp.nthr, [&](const int ithr, const int nthr) {
+    parallel(jcp.nthr, jcp.nthr, [&](const int ithr, const int nthr) {
         int ithr_g, nthr_g, ithr_mb, nthr_mb;
         size_t g_start{0}, g_end{0}, mb_start{0}, mb_end{0};
 

@@ -1385,7 +1385,7 @@ void jit_uni_batch_normalization_fwd_t<isa, d_type>::execute(event_t *e) const {
     auto scale_shift = reinterpret_cast<const acc_data_t *>(
             this->input_memory(idx_scale_shift));
 
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         bnorm_driver_->exec(ithr, nthr, src, nullptr, dst, nullptr,
                 scale_shift, nullptr, mean, var, ws, scratchpad);
     });
@@ -1469,7 +1469,7 @@ void jit_uni_batch_normalization_bwd_t<isa, d_type>::execute(event_t *e) const {
 
     bnorm_driver_->init_barriers(scratchpad);
 
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         bnorm_driver_->exec(ithr, nthr, src, diff_src, nullptr, diff_dst,
                 scale_shift, diff_scale_shift, mean, var, ws, scratchpad);
     });

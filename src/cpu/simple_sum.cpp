@@ -90,7 +90,7 @@ void simple_sum_t<src_data_type, dst_data_type>::execute() const {
         }
     };
 
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, blocks_number, [&](const int ithr, const int nthr) {
         size_t start{0}, end{0};
         balance211(blocks_number, nthr, ithr, start, end);
 

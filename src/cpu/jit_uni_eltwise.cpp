@@ -1308,9 +1308,8 @@ void jit_uni_eltwise_fwd_t<isa, d_type>::execute_forward() const {
     dst += data_d.blocking_desc().offset_padding;
 
     const int cache_line = 16;
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, utils::div_up(nelems, cache_line), [&](const int ithr, const int nthr) {
         size_t start{0}, end{0};
-
         balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
         start = nstl::min(nelems, start * cache_line);
         end = nstl::min(nelems, end * cache_line);
@@ -1373,10 +1372,10 @@ void jit_uni_eltwise_bwd_t<isa, d_type>::execute_backward() const {
     diff_dst += diff_data_d.blocking_desc().offset_padding;
     diff_src += diff_data_d.blocking_desc().offset_padding;
 
-    parallel(0, [&](const int ithr, const int nthr) {
-        size_t start{0}, end{0};
+    const int cache_line = 16;
 
-        const int cache_line = 16;
+    parallel(0, utils::div_up(nelems, cache_line), [&](const int ithr, const int nthr) {
+        size_t start{0}, end{0};
 
         balance211(utils::div_up(nelems, cache_line), nthr, ithr, start, end);
         start = nstl::min(nelems, start * cache_line);

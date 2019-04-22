@@ -90,7 +90,7 @@ void nspc_batch_normalization_fwd_t<data_type>::execute_forward() const {
             = [&](acc_data_t res) { return (with_relu && res < 0) ? 0 : res; };
 
     assert(mkldnn_thr_syncable());
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         dim_t N_s = 0, N_e = 0, C_s = 0, C_e = 0;
         balance211(N, nthr, ithr, N_s, N_e);
         balance211(C, nthr, ithr, C_s, C_e);
@@ -262,7 +262,7 @@ void nspc_batch_normalization_bwd_t<data_type>::execute_backward() const {
     const bool fuse_bn_relu = pd()->fuse_bn_relu();
 
     assert(mkldnn_thr_syncable());
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         dim_t N_s = 0, N_e = 0, C_s = 0, C_e = 0;
         balance211(N, nthr, ithr, N_s, N_e);
         balance211(C, nthr, ithr, C_s, C_e);

@@ -1060,7 +1060,17 @@ struct jit_uni_reorder_t : public cpu_primitive_t {
             omp_driver_0d(ndims_ker, in, out, scale);
             restore_rnd_mode();
         } else {
-            parallel(0, [&](const int ithr, const int nthr) {
+            size_t work_amount = 0;
+            const tr::node_t *ns = pd()->prb_.nodes + ndims_ker;
+            switch (ndims - ndims_ker) {
+                case 1: work_amount = (size_t)ns[0].n; break;
+                case 2: work_amount = (size_t)ns[1].n * (size_t)ns[0].n; break;
+                case 3: work_amount = (size_t)ns[2].n * (size_t)ns[1].n * (size_t)ns[0].n; break;
+                case 4: work_amount = (size_t)ns[3].n * (size_t)ns[2].n * (size_t)ns[1].n * (size_t)ns[0].n; break;
+                default: assert(!"unimplemented");
+            }
+
+            parallel(0, work_amount, [&](const int ithr, const int nthr) {
                 set_rnd_mode(pd()->attr()->round_mode_);
                 switch (ndims - ndims_ker) {
                 case 1: omp_driver_1d(ithr, nthr, ndims_ker, in, out, scale); break;

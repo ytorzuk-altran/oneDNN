@@ -88,7 +88,7 @@ void ncsp_batch_normalization_fwd_t<data_type>::execute_forward() const {
     size_t data_size = N * C * SP * sizeof(data_t);
     bool do_blocking = (data_size >= l3_size_ / 2 && l3_size_ > 0);
 
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         int C_blks_per_iter = 1, iters = 1;
         int C_ithr = 0, C_nthr = 0, N_ithr = 0, N_nthr = 0, N_s = 0, N_e = 0;
         int S_ithr = 0, S_nthr = 0, S_s = 0, S_e = 0;
@@ -303,7 +303,7 @@ void ncsp_batch_normalization_bwd_t<data_type>::execute_backward() const {
     size_t data_size = N * C * SP * sizeof(data_t);
     bool do_blocking = (data_size >= l3_size_ / 2 && l3_size_ > 0);
 
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         int C_blks_per_iter = 1, iters = 1;
         int C_ithr = 0, C_nthr = 0, N_ithr = 0, N_nthr = 0, N_s = 0, N_e = 0;
         int S_ithr = 0, S_nthr = 0, S_s = 0, S_e = 0;

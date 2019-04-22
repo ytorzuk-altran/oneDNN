@@ -110,7 +110,7 @@ void gemm_inner_product_bwd_weights_t<data_type>::execute_backward_weights() con
         constexpr int blksize = 8;
         const int OC_blocks = OC / blksize;
         const int rem_OC = OC % blksize;
-        parallel(0, [&](const int ithr, const int nthr) {
+        parallel(0, (size_t)OC_blocks, [&](const int ithr, const int nthr) {
             int oc_st{0}, oc_e{0};
             balance211(OC_blocks, nthr, ithr, oc_st, oc_e);
             oc_st = oc_st * blksize;

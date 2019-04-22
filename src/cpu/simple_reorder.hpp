@@ -1729,7 +1729,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const auto num_blocks = nelems / block_size;
         const auto rem_elems = nelems % block_size;
 
-        parallel(0, [&](const int ithr, const int nthr) {
+        parallel(0, num_blocks, [&](const int ithr, const int nthr) {
             size_t start{0}, end{0};
             balance211(num_blocks, nthr, ithr, start, end);
             start = start * block_size;
@@ -1827,7 +1827,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const size_t work_amount = N * nelems_no_d0;
 
         if (alpha == 1.0 && beta == 0.0) {
-            parallel(0, [&](const int ithr, const int nthr) {
+            parallel(0, work_amount, [&](const int ithr, const int nthr) {
                 size_t n{0}, dim1_s{0};
                 size_t start{0}, end{0};
                 balance211(work_amount, nthr, ithr, start, end);
@@ -1845,7 +1845,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             });
         } else {
-            parallel(0, [&](const int ithr, const int nthr) {
+            parallel(0, work_amount, [&](const int ithr, const int nthr) {
                 size_t n{0}, dim1_s{0};
                 size_t start{0}, end{0};
                 balance211(work_amount, nthr, ithr, start, end);

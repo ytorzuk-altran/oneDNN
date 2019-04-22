@@ -70,7 +70,7 @@ int fill_memory(const rnn_prb_t *p, rnn_data_kind_t kind, dnn_mem_t &mem1,
 
     dt_conf_t c = p->cfg[kind];
     float mean = c.f_mean, var = c.f_var, min = c.f_min, max = c.f_max;
-    mkldnn::impl::parallel(0, [&](int ithr, int nthr) {
+    mkldnn::impl::parallel(0, mkldnn_get_max_threads(), [&](int ithr, int nthr) {
         size_t chunk_size = (nelems + nthr - 1) / nthr;
         size_t idx_start = ithr * chunk_size;
         size_t idx_end = MIN2(idx_start + chunk_size, nelems);

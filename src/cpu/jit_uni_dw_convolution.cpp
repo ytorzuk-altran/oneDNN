@@ -332,7 +332,7 @@ void _jit_uni_dw_convolution_bwd_weights_t<isa, src_type,
         conv_params->input = &src[src_off * ch_block];
     };
 
-    parallel(jcp.nthr, [&](const int ithr, const int nthr) {
+    parallel(jcp.nthr, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         assert(nthr == jcp.nthr);
 
         auto conv_params = jit_dw_conv_call_s();

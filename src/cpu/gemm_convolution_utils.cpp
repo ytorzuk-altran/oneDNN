@@ -416,7 +416,7 @@ template void im2col_u8<uint8_t>(const jit_gemm_conv_conf_t &jcp,
 void col2im_s32(const jit_gemm_conv_conf_t &jcp, const int32_t *__restrict col,
         int32_t *__restrict im)
 {
-    parallel(0, [&](const int ithr, const int nthr) {
+    parallel(0, (size_t)mkldnn_get_max_threads(), [&](const int ithr, const int nthr) {
         int h_nthr = nstl::min(jcp.ih, nthr);
         int w_nthr = nstl::min(jcp.iw, nthr / h_nthr);
         int h_ithr = 1, h_s = 0, h_e = 0, w_ithr = 1, w_s = 0, w_e = 0;

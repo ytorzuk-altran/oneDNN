@@ -50,7 +50,8 @@ execute_forward() const {
             jcp.id != 1, jcp.oh_block == jcp.oh && jcp.ow_block == jcp.ow));
     assert(IMPLICATION(jcp.ow_block != jcp.ow, jcp.oh_block == 1));
 
-    parallel(jcp.nthr, [&](const int ithr, const int nthr) {
+    const size_t work_amount = jcp.ngroups * jcp.mb;
+    parallel(jcp.nthr, work_amount, [&](const int ithr, const int nthr) {
         execute_forward_thr(ithr, nthr, src_base, wei_base, bia_base, dst_base,
                 scratchpad);
     });
@@ -623,7 +624,7 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
             &zerof, acc, &M, jcp.signed_input ? wei_comp : &off_c);
 
 
-        parallel(0, [&](int ithr, int nthr) {
+        parallel(0, (size_t)jcp.os * jcp.oc, [&](int ithr, int nthr) {
             size_t start, end;
             balance211((size_t)N * jcp.oc, nthr, ithr, start, end);
             (*pp_ker_)(dst + (oh * jcp.ow + ow) * pp_ker_->dst_os_stride_,
@@ -650,7 +651,8 @@ execute_backward_data() const {
 
     const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
 
-    parallel(jcp.nthr, [&](const int ithr, const int nthr) {
+    const size_t work_amount = jcp.ngroups * jcp.mb;
+    parallel(jcp.nthr, work_amount, [&](const int ithr, const int nthr) {
         execute_backward_data_thr(ithr, nthr, diff_dst_base, wei_base,
                 bia_base, diff_src_base, scratchpad);
     });
