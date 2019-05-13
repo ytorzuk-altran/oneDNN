@@ -1219,24 +1219,27 @@ template <cpu_isa_t isa>
 bool jit_uni_dw_conv_row_f32<isa>::post_ops_ok(jit_conv_conf_t &jcp, const primitive_attr_t &attr) {
     const auto &p = attr.post_ops_;
 
-    auto is_eltwise = [&](int idx) { return p.entry_[idx].is_eltwise(); };
-    auto is_depthwise = [&](int idx) { return p.entry_[idx].is_depthwise(); };
-    auto is_sum = [&](int idx) { return p.entry_[idx].is_sum(); };
-    auto is_simple = [&](int idx) { return is_eltwise(idx) || is_depthwise(idx); };
-    auto is_binarization = [&](int idx) { return p.entry_[idx].is_binarization(); };
-
     int start_idx = p.find(primitive_kind::convolution) + 1;
 
-    switch (p.len_ - start_idx) {
-    case 0: return true; // no post_ops
-    case 1: return is_simple(start_idx) || is_sum(start_idx) || is_binarization(start_idx);
-    case 2: return (is_sum(start_idx) && is_simple(start_idx+1)) || (is_simple(start_idx) && is_simple(start_idx+1)) ||
-                   (is_simple(start_idx) && is_binarization(start_idx+1));
-    case 3: return (is_sum(start_idx) && is_simple(start_idx+1) && is_simple(start_idx+2));
-    default: return false;
-    }
+    auto all_post_ops_supported = [&]() {
+        bool ok = true;
 
-    return false;
+        for (int i = start_idx; i < p.len_; i++) {
+            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise,
+                                                       primitive_kind::binarization);
+        }
+        return ok;
+    };
+    auto contain = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind, start_idx, -1) != -1; };
+    auto position = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind, start_idx, -1); };
+    auto count = [&](mkldnn::impl::primitive_kind_t kind) { return p.count(kind, start_idx, -1); };
+
+    return all_post_ops_supported() &&
+           count(primitive_kind::sum) <= 1 &&
+           count(primitive_kind::binarization) <= 1 &&
+           IMPLICATION(contain(primitive_kind::sum), position(primitive_kind::sum) == start_idx) &&
+           IMPLICATION(contain(primitive_kind::binarization), position(primitive_kind::binarization) == p.len_-1) &&
+           IMPLICATION(contain(primitive_kind::binarization), !contain(primitive_kind::sum));
 }
 
 template <cpu_isa_t isa>

@@ -180,6 +180,16 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
         return -1;
     }
 
+    int count(mkldnn::impl::primitive_kind_t kind, int start = 0,
+             int stop = -1) const {
+        if (stop == -1) stop = len_;
+        stop = mkldnn::impl::nstl::min(stop, len_);
+        int cnt = 0;
+        for (int idx = start; idx < stop; ++idx)
+            if (entry_[idx].kind == kind) cnt++;
+        return cnt;
+    }
+
     bool has_default_values() const { return len_ == 0; }
 
     bool contain(mkldnn::impl::primitive_kind_t kind, int index) const
