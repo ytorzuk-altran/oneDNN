@@ -700,7 +700,7 @@ public:
 
 inline bool is_native_runtime(runtime_kind_t kind) {
     return utils::one_of(kind, runtime_kind::seq, runtime_kind::omp,
-            runtime_kind::tbb, runtime_kind::threadpool);
+            runtime_kind::tbb, runtime_kind::tbb_auto, runtime_kind::threadpool);
 }
 
 } // namespace impl
