@@ -82,6 +82,9 @@ void parallel(int nthr, const std::function<void(int, int)> &f) {
 #endif
             },
             tbb::static_partitioner());
+#elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB_AUTO
+    tbb::parallel_for(
+            0, nthr, [&](int ithr) { f(ithr, nthr); });
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
     using namespace dnnl::impl::threadpool_utils;
     dnnl::threadpool_interop::threadpool_iface *tp = get_active_threadpool();
