@@ -80,6 +80,9 @@ void parallel(int nthr, F f) {
     tbb::parallel_for(
             0, nthr, [&](int ithr) { f(ithr, nthr); },
             tbb::static_partitioner());
+#elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB_AUTO
+    tbb::parallel_for(
+            0, nthr, [&](int ithr) { f(ithr, nthr); });
 #elif DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
     using namespace dnnl::impl::threadpool_utils;
     dnnl::threadpool_iface *tp = get_active_threadpool();
@@ -457,6 +460,7 @@ void parallel_nd_in_omp(Args &&... args) {
     for_nd(omp_get_thread_num(), omp_get_num_threads(),
             utils::forward<Args>(args)...);
 #elif (DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB \
+        || DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_TBB_AUTO \
         || DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL)
     assert(!"parallel_nd_in_omp() is not supported by this DNNL_CPU_RUNTIME");
 #endif
