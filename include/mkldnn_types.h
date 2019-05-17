@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -541,6 +541,8 @@ typedef enum {
     mkldnn_binary_convolution,
     /** A binarization primitive. */
     mkldnn_binarization,
+    /** A deformable convolution primitive. */
+    mkldnn_deformable_convolution,
 } mkldnn_primitive_kind_t;
 
 /** Kinds of algorithms. */
@@ -621,10 +623,12 @@ typedef enum {
     /** Direct binary convolution */
     mkldnn_binary_convolution_direct = 0x1fffff,
     /** Depthwise binarization */
-    mkldnn_binarization_depthwise = 0xafffff
+    mkldnn_binarization_depthwise = 0xafffff,
+    /** Direct deformable convolution */
+    mkldnn_deformable_convolution_direct = 0x1ffffff,
 } mkldnn_alg_kind_t;
 
-/** Flags for batch-normalization primititve. */
+/** Flags for batch-normalization primitive. */
 typedef enum {
     /** Use global statistics
      *
@@ -1206,6 +1210,44 @@ typedef struct {
     mkldnn_memory_desc_t output_mask_desc;
 } mkldnn_binarization_desc_t;
 
+/** A descriptor of a deformable convolution operation. */
+typedef struct {
+    /** The kind of primitive. Used for self-identifying the primitive
+     * descriptor. Must be #mkldnn_deformable_convolution. */
+    mkldnn_primitive_kind_t primitive_kind;
+    /** The kind of propagation. Possible values: #mkldnn_forward_training,
+     * #mkldnn_forward_inference */
+    mkldnn_prop_kind_t prop_kind;
+    /** The kind of the convolution algorithm. Possible values:
+     * #mkldnn_deformable_convolution_direct. */
+    mkldnn_alg_kind_t alg_kind;
+    /** Source memory descriptors. */
+    mkldnn_memory_desc_t* src_descs;
+    /** Number of sources. */
+    int num_src;
+    /** Weights memory descriptor. */
+    mkldnn_memory_desc_t weights_desc;
+    /** Bias memory descriptor. */
+    mkldnn_memory_desc_t bias_desc;
+    /** Destination memory descriptor. */
+    mkldnn_memory_desc_t dst_desc;
+    /** Convolution strides in each spatial dimension. */
+    mkldnn_dims_t strides;
+    /** Convolution dilates in each spatial dimension. */
+    mkldnn_dims_t dilates;
+    /** Padding in each spatial dimension. padding[0] is a padding in the
+     * beginning (@p padding_l), padding[1] is a padding in the end (@p
+     * padding_r). */
+    mkldnn_dims_t padding[2];
+    //// TODO: is needed padding_kind?
+    /** The kind of padding to use. */
+    mkldnn_padding_kind_t padding_kind;
+    /** The accumulator data type. Initialized automatically. */
+    mkldnn_data_type_t accum_data_type;
+    /** Deformable group. */
+    int deformable_group;
+} mkldnn_deformable_convolution_desc_t;
+
 /** @} */
 
 /** @addtogroup c_api_engine_types Engine
@@ -1397,6 +1439,7 @@ typedef enum {
     mkldnn_query_depthwise_d, /**< eltwise descriptor */
     mkldnn_query_binary_convolution_d, /**< binary convolution descriptor */
     mkldnn_query_binarization_d, /**< binarization descriptor */
+    mkldnn_query_deformable_convolution_d, /**< deformable convolution descriptor */
 
     /* (memory) primitive descriptor section */
     mkldnn_query_some_pd = 128, /**< stub */

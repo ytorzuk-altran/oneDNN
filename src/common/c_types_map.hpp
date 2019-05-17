@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -95,6 +95,7 @@ namespace alg_kind {
     const alg_kind_t roi_pooling_bilinear = mkldnn_roi_pooling_bilinear;
     const alg_kind_t binary_convolution_direct = mkldnn_binary_convolution_direct;
     const alg_kind_t binarization_depthwise = mkldnn_binarization_depthwise;
+    const alg_kind_t deformable_convolution_direct = mkldnn_deformable_convolution_direct;
 }
 
 using data_type_t = mkldnn_data_type_t;
@@ -320,6 +321,7 @@ namespace primitive_kind {
     const primitive_kind_t roi_pooling = mkldnn_roi_pooling;
     const primitive_kind_t binary_convolution = mkldnn_binary_convolution;
     const primitive_kind_t binarization = mkldnn_binarization;
+    const primitive_kind_t deformable_convolution = mkldnn_deformable_convolution;
 }
 
 using query_t = mkldnn_query_t;
@@ -354,6 +356,7 @@ namespace query {
     const query_t roi_pooling_d = mkldnn_query_roi_pooling_d;
     const query_t binary_convolution_d = mkldnn_query_binary_convolution_d;
     const query_t binarization_d = mkldnn_query_binarization_d;
+    const query_t deformable_convolution_d = mkldnn_query_deformable_convolution_d;
 
     const query_t some_pd = mkldnn_query_some_pd;
     const query_t input_pd = mkldnn_query_input_pd;
@@ -385,6 +388,7 @@ using roi_pooling_desc_t = mkldnn_roi_pooling_desc_t;
 using depthwise_desc_t = mkldnn_depthwise_desc_t;
 using binary_convolution_desc_t = mkldnn_binary_convolution_desc_t;
 using binarization_desc_t = mkldnn_binarization_desc_t;
+using deformable_convolution_desc_t = mkldnn_deformable_convolution_desc_t;
 
 using rnn_direction_t = mkldnn_rnn_direction_t;
 using rnn_cell_desc_t = mkldnn_rnn_cell_desc_t;
@@ -412,6 +416,7 @@ struct op_desc_t {
         depthwise_desc_t depthwise;
         binary_convolution_desc_t binary_convolution;
         binarization_desc_t binarization;
+        deformable_convolution_desc_t deformable_convolution;
     };
 
     op_desc_t(const primitive_kind_t &_): kind(_) {}
@@ -437,6 +442,7 @@ struct op_desc_t {
     DECL_CTOR_AND_CONVERTERS(roi_pooling_desc_t, roi_pooling);
     DECL_CTOR_AND_CONVERTERS(binary_convolution_desc_t, binary_convolution);
     DECL_CTOR_AND_CONVERTERS(binarization_desc_t, binarization);
+    DECL_CTOR_AND_CONVERTERS(deformable_convolution_desc_t, deformable_convolution);
 
 #   undef DECL_CTOR_AND_CONVERTERS
 };

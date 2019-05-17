@@ -765,6 +765,53 @@ struct test_binary_convolution_dw_conv_params_t {
     test_convolution_dw_conv_sizes_t sizes;
 };
 
+struct test_deformable_convolution_formats_t {
+    mkldnn::memory::format src_format;
+    mkldnn::memory::format offsets_format;
+    mkldnn::memory::format weights_format;
+    mkldnn::memory::format bias_format;
+    mkldnn::memory::format dst_format;
+};
+
+struct test_deformable_convolution_sizes_t {
+    test_deformable_convolution_sizes_t(
+        int mb,
+        int ng,
+        int dg,
+        int ic, int ih, int iw,
+        int oc, int oh, int ow,
+        int kh, int kw,
+        int padh, int padw,
+        int strh, int strw,
+        int dilh=0, int dilw=0
+    ) :
+        mb(mb),
+        ng(ng),
+        dg(dg),
+        ic(ic), ih(ih), iw(iw),
+        oc(oc), oh(oh), ow(ow),
+        kh(kh), kw(kw),
+        padh(padh), padw(padw),
+        strh(strh), strw(strw),
+        dilh(dilh), dilw(dilw) {}
+    int mb;
+    int ng;
+    int dg;
+    int ic, ih, iw;
+    int oc, oh, ow;
+    int kh, kw;
+    int padh, padw;
+    int strh, strw;
+    int dilh, dilw;
+};
+
+struct test_deformable_convolution_params_t {
+    const mkldnn::engine::kind engine_kind;
+    mkldnn::algorithm aalgorithm;
+    test_deformable_convolution_formats_t formats;
+    test_deformable_convolution_sizes_t sizes;
+};
+
 std::ostream &operator<<(std::ostream &stream,
                          const roi_pool_test_params &tp)
 {

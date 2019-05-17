@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -82,6 +82,8 @@
 #include "cpu/ref_binary_convolution.hpp"
 #include "cpu/jit_uni_binarization.hpp"
 #include "cpu/ref_binarization.hpp"
+#include "cpu/jit_uni_deformable_convolution.hpp"
+#include "cpu/ref_deformable_convolution.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -428,6 +430,11 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_binarization_fwd_t<avx2>),
     INSTANCE(jit_uni_binarization_fwd_t<sse42>),
     INSTANCE(ref_binarization_fwd_t<f32>),
+    /* deformable convolution */
+    INSTANCE(jit_uni_deformable_convolution_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_deformable_convolution_fwd_t<avx2>),
+    INSTANCE(jit_uni_deformable_convolution_fwd_t<sse42>),
+    INSTANCE(ref_deformable_convolution_fwd_t),
     /* eol */
     nullptr,
 };

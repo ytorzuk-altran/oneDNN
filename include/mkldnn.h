@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -1823,6 +1823,25 @@ mkldnn_status_t MKLDNN_API mkldnn_binarization_forward_desc_init(
         mkldnn_alg_kind_t alg_kind, const mkldnn_memory_desc_t *src_desc,
         const mkldnn_memory_desc_t *dst_desc, const mkldnn_memory_desc_t *weights_desc,
         const mkldnn_memory_desc_t *output_mask_desc);
+
+/** @} */
+
+/** @addtogroup c_api_deformable_convolution Deformable convolution
+ * A primitive to compute deformable convolution.
+ * @{ */
+
+/**
+ */
+
+mkldnn_status_t MKLDNN_API mkldnn_deformable_convolution_forward_desc_init(
+        mkldnn_deformable_convolution_desc_t *def_conv_desc, mkldnn_prop_kind_t prop_kind,
+        mkldnn_alg_kind_t alg_kind, mkldnn_memory_desc_t *src_descs, int num_inputs,
+        const mkldnn_memory_desc_t *weights_desc,
+        const mkldnn_memory_desc_t *bias_desc,
+        const mkldnn_memory_desc_t *dst_desc,
+        const mkldnn_dims_t strides, const mkldnn_dims_t dilates, const mkldnn_dims_t padding_l,
+        const mkldnn_dims_t padding_r, mkldnn_padding_kind_t padding_kind,
+        const int deformable_group);
 
 /** @} */
 

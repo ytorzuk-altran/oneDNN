@@ -339,6 +339,38 @@ struct jit_bin_conv_conf_t {
     data_type_t dst_dt;
 };
 
+struct jit_def_conv_conf_t {
+    prop_kind_t prop_kind;
+
+    int ndims;
+    int mb;
+    int dg;
+    int ngroups, ic, oc, oc_padded, ic_padded;
+    int id, ih, iw, od, oh, ow;
+    int f_pad, l_pad, t_pad;
+    int back_pad, r_pad, b_pad;
+    int kd, kh, kw;
+    int stride_d, stride_h, stride_w;
+    int dilate_d, dilate_h, dilate_w;
+    memory_format_t src_fmt;
+    bool with_bias;
+    bool with_sum;
+    int nthr;
+    int nb_ic, ic_block;
+    int nb_oc, oc_block;
+    int nb_ic_blocking, nb_oc_blocking;
+    int ur_h, ur_w;
+    int ur_w_tail;
+    int typesize_in;
+    int typesize_off;
+    int typesize_bia;
+    int typesize_out;
+    data_type_t src_dt;
+    data_type_t off_dt;
+    data_type_t bia_dt;
+    data_type_t dst_dt;
+};
+
 struct jit_conv_call_s {
     const void *src; /* hack, non-const for backward_data */
     const void *dst; /* hack, non-const for forward */
@@ -560,6 +592,16 @@ struct jit_1x1_conv_call_s {
     size_t ic_pos_flag;
 	const void *is_data;
 	const void *oc_data;
+};
+
+struct jit_def_conv_call_s {
+    const void *src;
+    const void *off;
+    const void *filt;
+    const void *bias;
+    const void *dst;
+    const void *buf;
+    size_t oh_pos;
 };
 
 /* pooling */

@@ -89,6 +89,7 @@ file(GLOB PRIM_TEST_CASES_SRC
                               test_binary_convolution_dw_conv_depthwise_forward.cpp
                               test_binary_convolution_dw_conv_sum_forward.cpp
                               test_binary_convolution_dw_conv_binarization_forward.cpp
+                              test_deformable_convolution_forward_f32.cpp
                               ) #temporary
 
 foreach(TEST_FILE ${PRIM_TEST_CASES_SRC})

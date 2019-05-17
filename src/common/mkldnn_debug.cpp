@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018 Intel Corporation
+* Copyright 2018-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -261,6 +261,7 @@ const char *mkldnn_prim_kind2str(mkldnn_primitive_kind_t v) {
     if (v == mkldnn_roi_pooling) return "roi_pooling";
     if (v == mkldnn_binary_convolution) return "binary_convolution";
     if (v == mkldnn_binarization) return "binarization";
+    if (v == mkldnn_deformable_convolution) return "deformable_convolution";
     assert(!"unknown prim_kind");
     return "unknown prim_kind";
 }
@@ -303,6 +304,7 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_roi_pooling_bilinear) return "roi_pooling_bilinear";
     if (v == mkldnn_binary_convolution_direct) return "binary_convolution_direct";
     if (v == mkldnn_binarization_depthwise) return "binarization_depthwise";
+    if (v == mkldnn_deformable_convolution_direct) return "deformable_convolution_direct";
     assert(!"unknown alg_kind");
     return "unknown alg_kind";
 }

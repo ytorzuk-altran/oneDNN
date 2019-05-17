@@ -196,6 +196,7 @@ enum {
     key_dw_conv_buffer,
     key_dw_conv_padded_bias,
     key_conv_padded_compensation,
+    key_def_conv_buffer,
 };
 
 enum {
