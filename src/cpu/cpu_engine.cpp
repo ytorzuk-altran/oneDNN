@@ -70,6 +70,7 @@
 #include "cpu/jit_avx512_core_fp32_wino_conv_2x3.hpp"
 #include "cpu/jit_uni_batch_normalization_s8.hpp"
 #include "cpu/jit_uni_fork_softmax.hpp"
+#include "cpu/jit_uni_softmax.hpp"
 #include "cpu/jit_uni_roi_pooling.hpp"
 #include "cpu/ref_roi_pooling.hpp"
 #include "cpu/jit_uni_depthwise.hpp"
@@ -349,8 +350,11 @@ static const pd_create_f cpu_impl_list[] = {
 #endif
     /* softmax */
     INSTANCE(jit_uni_fork_softmax_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_softmax_fwd_t<avx512_common>),
     INSTANCE(jit_uni_fork_softmax_fwd_t<avx2>),
+    INSTANCE(jit_uni_softmax_fwd_t<avx2>),
     INSTANCE(jit_uni_fork_softmax_fwd_t<sse42>),
+    INSTANCE(jit_uni_softmax_fwd_t<sse42>),
     INSTANCE(ref_softmax_fwd_t<f32>),
 #ifdef ENABLE_UNUSED_PRIM
     INSTANCE(ref_softmax_bwd_t<f32>),
