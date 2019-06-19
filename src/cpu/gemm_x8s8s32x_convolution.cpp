@@ -50,7 +50,9 @@ execute_forward() const {
             jcp.id != 1, jcp.oh_block == jcp.oh && jcp.ow_block == jcp.ow));
     assert(IMPLICATION(jcp.ow_block != jcp.ow, jcp.oh_block == 1));
 
-    const size_t work_amount = jcp.ngroups * jcp.mb;
+    const int nb_oh = div_up(jcp.oh, jcp.oh_block);
+    const int nb_ow = div_up(jcp.ow, jcp.ow_block);
+    const size_t work_amount = jcp.ngroups * jcp.mb * nb_oh * nb_ow;
     parallel(jcp.nthr, work_amount, [&](const int ithr, const int nthr) {
         execute_forward_thr(ithr, nthr, src_base, wei_base, bia_base, dst_base,
                 scratchpad);

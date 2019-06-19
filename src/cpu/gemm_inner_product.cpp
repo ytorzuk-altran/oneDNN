@@ -52,7 +52,7 @@ void gemm_inner_product_fwd_t<data_type>::execute_forward() const {
             postops_in_ip_ ? nullptr : bias);
 
     if (postops_in_ip_) {
-        parallel(0, [&](int ithr, int nthr) {
+        parallel(0, (size_t)OC * MB, [&](int ithr, int nthr) {
             size_t start = 0, end = 0;
             balance211((size_t)OC * MB, nthr, ithr, start, end);
             (*pp_kernel_)(dst, dst, (char *)bias, scales, start, end);
