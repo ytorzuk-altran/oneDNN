@@ -412,6 +412,56 @@ template void im2col_u8<uint8_t>(const jit_gemm_conv_conf_t &jcp,
         const uint8_t *__restrict im, uint8_t *__restrict imtr,
         uint8_t *__restrict col, int hs, int hb, int ws, int wb);
 
+template <typename T>
+void im2col_u8_3d(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
+                  uint8_t *__restrict col, int od) {
+    uint8_t shift = jcp.signed_input ? 128 : 0;
+    const int dh = 1 + jcp.dilate_h;
+    const int dw = 1 + jcp.dilate_w;
+    const int dd = 1 + jcp.dilate_d;
+    const int sh = jcp.stride_h;
+    const int sw = jcp.stride_w;
+    const int sd = jcp.stride_d;
+    const int im_iw_stride = jcp.ic * jcp.ngroups;
+    const int im_ih_stride = jcp.iw * im_iw_stride;
+    const int im_id_stride = jcp.ih * im_ih_stride;
+    const int tp = jcp.t_pad;
+    const int lp = jcp.l_pad;
+    const int fp = jcp.f_pad;
+
+    const T* im_loc = im + od * sd * im_id_stride;
+
+    parallel_nd(jcp.kd, jcp.kh, jcp.kw, jcp.ic, jcp.oh, jcp.ow,
+                [&](int kd, int kh, int kw, int ic, int oh, int ow) {
+                    int im_idx = (kd * dd - fp) * im_id_stride
+                                 + (kh * dh - tp + oh * sh) * im_ih_stride
+                                 + (kw * dw - lp + ow * sw) * im_iw_stride
+                                 + ic;
+
+                    int col_idx = kd * jcp.kh * jcp.kw * jcp.ic * jcp.oh * jcp.ow
+                                  + kh * jcp.kw * jcp.ic * jcp.oh * jcp.ow
+                                  + kw * jcp.ic * jcp.oh * jcp.ow
+                                  + ic * jcp.oh * jcp.ow
+                                  + oh * jcp.ow
+                                  + ow;
+
+                    int id = od * sd + kd * dd - fp;
+                    int ih = oh * sh + kh * dh - tp;
+                    int iw = ow * sw + kw * dw - lp;
+
+                    if (id < 0 || id >= jcp.id || ih < 0 || ih >= jcp.ih || iw < 0 || iw >= jcp.iw)
+                        col[col_idx] = shift;
+                    else
+                        col[col_idx] = im_loc[im_idx] + shift;
+    });
+}
+
+template void im2col_u8_3d<int8_t>(const jit_gemm_conv_conf_t &jcp, const int8_t *__restrict im,
+                                   uint8_t *__restrict col, int od);
+
+template void im2col_u8_3d<uint8_t>(const jit_gemm_conv_conf_t &jcp, const uint8_t *__restrict im,
+                                    uint8_t *__restrict col, int od);
+
 /* im[ih][iw][ic] <-- col2im_s32(col[oh][ow][kh][kw][ic]) */
 void col2im_s32(const jit_gemm_conv_conf_t &jcp, const int32_t *__restrict col,
         int32_t *__restrict im)

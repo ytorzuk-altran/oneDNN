@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -79,7 +79,10 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     using namespace types;
 
     const auto dst_md = memory_desc_wrapper(pd->dst_pd());
-    dst_os_stride_ = dst_md.blk_off(0, 0, 0, 1);
+    if (pd->ndims() == 5)
+        dst_os_stride_ = dst_md.blk_off(0, 0, 0, 0, 1);
+    else if (pd->ndims() == 4)
+        dst_os_stride_ = dst_md.blk_off(0, 0, 0, 1);
 
     scale_idx_mult_ = (pd->attr()->output_scales_.mask_ == (1 << 1));
     rmode_ = pd->attr()->round_mode_;
@@ -585,14 +588,14 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
     const ptrdiff_t offset = (ptrdiff_t)jcp.ngroups * jcp.ks * jcp.ic * jcp.oc;
     const int32_t *_wei_comp = (const int32_t *)(wei_base + offset);
 
-    int g{ 0 }, n{ 0 }, ohb{ 0 }, owb{ 0 };
+    int g{ 0 }, n{ 0 }, ohb{ 0 }, owb{ 0 }, od{ 0 };
     size_t start = 0, end = 0;
 
     const int nb_oh = div_up(jcp.oh, jcp.oh_block);
     const int nb_ow = div_up(jcp.ow, jcp.ow_block);
-    const size_t work_amount = jcp.ngroups * jcp.mb * nb_oh * nb_ow;
+    const size_t work_amount = jcp.ngroups * jcp.mb * jcp.od * nb_oh * nb_ow;
     balance211(work_amount, nthr, ithr, start, end);
-    nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups, ohb,
+    nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups, od, jcp.od, ohb,
                 nb_oh, owb, nb_ow);
 
     for (size_t iwork = start; iwork < end; ++iwork) {
@@ -607,9 +610,13 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
         const int h_step = nstl::min(jcp.oh_block, jcp.oh - oh);
         const int w_step = nstl::min(jcp.ow_block, jcp.ow - ow);
 
-        if (jcp.im2col_sz)
-            jit_gemm_convolution_utils::im2col_u8<src_data_t>(
-                    jcp, src, imtr, col, oh, h_step, ow, w_step);
+        if (jcp.im2col_sz) {
+            if (jcp.id == 1)
+                jit_gemm_convolution_utils::im2col_u8<src_data_t>(
+                        jcp, src, imtr, col, oh, h_step, ow, w_step);
+            else
+                jit_gemm_convolution_utils::im2col_u8_3d<src_data_t>(jcp, src, col, od);
+        }
 
         const int M = jcp.oc;
         const int K = jcp.ks * jcp.ic;
@@ -622,20 +629,20 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
         const float onef = 1.0, zerof = 0.0;
         mkldnn_gemm_s8u8s32("N", BT, jcp.signed_input ? "C" : "F",
             &M, &N, &K, &onef, wei, &LDA, &off_a,
-            jcp.im2col_sz ? col : (uint8_t *)src, &LDB, &off_b,
+            jcp.im2col_sz ? col : (uint8_t *)src + od * jcp.ngroups * jcp.ic * N, &LDB, &off_b,
             &zerof, acc, &M, jcp.signed_input ? wei_comp : &off_c);
 
 
         parallel(0, (size_t)jcp.os * jcp.oc, [&](int ithr, int nthr) {
             size_t start, end;
             balance211((size_t)N * jcp.oc, nthr, ithr, start, end);
-            (*pp_ker_)(dst + (oh * jcp.ow + ow) * pp_ker_->dst_os_stride_,
+            (*pp_ker_)(dst + (od * jcp.oh * jcp.ow + oh * jcp.ow + ow) * pp_ker_->dst_os_stride_,
                     acc, bia_base, scales, nslope, sum_scale,
                     jcp.signed_input ? 1.f / jcp.wei_adj_scale : 1.f,
                     g, start, end);
         });
 
-        nd_iterator_step(n, jcp.mb, g, jcp.ngroups, ohb, nb_oh,
+        nd_iterator_step(n, jcp.mb, g, jcp.ngroups, od, jcp.od, ohb, nb_oh,
                     owb, nb_ow);
     }
 }

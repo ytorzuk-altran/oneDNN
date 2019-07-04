@@ -238,6 +238,10 @@ typedef enum {
      * used in Caffe.
      * Logical dimensions come in the order: (g, o, i, d, h, w) */
     mkldnn_goidhw,
+    /** 6D grouped weights tensor with the physical layout @c dhwigo,
+     * used in TensorFlow.
+     * Logical dimensions come in the order: (g, o, i, d, h, w) */
+    mkldnn_dhwigo,
     /** 3D RNN data tensor in the format (batch, seq_length, input channels). */
     mkldnn_ntc,
     /** 3D RNN data tensor in the format (seq_length, batch, input channels). */
@@ -343,6 +347,11 @@ typedef enum {
     mkldnn_OhIw16o32i /** blocked weights format */,
 
     /* weights, 5D */
+    /** weights format with additional buffer
+     * size equal to the number of output channels
+     * and containing the values:
+     * O[i:0,OC] = -128 * SUM(j:0,IC;d:0,D;h:0,H;w:0,W)(weights(i,j,d,h,w))*/
+    mkldnn_dhwio_s8s8,
     mkldnn_oIdhw8i /** blocked weights format */,
     mkldnn_oIdhw16i /** blocked weights format */,
     mkldnn_OIdhw4i4o /** blocked weights format */,
@@ -358,6 +367,10 @@ typedef enum {
     mkldnn_OIdhw8i16o2i /** blocked weights format */,
     mkldnn_OIdhw8o16i2o /** blocked weights format */,
     mkldnn_IOdhw8o16i2o /** blocked weights format */,
+    mkldnn_OdhIw8o4i /** blocked weights format */,
+    mkldnn_OdhIw8o4i_s8s8 /** blocked weights format */,
+    mkldnn_OIdhw4i16o4i /** blocked weights format */,
+    mkldnn_OIdhw4i16o4i_s8s8 /** blocked weights format */,
 
     /* weights w/ groups, 4D */
     mkldnn_gOwi4o /** blocked weights format */,
@@ -427,6 +440,7 @@ typedef enum {
     mkldnn_gOhwi4o /** blocked weights format */,
     mkldnn_gOhwi16o /** blocked weights format */,
     mkldnn_Goihw8g /** blocked weights format */,
+    mkldnn_Goihw8g_s8s8 /** blocked weights format */,
     mkldnn_Goihw16g /** blocked weights format */,
     /** blocked weights format with additional buffer
      * with size equal to the number of groups and containing the values:
@@ -441,6 +455,11 @@ typedef enum {
     mkldnn_gOhIw8o4i_s8s8,
 
     /* weights w/ groups, 6D */
+    /** weights format with additional buffer
+     * size equal to the number of output channels
+     * multiplied by number of groups and containing the values:
+     * O[i:0,G*OC] = -128 * SUM(j:0,IC;d:0,D;h:0,H;w:0,W)(weights(i,j,d,h,w))*/
+    mkldnn_dhwigo_s8s8,
     mkldnn_gOIdhw4i4o /** blocked weights format */,
     mkldnn_gOdhwi4o /** blocked weights format */,
     mkldnn_gOIdhw8i8o /** blocked weights format */,
@@ -454,6 +473,14 @@ typedef enum {
     mkldnn_gOidhw4o /** blocked weights format */,
     mkldnn_gOidhw16o /** blocked weights format */,
     mkldnn_gOdhwi16o /** blocked weights format */,
+    mkldnn_gOdhIw8o4i /** blocked weights format */,
+    mkldnn_gOdhIw8o4i_s8s8 /** blocked weights format */,
+    mkldnn_Goidhw8g /** blocked weights format */,
+    mkldnn_Goidhw8g_s8s8 /** blocked weights format */,
+    mkldnn_Goidhw16g /** blocked weights format */,
+    mkldnn_Goidhw16g_s8s8 /** blocked weights format */,
+    mkldnn_gOIdhw4i16o4i /** blocked weights format */,
+    mkldnn_gOIdhw4i16o4i_s8s8 /** blocked weights format */,
 
     mkldnn_wino_fmt /** Weights format used in 8bit Winograd convolution */,
 

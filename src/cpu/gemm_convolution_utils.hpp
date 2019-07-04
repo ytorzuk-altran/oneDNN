@@ -43,6 +43,10 @@ void im2col_u8(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
         T* __restrict imtr, uint8_t *__restrict col,
         int hs, int hb, int ws, int wb);
 
+template <typename T>
+void im2col_u8_3d(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
+        uint8_t *__restrict col, int od);
+
 void col2im_s32(const jit_gemm_conv_conf_t &jcp, const int32_t *__restrict col,
         int32_t *__restrict im);
 void col2im_3d(const jit_gemm_conv_conf_t &jcp, const float *col, float *im,

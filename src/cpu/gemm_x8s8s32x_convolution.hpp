@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2018 Intel Corporation
+* Copyright 2017-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -68,11 +68,16 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
                             this->desc()->bias_desc.data_type, f32, s32, s8,
                             u8))
                 && this->desc()->accum_data_type == data_type::s32
-                && utils::everyone_is(nhwc, this->src_pd_.desc()->format,
-                        this->dst_pd_.desc()->format)
-                && this->weights_pd_.desc()->format == (this->with_groups()
-                        ? ((src_type == data_type::s8) ? hwigo_s8s8 : hwigo)
-                        : ((src_type == data_type::s8) ? hwio_s8s8 : hwio))
+                && utils::one_of(this->src_pd_.desc()->format, nhwc, ndhwc)
+                && this->src_pd_.desc()->format == this->dst_pd_.desc()->format
+                && IMPLICATION(this->src_pd_.desc()->format == nhwc,
+                        this->weights_pd_.desc()->format == (this->with_groups()
+                                ? ((src_type == data_type::s8) ? hwigo_s8s8 : hwigo)
+                                : ((src_type == data_type::s8) ? hwio_s8s8 : hwio)))
+                && IMPLICATION(this->src_pd_.desc()->format == ndhwc,
+                        this->weights_pd_.desc()->format == (this->with_groups()
+                                ? ((src_type == data_type::s8) ? dhwigo_s8s8 : dhwigo)
+                                : ((src_type == data_type::s8) ? dhwio_s8s8 : dhwio)))
                 && this->is_gemm_conv_format();
             if (!ok) return status::unimplemented;
 
@@ -85,19 +90,30 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
         jit_gemm_conv_conf_t jcp_;
 
     protected:
+        memory_format_t src_format() const {
+            using namespace memory_format;
+            const size_t ndims_sp = this->desc()->src_desc.ndims - 4;
+            return (utils::pick(ndims_sp, nhwc, ndhwc));
+        }
+
+        memory_format_t wei_format() const {
+            using namespace memory_format;
+            const size_t ndims_sp = this->desc()->src_desc.ndims - 4;
+            return this->with_groups()
+                ? (src_type == data_type::s8) ? utils::pick(ndims_sp, hwigo_s8s8, dhwigo_s8s8)
+                                              : utils::pick(ndims_sp, hwigo, dhwigo)
+                : (src_type == data_type::s8) ? utils::pick(ndims_sp, hwio_s8s8, dhwio_s8s8)
+                                              : utils::pick(ndims_sp, hwio, dhwio);
+        }
+
         virtual status_t set_default_params() override {
             using namespace memory_format;
-            const bool is_sign_input =
-                this->desc()->src_desc.data_type == data_type::s8;
-
             if (this->src_pd_.desc()->format == any)
-                CHECK(this->src_pd_.set_format(nhwc));
+                CHECK(this->src_pd_.set_format(src_format()));
             if (this->dst_pd_.desc()->format == any)
-                CHECK(this->dst_pd_.set_format(nhwc));
+                CHECK(this->dst_pd_.set_format(src_format()));
             if (this->weights_pd_.desc()->format == any)
-                CHECK(this->weights_pd_.set_format(this->with_groups()
-                            ? (is_sign_input ? hwigo_s8s8 : hwigo)
-                            : (is_sign_input ? hwio_s8s8 : hwio)));
+                CHECK(this->weights_pd_.set_format(wei_format()));
             if (this->bias_pd_.desc()->format == any)
                 CHECK(this->bias_pd_.set_format(x));
             if (this->desc()->alg_kind == alg_kind::convolution_auto)
@@ -118,7 +134,6 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
                         || (po.contain(sum, 1) && is_eltwise(0));
             default: return false;
             }
-            return false;
         }
     };
 

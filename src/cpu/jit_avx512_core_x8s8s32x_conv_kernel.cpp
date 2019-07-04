@@ -41,7 +41,7 @@ void pick_loop_order(jit_conv_conf_t &jcp, int nthr)
     jcp.loop_order = loop_cwgn;
     if (jcp.ngroups > 1) {
         jcp.loop_order = loop_ngcw;
-        if (jcp.mb < nthr)
+        if (jcp.mb < nthr && jcp.ndims != 5)
             jcp.loop_order = jcp.ndims == 3 ? loop_nwcg : loop_nhwcg;
     }
 }
@@ -283,7 +283,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Zmm>::compute_ker_dw(
     };
 
     auto kernel_offset = [=](int ci, int ki) {
-        return jcp.typesize_in * ((ci * jcp.kh * jcp.kw + ki) * jcp.ch_block);
+        return jcp.typesize_in * ((ci * jcp.kd * jcp.kh * jcp.kw + ki) * jcp.ch_block);
     };
 
     auto compute = [=](Zmm vreg_acc, Zmm vreg_wei, Zmm vreg_src) {
@@ -414,7 +414,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
     };
     auto kernel_offset = [=](int ii, int ic, int ki) {
         return jcp.typesize_in
-                * ((ii * jcp.nb_ic * jcp.kh * jcp.kw + ki) * ch_block_all
+                * ((ii * jcp.nb_ic * jcp.kd * jcp.kh * jcp.kw + ki) * ch_block_all
                     + 4 * ic * oc_block);
     };
     auto compute = [=](Vmm vreg_acc, Vmm vreg_wei, Vmm vreg_src) {
@@ -493,13 +493,68 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::kh_loop(
     Label t_overflow_label, no_t_overflow_label,
           b_overflow_label, no_b_overflow_label;
 
+    Label kd_label, skip_kd_loop;
+
     int ch_block_all = jcp.ch_block * jcp.ic_block * jcp.oc_block;
     int shift_kernel_ptr = jcp.typesize_in * jcp.kw * ch_block_all;
     int shift_input_ptr = jcp.typesize_in * (jcp.dilate_h + 1) * jcp.iw
         * jcp.ic_without_padding * jcp.ngroups;
 
+    int shift_kernel_d_ptr = jcp.typesize_in * jcp.kh * jcp.kw * ch_block_all;
+    int shift_input_d_ptr = jcp.typesize_in * (jcp.dilate_d + 1) * jcp.ih * jcp.iw
+                          * jcp.ic_without_padding * jcp.ngroups;
+
+    auto d_overflow_func = [&] () {
+        Label d_overflow_label, no_d_overflow_label, aux_kh_label;
+        cmp(reg_overflow, 0);
+        je(no_d_overflow_label, T_NEAR);
+        L(d_overflow_label);
+        {
+            push(reg_overflow);
+
+            mov(reg_kj, jcp.kh);
+            L(aux_kh_label);
+            {
+                compute_ker(ur_w, pad_l, pad_r, last_ic_block_flag, true);
+
+                add(aux_reg_ker, shift_kernel_ptr);
+                dec(reg_kj);
+                cmp(reg_kj, 0);
+                jg(aux_kh_label, T_NEAR);
+            }
+
+            pop(reg_overflow);
+
+            add(aux_reg_ker_d, shift_kernel_d_ptr);
+            mov(aux_reg_ker, aux_reg_ker_d);
+            dec(reg_overflow);
+            cmp(reg_overflow, 0);
+            jg(d_overflow_label);
+        }
+        L(no_d_overflow_label);
+    };
+
     mov(aux_reg_inp, reg_inp);
     mov(aux_reg_ker, reg_ker);
+
+    if (jcp.ndims == 5) {
+        push(reg_out);
+        push(reg_oi);
+        push(reg_compensation);
+
+        mov(aux_reg_inp_d, reg_inp);
+        mov(aux_reg_ker_d, reg_ker);
+
+        if (jcp.signed_input) {
+            mov(reg_overflow, ptr[param1 + GET_OFF(front_overflow)]);
+            d_overflow_func();
+        }
+        mov(reg_kd, ptr[param1 + GET_OFF(kd_padding)]);
+        cmp(reg_kd, 0);
+        je(skip_kd_loop, T_NEAR);
+    }
+
+    L(kd_label);
 
     if (jcp.signed_input && jcp.ndims > 3) {
         mov(reg_overflow, ptr[param1 + GET_OFF(t_overflow)]);
@@ -547,6 +602,30 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::kh_loop(
         }
         L(no_b_overflow_label);
     }
+
+    if (jcp.ndims == 5) {
+        add(aux_reg_inp_d, shift_input_d_ptr);
+        add(aux_reg_ker_d, shift_kernel_d_ptr);
+        mov(aux_reg_inp, aux_reg_inp_d);
+        mov(aux_reg_ker, aux_reg_ker_d);
+
+        dec(reg_kd);
+        cmp(reg_kd, 0);
+        jg(kd_label, T_NEAR);
+    }
+
+    L(skip_kd_loop);
+
+    if (jcp.ndims == 5) {
+        if (jcp.signed_input) {
+            mov(reg_overflow, ptr[param1 + GET_OFF(back_overflow)]);
+            d_overflow_func();
+        }
+
+        pop(reg_compensation);
+        pop(reg_oi);
+        pop(reg_out);
+    }
 }
 
 template<typename Vmm>
@@ -581,7 +660,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::icb_loop(
     }
     // End of IC Loop
     int inp_step = jcp.ic_block;
-    int ker_step = jcp.kh * jcp.kw * jcp.oc_block * jcp.ic_block;
+    int ker_step = jcp.kd * jcp.kh * jcp.kw * jcp.oc_block * jcp.ic_block;
     add(reg_inp, jcp.typesize_in * inp_step);
     add(reg_ker, jcp.typesize_in * ker_step);
 
@@ -908,6 +987,7 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     int ndims = src_d.ndims();
     bool is_1d = ndims == 3;
+    bool is_3d = ndims == 5;
 
     if (!(mayiuse(avx512_core)
          && one_of(src_d.data_type(), data_type::u8, data_type::s8)
@@ -919,27 +999,41 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
     jcp = zero<decltype(jcp)>();
     jcp.ndims = ndims;
     jcp.prop_kind = cd.prop_kind;
+
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
     jcp.mb = src_d.dims()[0];
+
     jcp.oc = dst_d.dims()[1] / jcp.ngroups;
     jcp.oc_without_padding = jcp.oc;
     jcp.ic = src_d.dims()[1] / jcp.ngroups;
     jcp.ic_without_padding = jcp.ic;
+
+    jcp.id = is_3d ? src_d.dims()[2] : 1;
     jcp.ih = is_1d ? 1 : src_d.dims()[ndims - 2];
     jcp.iw = src_d.dims()[ndims - 1];
+
+    jcp.od = is_3d ? dst_d.dims()[2] : 1;
     jcp.oh = is_1d ? 1 : dst_d.dims()[ndims - 2];
     jcp.ow = dst_d.dims()[ndims - 1];
+
+    jcp.kd = is_3d ? weights_d.dims()[with_groups + 2] : 1;
     jcp.kh = is_1d ? 1 : weights_d.dims()[with_groups + ndims - 2];
     jcp.kw = weights_d.dims()[with_groups + ndims - 1];
+
+    jcp.f_pad = is_3d ? cd.padding[0][0] : 0;
     jcp.t_pad = is_1d ? 0 : cd.padding[0][ndims - 4];
     jcp.l_pad = cd.padding[0][ndims - 3];
+
+    jcp.stride_d = is_3d ? cd.strides[0] : 1;
     jcp.stride_h = is_1d ? 1 : cd.strides[ndims - 4];
     jcp.stride_w = cd.strides[ndims - 3];
+
     jcp.src_fmt = src_d.format();
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
 
     jcp.ur_h = 1; /* no code-unrolling by h so far */
 
+    jcp.dilate_d = is_3d ? cd.dilates[0] : 0;
     jcp.dilate_h = is_1d ? 0 : cd.dilates[ndims - 4];
     jcp.dilate_w = cd.dilates[ndims - 3];
 
@@ -978,7 +1072,7 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
             jcp.ic_block = jcp.ic % 8 == 0 ? 8 : 4;
             jcp.oc_block = jcp.ic_block;
         }
-        if (jcp.ic % jcp.ic_block !=0 || jcp.oc % jcp.oc_block != 0)
+        if (jcp.ic % jcp.ic_block != 0 || jcp.oc % jcp.oc_block != 0)
             return status::unimplemented;
     }
 
@@ -999,23 +1093,29 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
         jcp.max_regs_ur = jcp.ver == ver_vnni ? 31 : 28;
     }
 
-    auto src_format = pick(ndims - 3, nwc, nhwc);
-    auto dst_format = pick(ndims - 3, nwc, nhwc);
+    auto src_format = pick(ndims - 3, nwc, nhwc, ndhwc);
+    auto dst_format = pick(ndims - 3, nwc, nhwc, ndhwc);
 #define pick_signed(fmt) (jcp.signed_input ? fmt##_s8s8 : fmt)
     memory_format_t w_format;
-    if (jcp.ic_block == 16 || jcp.ch_block == 16) {
-        w_format = is_1d ?
-                (with_groups ? (jcp.is_depthwise ? pick_signed(Goiw16g) :
-                                                   pick_signed(gOIw4i16o4i)) :
-                               pick_signed(OIw4i16o4i)) :
-                (with_groups ? (jcp.is_depthwise ? pick_signed(Goihw16g) :
-                                                   pick_signed(gOIhw4i16o4i)) :
-                               pick_signed(OIhw4i16o4i));
-        /* Non-grouped conv will always be padded by 16*/
-    } else if (with_groups && jcp.ic_block == 8) {
-        w_format = pick_signed(gOIhw2i8o4i);
+    if (is_3d) {
+        w_format = with_groups ? jcp.is_depthwise ? pick_signed(Goidhw16g)
+                                                  : pick_signed(gOIdhw4i16o4i)
+                               : pick_signed(OIdhw4i16o4i);
     } else {
-        w_format = pick_signed(gOIhw4o4i);
+        if (jcp.ic_block == 16 || jcp.ch_block == 16) {
+            w_format = is_1d ?
+                       (with_groups ? (jcp.is_depthwise ? pick_signed(Goiw16g) :
+                                       pick_signed(gOIw4i16o4i)) :
+                        pick_signed(OIw4i16o4i)) :
+                       (with_groups ? (jcp.is_depthwise ? pick_signed(Goihw16g) :
+                                       pick_signed(gOIhw4i16o4i)) :
+                        pick_signed(OIhw4i16o4i));
+            /* Non-grouped conv will always be padded by 16*/
+        } else if (with_groups && jcp.ic_block == 8) {
+            w_format = pick_signed(gOIhw2i8o4i);
+        } else {
+            w_format = pick_signed(gOIhw4o4i);
+        }
     }
 #undef pick_signed
 

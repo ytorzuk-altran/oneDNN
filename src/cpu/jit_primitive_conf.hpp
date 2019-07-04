@@ -410,6 +410,8 @@ struct jit_conv_call_s {
     size_t ch_work;
     size_t t_overflow;
     size_t b_overflow;
+    size_t front_overflow;
+    size_t back_overflow;
     size_t oh_blocks;
     int flags;
 

@@ -140,6 +140,7 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::apply_filter(int ur_w, int pad_l, in
         int tail_size, bool h_padded) {
     int kw = jcp.kw;
     int kh = jcp.kh;
+    int kd = jcp.kd;
     int nb_ic = jcp.nb_ic;
     int stride_w = jcp.stride_w;
     int dilate_w = jcp.dilate_w + 1;
@@ -182,7 +183,7 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::apply_filter(int ur_w, int pad_l, in
             }
 
             for (int ii = 0; ii < oc_blocks; ii++) {
-                int ker_off = ii * nb_ic * kh * kw * ic_blk * oc_blk + ki * ic_blk * oc_blk + r * ic_blk * (oc_blk / 2);
+                int ker_off = ii * nb_ic * kd * kh * kw * ic_blk * oc_blk + ki * ic_blk * oc_blk + r * ic_blk * (oc_blk / 2);
                 uni_vmovups(get_ker_reg(0), ptr[aux1_reg_kernel + jcp.typesize_in * ker_off]);
 
                 for (int jj = _start; jj < _end; jj++) {
@@ -249,26 +250,24 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::kh_loop(int ur_w, int pad_l, int pad
     Label t_overflow_label, no_t_overflow_label,
           b_overflow_label, no_b_overflow_label;
 
-    mov(aux_reg_input, reg_input);
-    mov(aux_reg_kernel, reg_kernel);
-
-    mov(imm_addr64, l_table);
-    uni_vmovups(vmm_one,   ptr[imm_addr64 + 0 * vlen]);
-    uni_vmovups(vmm_shift, ptr[imm_addr64 + 1 * vlen]);
-
-    if (jcp.signed_input) {
-        mov(reg_overflow,  ptr[param1 + GET_OFF(t_overflow)]);
+    auto h_overflow_func = [&] () {
+        Label h_overflow_label, no_h_overflow_label;
         cmp(reg_overflow, 0);
-        je(no_t_overflow_label, T_NEAR);
-        L(t_overflow_label); {
+        je(no_h_overflow_label, T_NEAR);
+        L(h_overflow_label); {
             oh_step_unroll_kw(ur_w, pad_l, pad_r, oc_blocks, oc_step, true);
 
             add(aux_reg_kernel, jcp.typesize_in * kw * jcp.oc_block * rnd_up(jcp.ic, jcp.ic_block));
             dec(reg_overflow);
             cmp(reg_overflow, 0);
-            jg(t_overflow_label, T_NEAR);
+            jg(h_overflow_label, T_NEAR);
         }
-        L(no_t_overflow_label);
+        L(no_h_overflow_label);
+    };
+
+    if (jcp.signed_input) {
+        mov(reg_overflow,  ptr[param1 + GET_OFF(t_overflow)]);
+        h_overflow_func();
     }
 
     Label skip_kh_loop;
@@ -296,18 +295,90 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::kh_loop(int ur_w, int pad_l, int pad
 
     if (jcp.signed_input) {
         mov(reg_overflow,  ptr[param1 + GET_OFF(b_overflow)]);
-        cmp(reg_overflow, 0);
-        je(no_b_overflow_label, T_NEAR);
-        L(b_overflow_label); {
-            oh_step_unroll_kw(ur_w, pad_l, pad_r, oc_blocks, oc_step, true);
+        h_overflow_func();
+    }
+}
 
-            add(aux_reg_kernel, jcp.typesize_in * kw * jcp.oc_block * rnd_up(jcp.ic, jcp.ic_block));
+template <cpu_isa_t isa>
+void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::kd_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step) {
+    int iw = jcp.iw;
+    int ih = jcp.ih;
+    int kw = jcp.kw;
+    int kh = jcp.kh;
+    int dilate_d = jcp.dilate_d + 1;
+
+    auto d_overflow_func = [&] () {
+        Label d_overflow_label, no_d_overflow_label, aux_kh_label;
+        cmp(reg_overflow, 0);
+        je(no_d_overflow_label, T_NEAR);
+        L(d_overflow_label);
+        {
+            push(reg_overflow);
+
+            mov(reg_kj, jcp.kh);
+            L(aux_kh_label);
+            {
+                oh_step_unroll_kw(ur_w, pad_l, pad_r, oc_blocks, oc_step, true);
+
+                add(aux_reg_kernel, jcp.typesize_in * kw * jcp.oc_block * rnd_up(jcp.ic, jcp.ic_block));
+                dec(reg_kj);
+                cmp(reg_kj, 0);
+                jg(aux_kh_label, T_NEAR);
+            }
+
+            pop(reg_overflow);
+
+            add(aux_reg_ker_d, jcp.typesize_in * kh * kw * jcp.oc_block * rnd_up(jcp.ic, jcp.ic_block));
+            mov(aux_reg_kernel, aux_reg_ker_d);
             dec(reg_overflow);
             cmp(reg_overflow, 0);
-            jg(b_overflow_label, T_NEAR);
+            jg(d_overflow_label);
         }
-        L(no_b_overflow_label);
+        L(no_d_overflow_label);
+    };
+
+    push(reg_output);
+    push(reg_oi_iter);
+    push(reg_compensation_base);
+
+    mov(aux_reg_inp_d, reg_input);
+    mov(aux_reg_ker_d, reg_kernel);
+
+    if (jcp.signed_input) {
+        mov(reg_overflow, ptr[param1 + GET_OFF(front_overflow)]);
+        d_overflow_func();
     }
+
+    Label skip_kd_loop;
+    mov(reg_kd, ptr[param1 + GET_OFF(kd_padding)]);
+    cmp(reg_kd, 0);
+    je(skip_kd_loop, T_NEAR);
+
+    Label kd_label;
+    L(kd_label);
+    {
+        kh_loop(ur_w, pad_l, pad_r, oc_blocks, oc_step);
+
+        add(aux_reg_inp_d, jcp.typesize_in * dilate_d * ih * iw * jcp.ic * jcp.ngroups);
+        add(aux_reg_ker_d, jcp.typesize_in * kh * kw * jcp.oc_block * rnd_up(jcp.ic, jcp.ic_block));
+        mov(aux_reg_input, aux_reg_inp_d);
+        mov(aux_reg_kernel, aux_reg_ker_d);
+
+        dec(reg_kd);
+        cmp(reg_kd, 0);
+        jg(kd_label, T_NEAR);
+    }
+
+    L(skip_kd_loop);
+
+    if (jcp.signed_input) {
+        mov(reg_overflow, ptr[param1 + GET_OFF(back_overflow)]);
+        d_overflow_func();
+    }
+
+    pop(reg_compensation_base);
+    pop(reg_oi_iter);
+    pop(reg_output);
 }
 
 template <cpu_isa_t isa>
@@ -322,7 +393,18 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::width_blk_step(int ur_w, int pad_l, 
                           get_acc_reg(r*jcp.ur_w*jcp.nb_oc_blocking + ur_w * ii + jj),
                           get_acc_reg(r*jcp.ur_w*jcp.nb_oc_blocking + ur_w * ii + jj));
 
-    kh_loop(ur_w, pad_l, pad_r, oc_blocks, oc_step);
+    mov(imm_addr64, l_table);
+    uni_vmovups(vmm_one,   ptr[imm_addr64 + 0 * vlen]);
+    uni_vmovups(vmm_shift, ptr[imm_addr64 + 1 * vlen]);
+
+    mov(aux_reg_input, reg_input);
+    mov(aux_reg_kernel, reg_kernel);
+
+    if (jcp.ndims == 5) {
+        kd_loop(ur_w, pad_l, pad_r, oc_blocks, oc_step);
+    } else {
+        kh_loop(ur_w, pad_l, pad_r, oc_blocks, oc_step);
+    }
 
     pop(reg_oc_off);
     pop(reg_scales_base);
@@ -500,7 +582,7 @@ inline void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::solve_common(int oc_blocks, i
     const int out_mult = jcp.with_dw_conv ? jcp.oc_block : jcp.oc * jcp.ngroups;
 
     int l_pad = jcp.l_pad;
-    int r_pad = nstl::max(0, (int(jcp.ow) - 1) * str_w + (kw - 1) * dilate_w
+    int r_pad = nstl::max(0, (jcp.ow - 1) * str_w + (kw - 1) * dilate_w
             - (iw + l_pad - 1));
     int r_pad1 = (ur_w * n_oi - 1) * str_w + (kw - 1) * dilate_w
             - (iw + l_pad - 1);
@@ -612,7 +694,7 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::generate()
         solve_common(1, jcp.oc_block);
 
         sub(reg_oc_work, jcp.oc_block);
-        add(reg_kernel_base, jcp.oc_block * jcp.nb_ic * jcp.kh * jcp.kw * jcp.ic_block * jcp.typesize_in);
+        add(reg_kernel_base, jcp.oc_block * jcp.nb_ic * jcp.kd * jcp.kh * jcp.kw * jcp.ic_block * jcp.typesize_in);
         if (jcp.with_dw_conv)
             add(reg_output_base, jcp.oc_block * jcp_dw.kh * jcp.ow * jcp.typesize_out);
         else
@@ -731,6 +813,8 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
     jcp.prop_kind = cd.prop_kind;
 
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
+    int ndims = src_d.ndims();
+    jcp.ndims = ndims;
 
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
     jcp.mb = src_d.dims()[0];
@@ -738,22 +822,28 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
     jcp.oc = dst_d.dims()[1] / jcp.ngroups;
     jcp.ic = src_d.dims()[1] / jcp.ngroups;
 
-    jcp.ih = src_d.dims()[2];
-    jcp.iw = src_d.dims()[3];
-    jcp.oh = dst_d.dims()[2];
-    jcp.ow = dst_d.dims()[3];
+    jcp.id = (ndims == 5) ? src_d.dims()[2] : 1;
+    jcp.ih = src_d.dims()[ndims - 2];
+    jcp.iw = src_d.dims()[ndims - 1];
+    jcp.od = (ndims == 5) ? dst_d.dims()[2] : 1;
+    jcp.oh = dst_d.dims()[ndims - 2];
+    jcp.ow = dst_d.dims()[ndims - 1];
 
-    jcp.kh = weights_d.dims()[with_groups + 2];
-    jcp.kw = weights_d.dims()[with_groups + 3];
+    jcp.kd = (ndims == 5) ? weights_d.dims()[with_groups + 2] : 1;
+    jcp.kh = weights_d.dims()[with_groups + ndims - 2];
+    jcp.kw = weights_d.dims()[with_groups + ndims - 1];
 
-    jcp.t_pad = cd.padding[0][0];
-    jcp.l_pad = cd.padding[0][1];
+    jcp.f_pad = (ndims == 5) ? cd.padding[0][0] : 0;
+    jcp.t_pad = cd.padding[0][ndims - 4];
+    jcp.l_pad = cd.padding[0][ndims - 3];
 
-    jcp.stride_h = cd.strides[0];
-    jcp.stride_w = cd.strides[1];
+    jcp.stride_d = (ndims == 5) ? cd.strides[0] : 1;
+    jcp.stride_h = cd.strides[ndims - 4];
+    jcp.stride_w = cd.strides[ndims - 3];
 
-    jcp.dilate_h = cd.dilates[0];
-    jcp.dilate_w = cd.dilates[1];
+    jcp.dilate_d = (ndims == 5) ? cd.dilates[0] : 0;
+    jcp.dilate_h = cd.dilates[ndims - 4];
+    jcp.dilate_w = cd.dilates[ndims - 3];
 
     jcp.src_fmt = src_d.format();
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
@@ -786,6 +876,8 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
     int dw_conv_ind = p.find(primitive_kind::convolution);
     jcp.with_dw_conv = dw_conv_ind != -1;
     if (jcp.with_dw_conv) {
+        if (ndims == 5) return status::unimplemented;
+
         jcp.dw_conv_oh = jcp.oh;
         jcp.dw_conv_ow = jcp.ow;
         jcp.oh = p.entry_[dw_conv_ind].dw_conv.in_h;
@@ -795,9 +887,11 @@ status_t jit_uni_x8s8s32x_conv_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
         jcp.dst_dt = p.entry_[dw_conv_ind].dw_conv.in_dt;
     }
 
-    auto desired_act_fmt = nhwc;
-    auto desired_wei_fmt = with_groups ? (jcp.signed_input) ? gOhIw8o4i_s8s8 : gOhIw8o4i
-                                       : (jcp.signed_input) ?  OhIw8o4i_s8s8 :  OhIw8o4i;
+    auto desired_act_fmt = (ndims == 5) ? ndhwc : nhwc;
+    auto desired_wei_fmt = (ndims == 5) ? with_groups ? jcp.signed_input ? gOdhIw8o4i_s8s8 : gOdhIw8o4i
+                                                      : jcp.signed_input ? OdhIw8o4i_s8s8 : OdhIw8o4i
+                                        : with_groups ? jcp.signed_input ? gOhIw8o4i_s8s8 : gOhIw8o4i
+                                                      : jcp.signed_input ? OhIw8o4i_s8s8 : OhIw8o4i;
 
     if (src_d.format() == any)
         CHECK(src_pd.set_format(desired_act_fmt));

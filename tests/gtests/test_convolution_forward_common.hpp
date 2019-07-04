@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -115,6 +115,13 @@ void compute_ref_conv_fwd(const test_convolution_sizes_t &c,
     );
 }
 
+template <typename data_t>
+static void fill_data_even(const size_t size, data_t *data) {
+    for (size_t i = 0; i < size; i++) {
+        data[i] = (i * 13 % 21 - 10) * 2;
+    }
+}
+
 template <typename data_t_src, typename data_t_wei,
           typename data_t_acc, typename data_t_dst>
 class convolution_forward_test
@@ -156,11 +163,17 @@ protected:
         auto c_bias_desc = with_bias ?
                 create_md({ cd.oc }, data_type_dst, p.formats.bias_format) :
                 create_md({}, data_type_dst, p.formats.bias_format);
+        auto c_wei_aux_desc = cd.ng > 1 ?
+                              create_md({ cd.ng, cd.oc / cd.ng, cd.ic / cd.ng, cd.kh, cd.kw },
+                                        data_type_wei, mkldnn::memory::format::goihw) :
+                              create_md({ cd.oc, cd.ic, cd.kh, cd.kw },
+                                        data_type_wei, mkldnn::memory::format::oihw);
 
         auto c_src = test_memory(c_src_desc, eng);
         auto c_weights = test_memory(c_weights_desc, eng);
         auto c_bias = test_memory(c_bias_desc, eng);
         auto c_dst = test_memory(c_dst_desc, eng);
+        auto c_wei_aux = test_memory(c_wei_aux_desc, eng);
 
         std::vector<data_t_dst> ref_dst_data(c_dst.get_size());
 
@@ -169,8 +182,10 @@ protected:
                 (data_t_dst *)c_dst.get().get_data_handle());
         fill_data<data_t_src>(c_src.get_size() / sizeof(data_t_src),
                 (data_t_src *)c_src.get().get_data_handle());
-        fill_data<data_t_wei>(c_weights.get_size() / sizeof(data_t_wei),
-                (data_t_wei *)c_weights.get().get_data_handle());
+        if (data_type_src != memory::data_type::s8) {
+            fill_data<data_t_wei>(c_weights.get_size() / sizeof(data_t_wei),
+                                  (data_t_wei *) c_weights.get().get_data_handle());
+        }
         if (with_bias) {
             fill_data<data_t_dst>(c_bias.get_size() / sizeof(data_t_dst),
                     (data_t_dst *)c_bias.get().get_data_handle());
@@ -178,6 +193,22 @@ protected:
         check_zero_tail<data_t_src>(1, c_src.get());
         check_zero_tail<data_t_wei>(1, c_weights.get());
         check_zero_tail<data_t_dst>(1, c_dst.get());
+
+        if (data_type_src == memory::data_type::s8) {
+            ASSERT_EQ(data_type_wei, memory::data_type::s8);
+
+            fill_data_even(c_wei_aux.get_size() / sizeof(data_t_wei), (data_t_wei *) c_wei_aux.get().get_data_handle());
+
+            auto wei_i = memory(c_wei_aux.get().get_primitive_desc(), (data_t_wei *)c_wei_aux.get().get_data_handle());
+            auto wei_o = memory(c_weights.get().get_primitive_desc(), (data_t_wei *)c_weights.get().get_data_handle());
+
+            auto reor = reorder(wei_i, wei_o);
+
+            std::vector<primitive> pipeline_aux;
+            pipeline_aux.push_back(reor);
+            auto s_aux = stream(stream::kind::lazy);
+            s_aux.submit(pipeline_aux).wait();
+        }
 
         std::vector<ptrdiff_t> padR = {
             right_padding(cd.ih, cd.oh, cd.kh, cd.padh, cd.strh, cd.dilh),
@@ -210,9 +241,15 @@ protected:
 
         auto ref_memory = memory(memory::primitive_desc(c_dst_desc, eng),
                 &ref_dst_data[0]);
-        compute_ref_conv_fwd<data_t_src,data_t_wei,data_t_acc,data_t_dst>(
-                cd, attr, c_src_desc, c_weights_desc, c_bias_desc, c_dst_desc,
-                c_src.get(), c_weights.get(), c_bias.get(), ref_memory);
+        if (data_type_src == memory::data_type::s8) {
+            compute_ref_conv_fwd<data_t_src,data_t_wei,data_t_acc,data_t_dst>(
+                    cd, attr, c_src_desc, c_wei_aux_desc, c_bias_desc, c_dst_desc,
+                    c_src.get(), c_wei_aux.get(), c_bias.get(), ref_memory);
+        } else {
+            compute_ref_conv_fwd<data_t_src,data_t_wei,data_t_acc,data_t_dst>(
+                    cd, attr, c_src_desc, c_weights_desc, c_bias_desc, c_dst_desc,
+                    c_src.get(), c_weights.get(), c_bias.get(), ref_memory);
+        }
         check_zero_tail<data_t_dst>(1, ref_memory);
 
         compare_data<data_t_dst>(ref_memory, c_dst.get());

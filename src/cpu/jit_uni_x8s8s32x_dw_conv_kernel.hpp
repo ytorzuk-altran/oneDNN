@@ -70,6 +70,10 @@ private:
     using reg8_t = const Xbyak::Reg8;
     const int vlen = cpu_isa_traits<isa>::vlen;
 
+    reg64_t aux_reg_inp_d = r8;
+    reg64_t aux_reg_ker_d = r12;
+    reg64_t reg_kd = abi_not_param1;
+
     reg64_t reg_input_base = r10;
     reg64_t reg_output_base = r9;
     reg64_t reg_kernel_base = r11;

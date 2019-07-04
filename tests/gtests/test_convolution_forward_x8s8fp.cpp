@@ -21,16 +21,26 @@
 #include "test_convolution_forward_common.hpp"
 namespace mkldnn {
 
-using convolution_test = convolution_forward_test<uint8_t, int8_t,
-                                                  int32_t, float>;
+using convolution_test = convolution_forward_test<uint8_t, int8_t, int32_t, float>;
+using convolution_test_s8 = convolution_forward_test<int8_t, int8_t, int32_t, float>;
 
 TEST_P(convolution_test, TestConvolution)
 {
 }
 
+TEST_P(convolution_test_s8, TestConvolution)
+{
+}
+
 #define U8S8
+#define S8S8
 #define DIRECTION_FORWARD
 #include "convolution_common.h"
+
+INST_TEST_CASE(Simple_Gemm_u8s8fp_2d,
+    PARAMS(nhwc, hwigo, FMT_BIAS, nhwc,
+        1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 0, 0, 1, 1)
+);
 
 INST_TEST_CASE(SimpleSmall_Blocked_Padded_Channels,
     PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED, FMT_BIAS, FMT_DATA_BLOCKED,
@@ -87,6 +97,40 @@ INST_TEST_CASE(SimpleSmall_Depthwise_Blocked_Padded_Channels,
         1, 9, 9, 500, 500, 9, 698, 698, 3, 3, 100, 100, 1, 1),
     PARAMS(FMT_DATA_BLOCKED, Goihw8g, FMT_BIAS, FMT_DATA_BLOCKED,
         1, 2, 2, 500, 500, 2, 698, 698, 3, 3, 100, 100, 1, 1)
+);
+
+INST_TEST_CASE_SIGNED(SimpleSmall_Blocked_Padded_Channels,
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 7, 3, 3, 5, 3, 3, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 15, 3, 3, 37, 4, 4, 3, 3, 1, 1, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 14, 4, 4, 1, 4, 4, 3, 3, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 7, 3, 3, 33, 3, 3, 3, 3, 1, 1, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 19, 2, 2, 22, 2, 2, 3, 3, 1, 1, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 126, 13, 13, 126, 13, 13, 3, 3, 1, 1, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 77, 13, 13, 99, 11, 11, 3, 3, 0, 0, 1, 1)
+);
+
+INST_TEST_CASE_SIGNED(SimpleSmall_Blocked_1x1_Padded_Channels,
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 3, 13, 13, 35, 13, 13, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 7, 3, 3, 11, 3, 3, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 1, 4, 4, 58, 4, 4, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 27, 3, 3, 33, 3, 3, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 81, 2, 2, 81, 2, 2, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 126, 13, 13, 13, 13, 13, 1, 1, 0, 0, 1, 1),
+               PARAMS(FMT_DATA_BLOCKED, FMT_WEIGHTS_BLOCKED_SIGNED, FMT_BIAS, FMT_DATA_BLOCKED,
+                      2, 1, 111, 13, 13, 71, 13, 13, 1, 1, 0, 0, 1, 1)
 );
 
 //#undef TEST_PARAM_ATTR

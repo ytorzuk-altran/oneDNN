@@ -73,6 +73,10 @@ private:
         last_sp_block,
     } ic_block_t;
 
+    const Xbyak::Reg64 aux_reg_inp_d = rbx;
+    const Xbyak::Reg64 aux_reg_ker_d = r14;
+    const Xbyak::Reg64 reg_kd = r10;
+
     /* data regs */
     const Xbyak::Reg64 reg_ptr_scales = rax;
     const Xbyak::Reg64 reg_inp = r8;

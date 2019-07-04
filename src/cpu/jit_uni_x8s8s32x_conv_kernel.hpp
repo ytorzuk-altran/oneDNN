@@ -75,6 +75,10 @@ private:
     using reg32_t = const Xbyak::Reg32;
     using reg8_t = const Xbyak::Reg8;
 
+    reg64_t aux_reg_inp_d = r11;
+    reg64_t aux_reg_ker_d = abi_not_param1;
+    reg64_t reg_kd = rsi;
+
     reg64_t reg_scales_base = r13;
     reg64_t reg_bias_base = rbp;
     reg64_t reg_input_base = r8;
@@ -126,6 +130,7 @@ private:
                              int tail_size, bool h_padded);
     inline void oh_step_unroll_kw(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step, bool h_padded);
     inline void kh_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step);
+    inline void kd_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step);
     inline void width_blk_step(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step);
     inline void solve_common(int oc_blocks, int oc_step);
 
