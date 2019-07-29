@@ -130,7 +130,7 @@ public:
         inner_product = mkldnn_inner_product,
         rnn = mkldnn_rnn,
         binary_convolution = mkldnn_binary_convolution,
-        binarization = mkldnn_binarization,
+        quantization = mkldnn_quantization,
         deformable_convolution = mkldnn_deformable_convolution,
     };
 
@@ -293,6 +293,8 @@ enum algorithm {
     roi_pooling_bilinear = mkldnn_roi_pooling_bilinear,
     binary_convolution_direct = mkldnn_binary_convolution_direct,
     binarization_depthwise = mkldnn_binarization_depthwise,
+    quantization_quantize_dequantize = mkldnn_quantization_quantize_dequantize,
+    quantization_quantize = mkldnn_quantization_quantize,
     deformable_convolution_direct = mkldnn_deformable_convolution_direct,
 };
 
@@ -351,7 +353,7 @@ enum query {
     inner_product_d = mkldnn_query_inner_product_d,
     rnn_d = mkldnn_query_rnn_d,
     binary_convolution_d = mkldnn_query_binary_convolution_d,
-    binarization_d = mkldnn_query_binarization_d,
+    quantization_d = mkldnn_query_quantization_d,
     deformable_convolution_d = mkldnn_query_deformable_convolution_d,
 
     input_pd = mkldnn_query_input_pd,
@@ -466,6 +468,22 @@ struct post_ops: public handle<mkldnn_post_ops_t> {
         mkldnn_alg_kind_t c_alg;
         error::wrap_c_api(mkldnn_post_ops_get_params_binarization(get(), index, &c_alg, weights_data, output_mask),
                 "could not get binarization params");
+        alg = static_cast<algorithm>(c_alg);
+    }
+
+    void append_quantization(algorithm alg, const float* crop_low, const float* crop_high,
+            const float* input_scale, const float* input_shift, const float* output_scale, const float* output_shift) {
+        error::wrap_c_api(mkldnn_post_ops_append_quantization(get(), convert_to_c(alg),
+                crop_low, crop_high, input_scale, input_shift, output_scale, output_shift),
+                          "could not append quantization");
+    }
+
+    void get_params_quantization(int index, algorithm &alg, const float** crop_low, const float** crop_high,
+            const float** input_scale, const float** input_shift, const float** output_scale, const float** output_shift) const {
+        mkldnn_alg_kind_t c_alg;
+        error::wrap_c_api(mkldnn_post_ops_get_params_quantization(get(), index, &c_alg,
+                crop_low, crop_high, input_scale, input_shift, output_scale, output_shift),
+                          "could not get quantization params");
         alg = static_cast<algorithm>(c_alg);
     }
 };
@@ -3557,22 +3575,41 @@ struct binary_convolution_forward: public primitive {
 
 /// @}
 
-/// @addtogroup cpp_api_binarization Binarization
+/// @addtogroup cpp_api_quantization Quantization
 /// @{
 
-struct binarization_forward : public primitive {
+struct quantization_forward : public primitive {
     struct desc {
-        mkldnn_binarization_desc_t data;
+        mkldnn_quantization_desc_t data;
 
-        desc(prop_kind aprop_kind, algorithm alg_kind,
-             const memory::desc &src_desc, const memory::desc &weights_desc, const memory::desc &output_mask_desc,
+        desc(prop_kind aprop_kind, algorithm alg_kind, int axis,
+             const memory::desc &src_desc,
+             const memory::desc &thresholds_desc, const memory::desc &output_mask_desc,
              const memory::desc &dst_desc) {
             error::wrap_c_api(mkldnn_binarization_forward_desc_init(&data,
                                                                  mkldnn::convert_to_c(aprop_kind),
                                                                  mkldnn::convert_to_c(alg_kind),
-                                                                 &src_desc.data, &dst_desc.data,
-                                                                 &weights_desc.data, &output_mask_desc.data),
-                              "could not create a binarization forward descriptor");
+                                                                 axis,
+                                                                 &src_desc.data, &thresholds_desc.data, &output_mask_desc.data, &dst_desc.data),
+                              "could not create a quantization forward descriptor");
+        }
+
+        desc(prop_kind aprop_kind, algorithm alg_kind, int axis,
+             const memory::desc &src_desc,
+             const memory::desc &crop_low_desc, const memory::desc &crop_high_desc,
+             const memory::desc &input_scale_desc, const memory::desc &input_shift_desc,
+             const memory::desc &output_scale_desc, const memory::desc &output_shift_desc,
+             const memory::desc &dst_desc) {
+            error::wrap_c_api(mkldnn_quantization_forward_desc_init(&data,
+                                                                    mkldnn::convert_to_c(aprop_kind),
+                                                                    mkldnn::convert_to_c(alg_kind),
+                                                                    axis,
+                                                                    &src_desc.data,
+                                                                    &crop_low_desc.data, &crop_high_desc.data,
+                                                                    &input_scale_desc.data, &input_shift_desc.data,
+                                                                    &output_scale_desc.data, &output_shift_desc.data,
+                                                                    &dst_desc.data),
+                              "could not create a quantization forward descriptor");
         }
     };
 
@@ -3581,21 +3618,35 @@ struct binarization_forward : public primitive {
             mkldnn_primitive_desc_t result;
             error::wrap_c_api(mkldnn_primitive_desc_create(
                     &result, &adesc.data, aengine.get(), nullptr),
-                              "could not create a binarization forward primitive descriptor");
+                              "could not create a quantization forward primitive descriptor");
             reset(result);
         }
 
         engine get_engine() { return engine::query(*this); }
     };
 
-    binarization_forward(const primitive_desc &aprimitive_desc,
-                      const primitive::at &src, const primitive::at &weights, const primitive::at &output_mask,
+    quantization_forward(const primitive_desc &aprimitive_desc,
+                      const primitive::at &src, const primitive::at &thresholds, const primitive::at &output_mask,
                       const memory &dst) {
         mkldnn_primitive_t result;
-        mkldnn_primitive_at_t inputs[] = { src.data, weights.data, output_mask.data};
+        mkldnn_primitive_at_t inputs[] = { src.data, thresholds.data, output_mask.data};
         const_mkldnn_primitive_t outputs[] = { dst.get() };
         error::wrap_c_api(mkldnn_primitive_create(&result, aprimitive_desc.get(), inputs, outputs),
-                          "could not create a binarization forward primitive");
+                          "could not create a quantization forward primitive");
+        reset(result);
+    }
+
+    quantization_forward(const primitive_desc &aprimitive_desc,
+                         const primitive::at &src, const primitive::at &crop_low, const primitive::at &crop_high,
+                         const primitive::at &input_scale, const primitive::at &input_shift,
+                         const primitive::at &output_scale, const primitive::at &output_shift,
+                         const memory &dst) {
+        mkldnn_primitive_t result;
+        mkldnn_primitive_at_t inputs[] = { src.data, crop_low.data, crop_high.data,
+                                           input_scale.data, input_shift.data, output_scale.data, output_shift.data};
+        const_mkldnn_primitive_t outputs[] = { dst.get() };
+        error::wrap_c_api(mkldnn_primitive_create(&result, aprimitive_desc.get(), inputs, outputs),
+                          "could not create a quantization forward primitive");
         reset(result);
     }
 };

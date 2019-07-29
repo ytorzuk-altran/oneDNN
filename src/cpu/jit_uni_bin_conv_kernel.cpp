@@ -470,7 +470,7 @@ void jit_uni_bin_conv_fwd_kernel<isa>::width_blk_step(int ur_w, int pad_l, int p
 
         pop(reg_oc_off);
 
-        mov(reg_b_weights, reinterpret_cast<size_t>(p.entry_[binarization_idx].binarization.weights_data));
+        mov(reg_b_weights, reinterpret_cast<size_t>(p.entry_[binarization_idx].binarization.thresholds_data));
         mov(reg_b_out_mask, reinterpret_cast<size_t>(p.entry_[binarization_idx].binarization.output_mask_data));
         add(reg_b_weights, reg_oc_off);
         add(reg_b_out_mask, reg_oc_off);

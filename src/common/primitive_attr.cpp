@@ -131,7 +131,7 @@ status_t post_ops_t::append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, in
     return success;
 }
 
-status_t post_ops_t::append_binarization(alg_kind_t alg, const float* weights_data, const float* output_mask_data) {
+status_t post_ops_t::append_binarization(alg_kind_t alg, const float* thresholds_data, const float* output_mask_data) {
     using namespace mkldnn::impl::alg_kind;
     bool known_alg = one_of(alg, binarization_depthwise);
     if (!known_alg)
@@ -142,8 +142,32 @@ status_t post_ops_t::append_binarization(alg_kind_t alg, const float* weights_da
 
     entry_[len_].kind = primitive_kind::binarization;
     entry_[len_].binarization.alg = alg;
-    entry_[len_].binarization.weights_data = weights_data;
+    entry_[len_].binarization.thresholds_data = thresholds_data;
     entry_[len_].binarization.output_mask_data = output_mask_data;
+
+    len_++;
+
+    return success;
+}
+
+status_t post_ops_t::append_quantization(alg_kind_t alg, const float* crop_low_data, const float* crop_high_data,
+        const float* input_scale_data, const float* input_shift_data, const float* output_scale_data, const float* output_shift_data) {
+    using namespace mkldnn::impl::alg_kind;
+    bool known_alg = one_of(alg, quantization_quantize_dequantize, quantization_quantize);
+    if (!known_alg)
+        return invalid_arguments;
+
+    if (len_ == capacity)
+        return out_of_memory;
+
+    entry_[len_].kind = primitive_kind::quantization;
+    entry_[len_].quantization.alg = alg;
+    entry_[len_].quantization.crop_low_data = crop_low_data;
+    entry_[len_].quantization.crop_high_data = crop_high_data;
+    entry_[len_].quantization.input_scale_data = input_scale_data;
+    entry_[len_].quantization.input_shift_data = input_shift_data;
+    entry_[len_].quantization.output_scale_data = output_scale_data;
+    entry_[len_].quantization.output_shift_data = output_shift_data;
 
     len_++;
 
@@ -420,17 +444,45 @@ status_t mkldnn_post_ops_append_binarization(post_ops_t *post_ops, alg_kind_t ki
 }
 
 status_t mkldnn_post_ops_get_params_binarization(const post_ops_t *post_ops, int index, alg_kind_t *alg,
-        const float** weights_data, const float** output_mask_data) {
+        const float** thresholds_data, const float** output_mask_data) {
     bool ok = true
         && simple_get_params_check(post_ops, index, primitive_kind::binarization)
-        && !any_null(alg, weights_data, output_mask_data);
+        && !any_null(alg, thresholds_data, output_mask_data);
     if (!ok)
         return invalid_arguments;
 
     const auto &e = post_ops->entry_[index].binarization;
     *alg = e.alg;
-    *weights_data = e.weights_data;
+    *thresholds_data = e.thresholds_data;
     *output_mask_data = e.output_mask_data;
+
+    return success;
+}
+
+status_t mkldnn_post_ops_append_quantization(post_ops_t *post_ops, alg_kind_t kind, const float* crop_low_data, const float* crop_high_data,
+        const float* input_scale_data, const float* input_shift_data, const float* output_scale_data, const float* output_shift_data) {
+    if (post_ops == nullptr)
+        return invalid_arguments;
+
+    return post_ops->append_quantization(kind, crop_low_data, crop_high_data, input_scale_data, input_shift_data, output_scale_data, output_shift_data);
+}
+
+status_t mkldnn_post_ops_get_params_quantization(const post_ops_t *post_ops, int index, alg_kind_t *alg, const float** crop_low_data, const float** crop_high_data,
+        const float** input_scale_data, const float** input_shift_data, const float** output_scale_data, const float** output_shift_data) {
+    bool ok = true
+              && simple_get_params_check(post_ops, index, primitive_kind::quantization)
+              && !any_null(alg, crop_low_data, crop_high_data, input_scale_data, input_shift_data, output_scale_data, output_shift_data);
+    if (!ok)
+        return invalid_arguments;
+
+    const auto &e = post_ops->entry_[index].quantization;
+    *alg = e.alg;
+    *crop_low_data = e.crop_low_data;
+    *crop_high_data = e.crop_high_data;
+    *input_scale_data = e.input_scale_data;
+    *input_shift_data = e.input_shift_data;
+    *output_scale_data = e.output_scale_data;
+    *output_shift_data = e.output_shift_data;
 
     return success;
 }

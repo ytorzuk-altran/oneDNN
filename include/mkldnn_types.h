@@ -568,6 +568,8 @@ typedef enum {
     mkldnn_binary_convolution,
     /** A binarization primitive. */
     mkldnn_binarization,
+    /** A quantization primitive. */
+    mkldnn_quantization,
     /** A deformable convolution primitive. */
     mkldnn_deformable_convolution,
 } mkldnn_primitive_kind_t;
@@ -651,6 +653,9 @@ typedef enum {
     mkldnn_binary_convolution_direct = 0x1fffff,
     /** Depthwise binarization */
     mkldnn_binarization_depthwise = 0xafffff,
+    /** Depthwise quantization */
+    mkldnn_quantization_quantize_dequantize = 0xbfffff,
+    mkldnn_quantization_quantize = 0xcfffff,
     /** Direct deformable convolution */
     mkldnn_deformable_convolution_direct = 0x1ffffff,
 } mkldnn_alg_kind_t;
@@ -1216,26 +1221,31 @@ typedef struct {
     float pad_value;
 } mkldnn_binary_convolution_desc_t;
 
-/** A descriptor of a binarization operation. */
+/** A descriptor of a quantization operation. */
 typedef struct {
     /** The kind of primitive. Used for self identifying the primitive
-     * descriptor. Must be #mkldnn_binarization. */
+     * descriptor. Must be #mkldnn_quantization. */
     mkldnn_primitive_kind_t primitive_kind;
     /** The kind of propagation. Possible values: #mkldnn_forward_training,
      * #mkldnn_forward_inference, #mkldnn_backward, and #mkldnn_backward_data.
      */
     mkldnn_prop_kind_t prop_kind;
-    /** The kind of binarization algorithm. Possible values: #mkldnn_binarization_depthwise */
+    /** The kind of quantization algorithm. Possible values: #mkldnn_binarization_depthwise, #mkldnn_quantization_depthwise */
     mkldnn_alg_kind_t alg_kind;
     /** Source memory descriptor. */
     mkldnn_memory_desc_t src_desc;
     /** Destination memory descriptor. */
     mkldnn_memory_desc_t dst_desc;
-    /** Weights memory descriptor. */
-    mkldnn_memory_desc_t weights_desc;
-    /** Weights memory descriptor. */
+    mkldnn_memory_desc_t thresholds_desc;
     mkldnn_memory_desc_t output_mask_desc;
-} mkldnn_binarization_desc_t;
+    mkldnn_memory_desc_t crop_low_desc;
+    mkldnn_memory_desc_t crop_high_desc;
+    mkldnn_memory_desc_t input_scale_desc;
+    mkldnn_memory_desc_t input_shift_desc;
+    mkldnn_memory_desc_t output_scale_desc;
+    mkldnn_memory_desc_t output_shift_desc;
+    int axis;
+} mkldnn_quantization_desc_t;
 
 /** A descriptor of a deformable convolution operation. */
 typedef struct {
@@ -1465,7 +1475,7 @@ typedef enum {
     mkldnn_query_roi_pooling_d, /**< roi descriptor */
     mkldnn_query_depthwise_d, /**< eltwise descriptor */
     mkldnn_query_binary_convolution_d, /**< binary convolution descriptor */
-    mkldnn_query_binarization_d, /**< binarization descriptor */
+    mkldnn_query_quantization_d, /**< quantization descriptor */
     mkldnn_query_deformable_convolution_d, /**< deformable convolution descriptor */
 
     /* (memory) primitive descriptor section */

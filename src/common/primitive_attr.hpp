@@ -119,9 +119,18 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
             } dw_conv;
             struct {
                 mkldnn::impl::alg_kind_t alg;
-                const float* weights_data;
+                const float* thresholds_data;
                 const float* output_mask_data;
             } binarization;
+            struct {
+                mkldnn::impl::alg_kind_t alg;
+                const float* crop_low_data;
+                const float* crop_high_data;
+                const float* input_scale_data;
+                const float* input_shift_data;
+                const float* output_scale_data;
+                const float* output_shift_data;
+            } quantization;
         };
 
         bool is_eltwise(bool require_scale_one = true) const {
@@ -157,6 +166,10 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
             using namespace mkldnn::impl;
             return kind == primitive_kind::binarization;
         }
+        bool is_quantization() const {
+            using namespace mkldnn::impl;
+            return kind == primitive_kind::quantization;
+        }
     };
 
     mkldnn_post_ops(): len_(0) {}
@@ -172,6 +185,8 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
                                           const float* biases_data);
     mkldnn::impl::status_t append_binarization(mkldnn::impl::alg_kind_t alg, const float* weights_data,
                                                const float* output_mask_data);
+    mkldnn::impl::status_t append_quantization(mkldnn::impl::alg_kind_t alg, const float* crop_low, const float* crop_high,
+            const float* input_scale, const float* input_shift, const float* output_scale, const float* output_shift);
 
     int find(mkldnn::impl::primitive_kind_t kind, int start = 0,
             int stop = -1) const {

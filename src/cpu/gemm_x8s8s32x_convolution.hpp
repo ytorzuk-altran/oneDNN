@@ -29,6 +29,8 @@
 #include "gemm_convolution_utils.hpp"
 
 #include "gemm/gemm.hpp"
+#include "ref_eltwise.hpp"
+#include "ref_depthwise.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -122,18 +124,22 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
         }
 
         virtual bool is_gemm_conv_format() const {
-            using namespace mkldnn::impl::primitive_kind;
-            auto const &po = this->attr()->post_ops_;
-            auto is_eltwise = [&](int idx) { return po.entry_[idx].is_eltwise(); };
+            const auto &p = this->attr()->post_ops_;
 
-            switch (po.len_) {
-            case 0: return true;
-            case 1: return is_eltwise(0) || po.contain(sum, 0);
-            case 2:
-                return (po.contain(sum, 0) && is_eltwise(1))
-                        || (po.contain(sum, 1) && is_eltwise(0));
-            default: return false;
-            }
+            auto all_post_ops_supported = [&]() {
+                bool ok = true;
+
+                for (int i = 0; i < p.len_; i++) {
+                    ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise,
+                                             primitive_kind::quantization);
+                }
+                return ok;
+            };
+            auto contain = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind) != -1; };
+            auto position = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind); };
+            auto count = [&](mkldnn::impl::primitive_kind_t kind) { return p.count(kind); };
+
+            return all_post_ops_supported();
         }
     };
 
@@ -172,13 +178,21 @@ private:
                 delete eltwise_injector_;
             if (eltwise_)
                 delete eltwise_;
+
+            for (auto inj : eltwise_injectors)
+                delete inj;
+            eltwise_injectors.clear();
+
+            for (auto inj : depthwise_injectors)
+                delete inj;
+            depthwise_injectors.clear();
         }
 
 
-        void operator()(dst_data_t *dst, const acc_data_t *acc,
+        void operator()(dst_data_t *dst, acc_data_t *acc,
             const char *bias, const float *scales,
             float nslope, float sum_scale, float signed_scale,
-            int g, size_t start, size_t end);
+            int g, size_t start, size_t end, const post_ops_t& p);
 
         size_t dst_os_stride_;
 
@@ -209,10 +223,13 @@ private:
         bool do_eltwise_;
         bool do_sum_;
         bool do_signed_scaling_;
+        bool use_fast_post_processing;
         size_t vlen_;
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
         ref_eltwise_scalar_fwd_t *eltwise_;
 
+        nstl::vector<ref_eltwise_scalar_fwd_t*> eltwise_injectors;
+        nstl::vector<ref_depthwise_scalar_fwd_t*> depthwise_injectors;
     };
 
 
@@ -223,7 +240,6 @@ private:
 
     int nthr_;
     pp_ker_t *pp_ker_;
-
 };
 
 template <data_type_t dst_type>

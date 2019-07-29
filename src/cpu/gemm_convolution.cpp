@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <common/primitive_attr.hpp>
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -104,6 +105,7 @@ void gemm_convolution_fwd_t::execute_forward() const {
             const int M = jcp.os * jcp.od;
             const int m = step.sp;
             const int LDA = jcp.im2col_sz ? m : M;
+
             data_t *_dst = dst + (curr.n * jcp.ngroups + curr.g) * dst_step
                     + curr.oc * M + curr.od * jcp.os + curr.sp;
             const int K = step.ic * jcp.ks;
@@ -175,6 +177,32 @@ void gemm_convolution_fwd_t::execute_forward() const {
                             });
 
                             depthwise_inj_idx++;
+                            need_bias = false;
+                        } else if (post_op.is_quantization()) {
+                            auto pcl = post_op.quantization.crop_low_data;
+                            auto pch = post_op.quantization.crop_high_data;
+                            auto pisc = post_op.quantization.input_scale_data;
+                            auto pish = post_op.quantization.input_shift_data;
+                            auto posc = post_op.quantization.output_scale_data;
+                            auto posh = post_op.quantization.output_shift_data;
+
+                            parallel_nd(step.oc, [&](const int oc) {
+                                data_t b = need_bias ? bias[oc_start + oc] : 0;
+                                data_t *d_ = _dst + oc * M;
+
+                                int idx = oc_start + oc;
+
+                                PRAGMA_OMP_SIMD()
+                                for (int oS = 0; oS < m; ++oS) {
+                                    d_[oS] += b;
+
+                                    d_[oS] = nstl::min(pch[idx], nstl::max(pcl[idx], d_[oS]));
+                                    d_[oS] = d_[oS] * pisc[idx] + pish[idx];
+                                    d_[oS] = roundf(d_[oS]);
+                                    d_[oS] = d_[oS] * posc[idx] + posh[idx];
+                                }
+                            });
+
                             need_bias = false;
                         }
                     }

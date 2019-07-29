@@ -100,6 +100,9 @@ private:
     const Xbyak::Reg64 reg_d_weights = r15;
     const Xbyak::Reg64 reg_d_bias = r13;
 
+    const Vmm vmm_d_weights = Vmm(31);
+    const Vmm vmm_d_bias = Vmm(30);
+
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
 

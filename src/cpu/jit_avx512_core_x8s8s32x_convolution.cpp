@@ -558,6 +558,8 @@ void jit_avx512_core_x8s8s32x_convolution_fwd_t<src_type,
         p.b_overflow = i_b_overflow;
         p.owb = owb;
 
+        p.oc_off = g * sizeof(float);
+
         kernel_->jit_ker(&p);
     });
 }

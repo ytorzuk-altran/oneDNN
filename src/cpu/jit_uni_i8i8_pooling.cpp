@@ -42,6 +42,8 @@ template <cpu_isa_t isa>
 struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_i8i8_pooling_fwd_ker_t)
 
+    const primitive_attr_t &attr;
+
     struct call_params_t {
         const char *src_i8;
         const char *dst_i8;
@@ -79,6 +81,10 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
     Reg64 reg_tmp = rdx;
 
     Reg64 reg_mask = r15;
+
+    Reg64 reg_oc_off = reg_tmp;
+    Reg64 reg_d_weights = aux_reg_src_h;
+    Reg64 reg_d_bias = aux_reg_src_w;
 
     Opmask k_cmp_mask = Opmask(7);
 
@@ -121,6 +127,11 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
     Vmm vreg_dst_s32(int jj, int ll) { return base_vr(3*max_num_ll*jj + ll + 1*max_num_ll); }  // ll: 0..4 [4..7]
     Vmm vreg_dst_f32(int jj, int ll) { return base_vr(3*max_num_ll*jj + ll + 2*max_num_ll); }  // ll: 0..4 [8..11]
 
+    Vmm vreg_d_weights(int jj, int ll) { return vreg_src_s32(jj, ll); }     // ll: 0..4 [0..3]
+    Vmm vreg_d_bias(int jj, int ll) { return vreg_dst_s32(jj, ll); }        // ll: 0..4 [4..7]
+
+    Vmm vreg_mask_dst = vreg_src(1);
+
     void (*ker_)(const call_params_t *);
     jit_pool_conf_t jpp;
 
@@ -136,6 +147,7 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
     void store_dst_max_op(int jj, int ll, size_t offset, bool masked, uint64_t msk);
     void store_dst_avg_op(int jj, int ll, size_t offset, bool masked, uint64_t msk);
     void store_dst(int jj, int ll, int c_tail);
+    void apply_post_ops(int ur_c, int c_tail);
 
     void compute_avg_step(int ur_c, int c_tail);
     void compute_max_op(const int jj);
@@ -149,8 +161,8 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
         const pooling_desc_t &pd, const memory_desc_wrapper &src_d,
         const memory_desc_wrapper &dst_d);
 
-    jit_uni_i8i8_pooling_fwd_ker_t(const jit_pool_conf_t &jpp_)
-           : jpp(jpp_) {
+    jit_uni_i8i8_pooling_fwd_ker_t(const jit_pool_conf_t &jpp_, const primitive_attr_t &attr_)
+           : jpp(jpp_), attr(attr_) {
         generate();
         ker_ = reinterpret_cast<decltype(ker_)>(const_cast<uint8_t*>(
                        getCode()));
@@ -394,14 +406,26 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx2>::store_dst_avg_op(int jj, int ll,
         if (is_masked) {
             // load ll-th part of mask into vreg_mask_q
             load_vreg_mask_q(ll);
+            // store 8 bytes
+            lea(reg_ptr_maskmovdqu_dst, ptr[reg_ptr_dst_i8 + offset]);
+            maskmovdqu(vr_dst, xreg_mask_q);
+        } else {
+            vmovq(ptr[reg_ptr_dst_i8 + offset], Xmm(vr_dst.getIdx()));
         }
-
-        // store 8 bytes
-        lea(reg_ptr_maskmovdqu_dst, ptr[reg_ptr_dst_i8 + offset]);
-        maskmovdqu(vr_dst, xreg_mask_q);
     };
 
     switch (jpp.dst_dt) {
+        case f32:
+            if (masked) {
+                if (sizeof_src_dt() != sizeof_dst_dt()) {
+                    vpmaskmovd(ptr[reg_ptr_dst_i8 + offset], vreg_mask_dst, vreg_dst_f32(jj, ll));
+                } else {
+                    vpmaskmovd(ptr[reg_ptr_dst_i8 + offset], vreg_mask, vreg_dst_f32(jj, ll));
+                }
+            } else {
+                vmovups(ptr[reg_ptr_dst_i8 + offset], vreg_dst_f32(jj, ll));
+            }
+            break;
         case s32:
             if (masked) {
                 vpmaskmovd(ptr[reg_ptr_dst_i8 + offset], vreg_mask, vreg_dst_s32(jj, ll));
@@ -414,7 +438,7 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx2>::store_dst_avg_op(int jj, int ll,
         case u8:
             store_i8(false, masked, vreg_dst_s32(jj, ll));
             break;
-        default: assert(!"unsuppotred dst data_type");
+        default: assert(!"unsupported dst data_type");
     }
 }
 
@@ -427,11 +451,11 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::store_dst_avg_op(int jj, int l
     if (masked && !msk)
         return;
 
-    const Vmm& vr_dst = masked ?
-            vreg_dst_s32(jj, ll) | mask(ll) :
-            vreg_dst_s32(jj, ll);
+    const Vmm& vr_dst = jpp.dst_dt == f32 ? masked ? vreg_dst_f32(jj, ll) | mask(ll) : vreg_dst_f32(jj, ll)
+                                          : masked ? vreg_dst_s32(jj, ll) | mask(ll) : vreg_dst_s32(jj, ll);
 
     switch (jpp.dst_dt) {
+        case f32:
         case s32:
             vmovups(ptr[reg_ptr_dst_i8 + offset], vr_dst);
             break;
@@ -469,6 +493,87 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::store_dst(int jj, int ll,
             break;
         }
         default: assert(!"unsupported pooling algorithm");
+    }
+}
+
+template <cpu_isa_t isa>
+void jit_uni_i8i8_pooling_fwd_ker_t<isa>::apply_post_ops(int ur_c, int c_tail) {
+    const auto &p = attr.post_ops_;
+    const int num_ll = data_type_size(avg_proc_dt)/data_type_size(jpp.dst_dt);
+    for (int i = 0; i < p.len_; i++) {
+        auto& post_op = p.entry_[i];
+        if (post_op.is_quantization()) {
+            bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
+            bool do_rounding = do_dequantization || jpp.dst_dt == mkldnn_f32 || i != p.len_ - 1;
+
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data));
+
+            add(reg_d_weights, reg_oc_off);
+            add(reg_d_bias, reg_oc_off);
+
+            for (int jj = 0; jj < ur_c; jj++) {
+                for (int ll = 0; ll < num_ll; ll++) {
+                    bool masked = jj == ur_c - 1 && c_tail;
+                    size_t msk = jpp.tail[ll];
+                    if (!(masked && !msk)) {
+                        uni_vmovups(vreg_d_weights(jj, ll), ptr[reg_d_weights + (jj + ll) * jpp.c_block / num_ll * sizeof(float)]);
+                        uni_vmovups(vreg_d_bias(jj, ll), ptr[reg_d_bias +  (jj + ll) * jpp.c_block / num_ll * sizeof(float)]);
+
+                        Vmm vmm_dst = vreg_dst_f32(jj, ll);
+
+                        uni_vmaxps(vmm_dst, vmm_dst, vreg_d_weights(jj, ll));
+                        uni_vminps(vmm_dst, vmm_dst, vreg_d_bias(jj, ll));
+                    }
+                }
+            }
+
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data));
+
+            add(reg_d_weights, reg_oc_off);
+            add(reg_d_bias, reg_oc_off);
+
+            for (int jj = 0; jj < ur_c; jj++) {
+                for (int ll = 0; ll < num_ll; ll++) {
+                    bool masked = jj == ur_c - 1 && c_tail;
+                    size_t msk = jpp.tail[ll];
+                    if (!(masked && !msk)) {
+                        uni_vmovups(vreg_d_weights(jj, ll), ptr[reg_d_weights +  (jj + ll) * jpp.c_block / num_ll * sizeof(float)]);
+                        uni_vmovups(vreg_d_bias(jj, ll), ptr[reg_d_bias +  (jj + ll) * jpp.c_block / num_ll * sizeof(float)]);
+
+                        Vmm vmm_dst = vreg_dst_f32(jj, ll);
+
+                        uni_vfmadd213ps(vmm_dst, vreg_d_weights(jj, ll), vreg_d_bias(jj, ll));
+                        if (do_rounding)
+                            uni_vroundps(vmm_dst, vmm_dst, 0);
+                    }
+                }
+            }
+
+            if (do_dequantization) {
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data));
+
+                add(reg_d_weights, reg_oc_off);
+                add(reg_d_bias, reg_oc_off);
+
+                for (int jj = 0; jj < ur_c; jj++) {
+                    for (int ll = 0; ll < num_ll; ll++) {
+                        bool masked = jj == ur_c - 1 && c_tail;
+                        size_t msk = jpp.tail[ll];
+                        if (!(masked && !msk)) {
+                            uni_vmovups(vreg_d_weights(jj, ll), ptr[reg_d_weights +  (jj + ll) * jpp.c_block / num_ll * sizeof(float)]);
+                            uni_vmovups(vreg_d_bias(jj, ll), ptr[reg_d_bias +  (jj + ll) * jpp.c_block / num_ll * sizeof(float)]);
+
+                            Vmm vmm_dst = vreg_dst_f32(jj, ll);
+
+                            uni_vfmadd213ps(vmm_dst, vreg_d_weights(jj, ll), vreg_d_bias(jj, ll));
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -566,7 +671,7 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_avg_step(int ur_c, int c_tail)
     int iw = jpp.iw;
     int c = jpp.c;
 
-    const int num_ll = data_type_size(avg_proc_dt)/data_type_size(jpp.src_dt);
+    const int num_ll = data_type_size(avg_proc_dt)/data_type_size(jpp.dst_dt);
 
     for (int jj = 0; jj < ur_c; jj++) {
         for (int ll = 0; ll < num_ll; ll++) {
@@ -618,13 +723,25 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_avg_step(int ur_c, int c_tail)
 
                 vcvtdq2ps(vreg_dst_f32(jj, ll), vreg_dst_s32(jj, ll));
                 vfmadd132ps(vreg_dst_f32(jj, ll), vreg_zeros, vreg_tmp);
+            }
+        }
+    }
 
-                if (isa == avx2) {
-                    uni_vroundps(vreg_dst_f32(jj, ll), vreg_dst_f32(jj, ll), rnd_op_nearest);
-                    vcvtps2dq(vreg_dst_s32(jj, ll), vreg_dst_f32(jj, ll));
-                } else if (isa >= avx512_common) {
-                    // AVX512: use of EVEX-embedded static rounding override
-                    vcvtps2dq(vreg_dst_s32(jj, ll) | T_rn_sae, vreg_dst_f32(jj, ll));
+    apply_post_ops(ur_c, c_tail);
+
+    for (int jj = 0; jj < ur_c; jj++) {
+        for (int ll = 0; ll < num_ll; ll++) {
+            bool masked = jj == ur_c - 1 && c_tail;
+            size_t msk = jpp.tail[ll];
+            if (!(masked && !msk)) {
+                if (jpp.dst_dt != f32) {
+                    if (isa == avx2) {
+                        uni_vroundps(vreg_dst_f32(jj, ll), vreg_dst_f32(jj, ll), rnd_op_nearest);
+                        vcvtps2dq(vreg_dst_s32(jj, ll), vreg_dst_f32(jj, ll));
+                    } else if (isa >= avx512_common) {
+                        // AVX512: use of EVEX-embedded static rounding override
+                        vcvtps2dq(vreg_dst_s32(jj, ll) | T_rn_sae, vreg_dst_f32(jj, ll));
+                    }
                 }
 
                 store_dst(jj, ll, c_tail);
@@ -657,11 +774,14 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_c_block(){
     int c_tail = jpp.c_tail;
 
     xor_(c_iter, c_iter);
+    xor_(reg_oc_off, reg_oc_off);
+
     if (c_steps > 0) {
         L(l_main_loop); {
             compute_step(ur_c, 0);
             add(reg_ptr_src_i8, ur_c*c_block*sizeof_src_dt());
             add(reg_ptr_dst_i8, ur_c*c_block*sizeof_dst_dt());
+            add(reg_oc_off, ur_c*c_block*sizeof(float));
             inc(c_iter);
             cmp(c_iter, c_steps);
             jl(l_main_loop, T_NEAR);
@@ -721,6 +841,10 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx2>::init_mask() {
         // and High (xreg_mask_hi) into full vreg_mask
         // vreg_mask -> {xreg_mask_hi, vreg_mask.xreg}
         vinserti128(vreg_mask, vreg_mask, xreg_mask_hi, 1);
+
+        if (sizeof_src_dt() != sizeof_dst_dt()) {
+            vpmovsxbd(vreg_mask_dst, vreg_mask);
+        }
 
         // Keep only low qword of mask in xreg_mask_q
         if (init_mask_q) {
@@ -871,7 +995,7 @@ status_t jit_uni_i8i8_pooling_fwd_ker_t<isa>::init_conf(jit_pool_conf_t &jpp,
     // data_type items per one vreg on the <isa>
     //     isa == avx2    : 32 bytes -> 32 for s8/u8, 8 for s32
     //     isa == avx512* : 64 bytes -> 64 for s8/u8, 16 for s32
-    int simd_w = cpu_isa_traits<isa>::vlen / data_type_size(jpp.src_dt);
+    int simd_w = cpu_isa_traits<isa>::vlen / data_type_size(jpp.dst_dt);
 
     jpp.c_block = simd_w;
     jpp.c_tail = jpp.c % jpp.c_block;
@@ -919,7 +1043,7 @@ jit_uni_i8i8_pooling_fwd_t<isa>::
 jit_uni_i8i8_pooling_fwd_t(const pd_t *apd,
           const input_vector &inputs, const output_vector &outputs)
     : cpu_primitive_t(apd, inputs, outputs), ker_(nullptr)
-{ ker_ = new jit_uni_i8i8_pooling_fwd_ker_t<isa>(pd()->jpp_); }
+{ ker_ = new jit_uni_i8i8_pooling_fwd_ker_t<isa>(pd()->jpp_, *pd()->attr()); }
 
 template <cpu_isa_t isa>
 jit_uni_i8i8_pooling_fwd_t<isa>::

@@ -75,6 +75,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     , do_sum_(false)
     , eltwise_injector_(nullptr)
     , eltwise_(nullptr)
+    , use_fast_post_processing(false)
 {
     using namespace types;
 
@@ -111,21 +112,45 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     const int eltwise_ind = post_ops.find(primitive_kind::eltwise);
     do_eltwise_ = eltwise_ind != -1;
 
-    if (!mayiuse(avx512_core)) {
-        if (do_eltwise_) {
-            eltwise_ = new ref_eltwise_scalar_fwd_t(
-                    post_ops.entry_[eltwise_ind].eltwise);
-        }
-        return;
-    } else {
+    auto is_eltwise = [&](int idx) { return post_ops.entry_[idx].is_eltwise(); };
+    switch (post_ops.len_) {
+        case 0: use_fast_post_processing = true; break;
+        case 1: use_fast_post_processing = is_eltwise(0) || post_ops.contain(mkldnn::impl::primitive_kind::sum, 0); break;
+        case 2: use_fast_post_processing = post_ops.contain(mkldnn::impl::primitive_kind::sum, 0) && is_eltwise(1); break;
+        default: use_fast_post_processing = false; break;
+    };
+
+    if (mayiuse(avx512_core) && use_fast_post_processing) {
         if (do_eltwise_) {
             eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
                     this, post_ops.entry_[eltwise_ind].eltwise, true,
                     Xbyak::util::rax, Xbyak::Opmask(2));
         }
         generate();
+    } else {
+        // use fallback code for unsupported cases
+        if (!use_fast_post_processing) {
+            for (int i = 0; i < post_ops.len_; i++) {
+                auto &post_op = post_ops.entry_[i];
+                if (post_op.is_eltwise()) {
+                    eltwise_injectors.push_back(new ref_eltwise_scalar_fwd_t(
+                            post_op.eltwise.alg,
+                            post_op.eltwise.alpha,
+                            post_op.eltwise.beta
+                    ));
+                } else if (post_op.is_depthwise()) {
+                    depthwise_injectors.push_back(new ref_depthwise_scalar_fwd_t(
+                            post_op.depthwise.alg
+                    ));
+                }
+            }
+        } else {
+            if (do_eltwise_) {
+                eltwise_ = new ref_eltwise_scalar_fwd_t(
+                        post_ops.entry_[eltwise_ind].eltwise);
+            }
+        }
     }
-
 }
 
 template <data_type_t src_type, data_type_t dst_type>
@@ -488,9 +513,9 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::generate()
 
 template <data_type_t src_type, data_type_t dst_type>
 void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
-    (dst_data_t *dst, const acc_data_t *acc, const char *bias,
+    (dst_data_t *dst, acc_data_t *acc, const char *bias,
         const float *scales, float nslope, float sum_scale, float signed_scale,
-        int g, size_t start, size_t end)
+        int g, size_t start, size_t end, const post_ops_t& p)
 {
     using math::get_bias;
 
@@ -514,32 +539,148 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
         ker_(&args);
     }
     else {
-        // Fallback
         const size_t first_oc = start % OC_;
         const size_t last_oc = (end - 1) % OC_;
         const size_t first_os = start / OC_;
         const size_t last_os = (end - 1) / OC_;
-        for (size_t os = first_os; os <= last_os; os++) {
-            const size_t start_oc = (os == first_os) ? first_oc : 0;
-            const size_t end_oc = (os == last_os) ? last_oc : OC_ - 1;
-            for (size_t oc = start_oc; oc <= end_oc; oc++) {
-                const size_t acc_off = os * jcp_.oc + oc;
-                const size_t dst_off = os * dst_os_stride_ + oc;
 
-                float d = (float)(acc[acc_off]);
-                if (jcp_.signed_input)
-                    d *= signed_scale;
+        // Fallback
+        if (use_fast_post_processing) {
+            for (size_t os = first_os; os <= last_os; os++) {
+                const size_t start_oc = (os == first_os) ? first_oc : 0;
+                const size_t end_oc = (os == last_os) ? last_oc : OC_ - 1;
+                for (size_t oc = start_oc; oc <= end_oc; oc++) {
+                    const size_t acc_off = os * jcp_.oc + oc;
+                    const size_t dst_off = os * dst_os_stride_ + oc;
 
-                if (do_bias_)
-                    d += get_bias(bias, g * jcp_.oc + oc,
-                        bias_data_type_);
+                    float d = (float)(acc[acc_off]);
+                    if (jcp_.signed_input)
+                        d *= signed_scale;
 
-                d *= scales[(g * jcp_.oc + oc) * scale_idx_mult_];
-                if (do_sum_)
-                    d += sum_scale * dst[dst_off];
-                if (do_eltwise_)
-                    d = eltwise_->compute_scalar(d);
-                dst[dst_off] = qz_a1b0<float, dst_data_t>()(d, rmode_);
+                    if (do_bias_)
+                        d += get_bias(bias, g * jcp_.oc + oc,
+                            bias_data_type_);
+
+                    d *= scales[(g * jcp_.oc + oc) * scale_idx_mult_];
+                    if (do_sum_)
+                        d += sum_scale * dst[dst_off];
+                    if (do_eltwise_)
+                        d = eltwise_->compute_scalar(d);
+                    dst[dst_off] = qz_a1b0<float, dst_data_t>()(d, rmode_);
+                }
+            }
+        } else {
+            float* acc_fp = reinterpret_cast<float*>(acc);
+
+            auto load = [&](int idx, size_t oc, size_t acc_off, size_t dst_off) {
+                float d;
+                if (idx == 0) {
+                    d = (float) (acc[acc_off]);
+
+                    if (jcp_.signed_input)
+                        d *= signed_scale;
+
+                    if (do_bias_)
+                        d += get_bias(bias, g * jcp_.oc + oc,
+                                      bias_data_type_);
+
+                    d *= scales[(g * jcp_.oc + oc) * scale_idx_mult_];
+                } else {
+                    d = acc_fp[acc_off];
+                }
+
+                return d;
+            };
+
+            auto store = [&](int idx, float d, size_t acc_off, size_t dst_off) {
+                if (idx == p.len_ - 1)
+                    dst[dst_off] = qz_a1b0<float, dst_data_t>()(d, rmode_);
+                else
+                    acc_fp[acc_off] = d;
+            };
+
+            int eltwise_inj_idx = 0;
+            int depthwise_inj_idx = 0;
+            for (int i = 0; i < p.len_; i++) {
+                auto &post_op = p.entry_[i];
+                if (post_op.is_eltwise()) {
+                    for (size_t os = first_os; os <= last_os; os++) {
+                        const size_t start_oc = (os == first_os) ? first_oc : 0;
+                        const size_t end_oc = (os == last_os) ? last_oc : OC_ - 1;
+                        for (size_t oc = start_oc; oc <= end_oc; oc++) {
+                            const size_t acc_off = os * jcp_.oc + oc;
+                            const size_t dst_off = os * dst_os_stride_ + oc;
+
+                            float d = load(i, oc, acc_off, dst_off);
+
+                            d = eltwise_injectors[eltwise_inj_idx]->compute_scalar(d);
+
+                            store(i, d, acc_off, dst_off);
+                        }
+                    }
+                    eltwise_inj_idx++;
+                } else if (post_op.is_depthwise()) {
+                    for (size_t os = first_os; os <= last_os; os++) {
+                        const size_t start_oc = (os == first_os) ? first_oc : 0;
+                        const size_t end_oc = (os == last_os) ? last_oc : OC_ - 1;
+                        for (size_t oc = start_oc; oc <= end_oc; oc++) {
+                            const size_t acc_off = os * jcp_.oc + oc;
+                            const size_t dst_off = os * dst_os_stride_ + oc;
+
+                            auto depthwise_weights = post_op.depthwise.weights_data;
+                            auto depthwise_bias = post_op.depthwise.biases_data;
+
+                            float d = load(i, oc, acc_off, dst_off);
+
+                            d = depthwise_injectors[depthwise_inj_idx]->compute_scalar(d, depthwise_weights + g * jcp_.oc + oc,
+                                                                                          depthwise_bias + g * jcp_.oc + oc);
+
+                            store(i, d, acc_off, dst_off);
+                        }
+                    }
+                    depthwise_inj_idx++;
+                } else if (post_op.is_quantization()) {
+                    for (size_t os = first_os; os <= last_os; os++) {
+                        const size_t start_oc = (os == first_os) ? first_oc : 0;
+                        const size_t end_oc = (os == last_os) ? last_oc : OC_ - 1;
+                        for (size_t oc = start_oc; oc <= end_oc; oc++) {
+                            const size_t acc_off = os * jcp_.oc + oc;
+                            const size_t dst_off = os * dst_os_stride_ + oc;
+
+                            auto pcl = post_op.quantization.crop_low_data;
+                            auto pch = post_op.quantization.crop_high_data;
+                            auto pisc = post_op.quantization.input_scale_data;
+                            auto pish = post_op.quantization.input_shift_data;
+                            auto posc = post_op.quantization.output_scale_data;
+                            auto posh = post_op.quantization.output_shift_data;
+
+                            float d = load(i, oc, acc_off, dst_off);
+
+                            int idx = g * jcp_.oc + oc;
+                            d = nstl::min(pch[idx], nstl::max(pcl[idx], d));
+                            d = d * pisc[idx] + pish[idx];
+                            d = roundf(d);
+                            d = d * posc[idx] + posh[idx];
+
+                            store(i, d, acc_off, dst_off);
+                        }
+                    }
+                } else if (post_op.is_sum()) {
+                    for (size_t os = first_os; os <= last_os; os++) {
+                        const size_t start_oc = (os == first_os) ? first_oc : 0;
+                        const size_t end_oc = (os == last_os) ? last_oc : OC_ - 1;
+                        for (size_t oc = start_oc; oc <= end_oc; oc++) {
+                            const size_t acc_off = os * jcp_.oc + oc;
+                            const size_t dst_off = os * dst_os_stride_ + oc;
+
+                            float d = load(i, oc, acc_off, dst_off);
+
+                            d += sum_scale * dst[dst_off];
+
+                            store(i, d, acc_off, dst_off);
+                        }
+                    }
+                }
             }
         }
     }
@@ -639,7 +780,7 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
             (*pp_ker_)(dst + (od * jcp.oh * jcp.ow + oh * jcp.ow + ow) * pp_ker_->dst_os_stride_,
                     acc, bia_base, scales, nslope, sum_scale,
                     jcp.signed_input ? 1.f / jcp.wei_adj_scale : 1.f,
-                    g, start, end);
+                    g, start, end, post_ops);
         });
 
         nd_iterator_step(n, jcp.mb, g, jcp.ngroups, od, jcp.od, ohb, nb_oh,

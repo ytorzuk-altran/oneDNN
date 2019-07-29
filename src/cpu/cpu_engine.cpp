@@ -80,8 +80,8 @@
 #include "cpu/jit_uni_planar_convolution.hpp"
 #include "cpu/jit_uni_binary_convolution.hpp"
 #include "cpu/ref_binary_convolution.hpp"
-#include "cpu/jit_uni_binarization.hpp"
-#include "cpu/ref_binarization.hpp"
+#include "cpu/jit_uni_quantization.hpp"
+#include "cpu/ref_quantization.hpp"
 #include "cpu/jit_uni_deformable_convolution.hpp"
 #include "cpu/ref_deformable_convolution.hpp"
 
@@ -384,21 +384,23 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(nhwc_pooling_bwd_t<f32>),
 #endif
 
-    INSTANCE(ref_pooling_fwd_t<f32>),
+    INSTANCE(ref_pooling_fwd_t<f32, f32>),
 #ifdef ENABLE_UNUSED_PRIM
-    INSTANCE(ref_pooling_fwd_t<bf16, f32>),
-    INSTANCE(ref_pooling_bwd_t<f32>),
-    INSTANCE(ref_pooling_bwd_t<bf16>),
+    INSTANCE(ref_pooling_fwd_t<bf16, bf16, f32>),
+    INSTANCE(ref_pooling_bwd_t<f32, f32>),
+    INSTANCE(ref_pooling_bwd_t<bf16, bf16>),
 #endif
 
     /* pool (int) */
     INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx512_core>),
     INSTANCE(jit_uni_i8i8_pooling_fwd_t<avx2>),
     INSTANCE(jit_sse42_i8i8_pooling_fwd_t),
-    INSTANCE(ref_pooling_fwd_t<s32>),
-    INSTANCE(ref_pooling_fwd_t<s16, s32>),
-    INSTANCE(ref_pooling_fwd_t<s8, s32>),
-    INSTANCE(ref_pooling_fwd_t<u8, s32>),
+    INSTANCE(ref_pooling_fwd_t<s32, s32>),
+    INSTANCE(ref_pooling_fwd_t<s16, s16, s32>),
+    INSTANCE(ref_pooling_fwd_t<s8, s8, s32>),
+    INSTANCE(ref_pooling_fwd_t<u8, u8, s32>),
+    INSTANCE(ref_pooling_fwd_t<s8, f32, f32>),
+    INSTANCE(ref_pooling_fwd_t<u8, f32, f32>),
 #ifdef ENABLE_UNUSED_PRIM
     INSTANCE(ref_pooling_bwd_t<s32>),
     INSTANCE(ref_pooling_bwd_t<s16>),
@@ -504,11 +506,16 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_binary_convolution_fwd_t<avx2>),
     INSTANCE(jit_uni_binary_convolution_fwd_t<sse42>),
     INSTANCE(ref_binary_convolution_fwd_t),
-    /* binarization */
-    INSTANCE(jit_uni_binarization_fwd_t<avx512_common>),
-    INSTANCE(jit_uni_binarization_fwd_t<avx2>),
-    INSTANCE(jit_uni_binarization_fwd_t<sse42>),
-    INSTANCE(ref_binarization_fwd_t<f32>),
+    /* quantization */
+    INSTANCE(jit_uni_quantization_fwd_t<avx512_common>),
+    INSTANCE(jit_uni_quantization_fwd_t<avx2>),
+    INSTANCE(jit_uni_quantization_fwd_t<sse42>),
+    INSTANCE(ref_quantization_fwd_t<f32, bin>),
+    INSTANCE(ref_quantization_fwd_t<f32, u8>),
+    INSTANCE(ref_quantization_fwd_t<f32, s8>),
+    INSTANCE(ref_quantization_fwd_t<f32, f32>),
+    INSTANCE(ref_quantization_fwd_t<u8, u8>),
+    INSTANCE(ref_quantization_fwd_t<u8, f32>),
     /* deformable convolution */
     INSTANCE(jit_uni_deformable_convolution_fwd_t<avx512_common>),
     INSTANCE(jit_uni_deformable_convolution_fwd_t<avx2>),

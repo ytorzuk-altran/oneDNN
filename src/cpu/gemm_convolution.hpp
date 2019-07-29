@@ -108,26 +108,22 @@ struct gemm_convolution_fwd_t: public cpu_primitive_t {
         virtual bool is_gemm_conv_format() const {
             const auto &p = this->attr()->post_ops_;
 
-            int dw_conv_idx = p.find(primitive_kind::convolution);
-            bool with_dw_conv = dw_conv_idx != -1;
-
             auto all_post_ops_supported = [&]() {
                 bool ok = true;
 
-                int end_idx = with_dw_conv ? dw_conv_idx : p.len_;
-                for (int i = 0; i < end_idx; i++) {
-                    ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise);
+                for (int i = 0; i < p.len_; i++) {
+                    ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise,
+                            primitive_kind::quantization);
                 }
                 return ok;
             };
-            auto contain = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind, 0, dw_conv_idx) != -1; };
-            auto position = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind, 0, dw_conv_idx); };
-            auto count = [&](mkldnn::impl::primitive_kind_t kind) { return p.count(kind, 0, dw_conv_idx); };
+            auto contain = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind) != -1; };
+            auto position = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind); };
+            auto count = [&](mkldnn::impl::primitive_kind_t kind) { return p.count(kind); };
 
             return all_post_ops_supported() &&
                    count(primitive_kind::sum) <= 1 &&
-                   IMPLICATION(contain(primitive_kind::sum), position(primitive_kind::sum) == 0) &&
-                   IMPLICATION(with_dw_conv, !contain(primitive_kind::sum));
+                   IMPLICATION(contain(primitive_kind::sum), position(primitive_kind::sum) == 0);
         }
     };
 

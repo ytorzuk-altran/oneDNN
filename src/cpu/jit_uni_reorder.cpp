@@ -925,6 +925,7 @@ struct jit_uni_reorder_t : public cpu_primitive_t {
                 imd->format == mkldnn_OhIw8o4i_s8s8 || imd->format == mkldnn_gOhIw8o4i_s8s8 ||
                 omd->format == mkldnn_OhIw8o4i || omd->format == mkldnn_gOhIw8o4i ||
                 omd->format == mkldnn_OhIw8o4i_s8s8 || omd->format == mkldnn_gOhIw8o4i_s8s8 ||
+                omd->format == mkldnn_OdhIw8o4i || omd->format == mkldnn_gOdhIw8o4i ||
                 omd->format == mkldnn_OdhIw8o4i_s8s8 || omd->format == mkldnn_gOdhIw8o4i_s8s8 ||
                 omd->format == mkldnn_dhwio_s8s8 || omd->format == mkldnn_dhwigo_s8s8)
                 return status::unimplemented;

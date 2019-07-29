@@ -194,6 +194,140 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::store_output(
             }
 
             depthwise_inj_idx++;
+        } else if (post_op.is_quantization()) {
+            if (jcp.ver == ver_vnni) {
+                bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
+                bool do_rounding = do_dequantization || jcp.dst_dt == mkldnn_f32 || i != p.len_ - 1;
+
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data));
+
+                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+                for (int k = 0; k < nb_oc_block; k++) {
+                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm_dst = vmm_out(j, k);
+
+                        uni_vmaxps(vmm_dst, vmm_dst, vmm_d_weights);
+                    }
+
+                    uni_vmovups(vmm_d_weights, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm_dst = vmm_out(j, k);
+
+                        uni_vminps(vmm_dst, vmm_dst, vmm_d_weights);
+                    }
+                }
+
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data));
+
+                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+                for (int k = 0; k < nb_oc_block; k++) {
+                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm_dst = vmm_out(j, k);
+
+                        uni_vmulps(vmm_dst, vmm_dst, vmm_d_weights);
+                    }
+
+                    uni_vmovups(vmm_d_weights, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm_dst = vmm_out(j, k);
+
+                        uni_vaddps(vmm_dst, vmm_dst, vmm_d_weights);
+                        if (do_rounding)
+                            uni_vroundps(vmm_dst, vmm_dst, 0);
+                    }
+                }
+
+                if (do_dequantization) {
+                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data));
+                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data));
+
+                    add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+                    add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+                    for (int k = 0; k < nb_oc_block; k++) {
+                        uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
+                        for (int j = 0; j < ur_w; j++) {
+                            Vmm vmm_dst = vmm_out(j, k);
+
+                            uni_vmulps(vmm_dst, vmm_dst, vmm_d_weights);
+                        }
+
+                        uni_vmovups(vmm_d_weights, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
+                        for (int j = 0; j < ur_w; j++) {
+                            Vmm vmm_dst = vmm_out(j, k);
+
+                            uni_vaddps(vmm_dst, vmm_dst, vmm_d_weights);
+                        }
+                    }
+                }
+            } else {
+                bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
+                bool do_rounding = do_dequantization || jcp.dst_dt == mkldnn_f32 || i != p.len_ - 1;
+
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data));
+
+                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+                for (int k = 0; k < nb_oc_block; k++) {
+                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
+                    uni_vmovups(vmm_d_bias, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
+
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm_dst = vmm_out(j, k);
+
+                        uni_vmaxps(vmm_dst, vmm_dst, vmm_d_weights);
+                        uni_vminps(vmm_dst, vmm_dst, vmm_d_bias);
+                    }
+                }
+
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data));
+
+                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+                for (int k = 0; k < nb_oc_block; k++) {
+                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
+                    uni_vmovups(vmm_d_bias, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
+
+                    for (int j = 0; j < ur_w; j++) {
+                        Vmm vmm_dst = vmm_out(j, k);
+
+                        uni_vfmadd213ps(vmm_dst, vmm_d_weights, vmm_d_bias);
+                        if (do_rounding)
+                            uni_vroundps(vmm_dst, vmm_dst, 0);
+                    }
+                }
+
+                if (do_dequantization) {
+                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data));
+                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data));
+
+                    add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+                    add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+
+                    for (int k = 0; k < nb_oc_block; k++) {
+                        uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
+                        uni_vmovups(vmm_d_bias, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
+
+                        for (int j = 0; j < ur_w; j++) {
+                            Vmm vmm_dst = vmm_out(j, k);
+
+                            uni_vfmadd213ps(vmm_dst, vmm_d_weights, vmm_d_bias);
+                        }
+                    }
+                }
+            }
         } else if (post_op.is_sum(false)) {
             for (int k = 0; k < nb_oc_block; k++) {
                 const bool mask_flag = last_oc_block_flag && k == nb_oc_block - 1;
@@ -961,7 +1095,8 @@ bool jit_avx512_core_x8s8s32x_fwd_kernel::post_ops_ok(
         bool ok = true;
 
         for (int i = 0; i < p.len_; i++) {
-            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise);
+            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise,
+                                                       primitive_kind::quantization);
         }
         return ok;
     };

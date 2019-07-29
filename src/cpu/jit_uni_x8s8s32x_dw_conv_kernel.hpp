@@ -110,6 +110,9 @@ private:
     Vmm vmm_scale = Vmm(2);
     Vmm vmm_prev_dst = Vmm(2);
 
+    Vmm vmm_d_weights = Vmm(2);
+    Vmm vmm_d_bias = Vmm(3);
+
     inline Vmm get_ker_reg(int idx) { return Vmm(idx + 0); }
     inline Vmm get_src_reg(int idx) { return Vmm(idx + 1); }
     inline Vmm get_acc_reg(int idx) { return Vmm(idx + 4); }

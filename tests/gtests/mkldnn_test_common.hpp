@@ -262,6 +262,7 @@ inline mkldnn::memory::desc create_md(mkldnn::memory::dims dims,
     case f::nwc:
     case f::oiw:
     case f::wio:
+    case f::tnc:
         ndims = 3; break;
     case f::nchw:
     case f::nhwc:

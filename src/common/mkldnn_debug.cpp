@@ -277,6 +277,7 @@ const char *mkldnn_prim_kind2str(mkldnn_primitive_kind_t v) {
     if (v == mkldnn_roi_pooling) return "roi_pooling";
     if (v == mkldnn_binary_convolution) return "binary_convolution";
     if (v == mkldnn_binarization) return "binarization";
+    if (v == mkldnn_quantization) return "quantization";
     if (v == mkldnn_deformable_convolution) return "deformable_convolution";
     assert(!"unknown prim_kind");
     return "unknown prim_kind";
@@ -320,6 +321,8 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_roi_pooling_bilinear) return "roi_pooling_bilinear";
     if (v == mkldnn_binary_convolution_direct) return "binary_convolution_direct";
     if (v == mkldnn_binarization_depthwise) return "binarization_depthwise";
+    if (v == mkldnn_quantization_quantize_dequantize) return "quantization_quantize_dequantize";
+    if (v == mkldnn_quantization_quantize) return "quantization_quantize";
     if (v == mkldnn_deformable_convolution_direct) return "deformable_convolution_direct";
     assert(!"unknown alg_kind");
     return "unknown alg_kind";

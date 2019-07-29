@@ -118,6 +118,9 @@ private:
     Vmm vmm_comp = Vmm(12);
     Vmm vmm_prev_dst = Vmm(12);
 
+    Vmm vmm_d_weights = Vmm(14);
+    Vmm vmm_d_bias = Vmm(15);
+
     inline Vmm get_src_reg(int idx) { return Vmm(idx + 9); }
     inline Vmm get_ker_reg(int idx) { return Vmm(idx + 0); }
     inline Vmm get_tmp_reg(int idx) { return Vmm(idx + 13); }
