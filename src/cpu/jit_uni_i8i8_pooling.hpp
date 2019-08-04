@@ -47,7 +47,7 @@ struct jit_uni_i8i8_pooling_fwd_t : public cpu_primitive_t {
             assert(this->engine()->kind() == engine_kind::cpu);
             bool ok = true
                 && mayiuse(isa)
-                && desc()->src_desc.ndims == 4
+                && utils::one_of(desc()->src_desc.ndims, 4, 5)
                 && set_default_params() == status::success
                 && desc()->prop_kind == prop_kind::forward_inference
                 && utils::one_of(desc()->alg_kind, alg_kind::pooling_max,
@@ -57,8 +57,8 @@ struct jit_uni_i8i8_pooling_fwd_t : public cpu_primitive_t {
                 && IMPLICATION(desc()->alg_kind == alg_kind::pooling_max, src_pd()->desc()->data_type == dst_pd()->desc()->data_type)
                 && IMPLICATION(utils::one_of(desc()->alg_kind, alg_kind::pooling_avg_include_padding, alg_kind::pooling_avg_exclude_padding),
                                utils::one_of(dst_pd()->desc()->data_type, src_pd()->desc()->data_type, data_type::f32))
-                && utils::everyone_is(memory_format::nhwc,
-                        src_pd()->desc()->format, dst_pd()->desc()->format)
+                && utils::one_of(src_pd()->desc()->format, memory_format::nhwc, memory_format::ndhwc)
+                && src_pd()->desc()->format == dst_pd()->desc()->format
                 && is_supported_post_ops();
             if (!ok) return status::unimplemented;
 

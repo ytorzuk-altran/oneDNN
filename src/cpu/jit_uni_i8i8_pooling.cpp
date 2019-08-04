@@ -49,6 +49,7 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
         const char *dst_i8;
         size_t kw_range;
         size_t kh_range;
+        size_t kd_range;
         float idivider;
     };
 
@@ -71,10 +72,13 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
 
     Reg64 ki = r10;
     Reg64 kj = r11;
+    Reg64 kk = r14;
     Reg64 reg_kw = r12;
     Reg64 reg_kh = r13;
+    Reg64 reg_kd = rbp;
     Reg64 c_iter = r14;
 
+    Reg64 aux_reg_src_d = rsi;
     Reg64 aux_reg_src_h = rax;
     Reg64 aux_reg_src_w = rbx;
 
@@ -625,15 +629,25 @@ void jit_uni_i8i8_pooling_fwd_ker_t<avx512_core>::compute_max_op(const int jj)
 template <cpu_isa_t isa>
 void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_max_step(int ur_c, int c_tail)
 {
-    Label l_kw, l_kh;
+    Label l_kw, l_kh, l_kd;
 
     int iw = jpp.iw;
+    int ih = jpp.ih;
     int c = jpp.c;
 
     for (int jj = 0; jj < ur_c; jj++)
         vmovups(vreg_dst(jj), vreg_tmp);
 
-    mov(aux_reg_src_h, reg_ptr_src_i8);
+    if (jpp.ndims == 5) {
+        push(c_iter);
+
+        mov(aux_reg_src_d, reg_ptr_src_i8);
+        xor_(kk, kk);
+        L(l_kd);
+        mov(aux_reg_src_h, aux_reg_src_d);
+    } else {
+        mov(aux_reg_src_h, reg_ptr_src_i8);
+    }
 
     xor_(kj, kj);
     L(l_kh);
@@ -657,6 +671,15 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_max_step(int ur_c, int c_tail)
         jl(l_kh, T_NEAR);
     }
 
+    if (jpp.ndims == 5) {
+        add(aux_reg_src_d, ih * iw * c * sizeof_src_dt());
+        inc(kk);
+        cmp(kk, reg_kd);
+        jl(l_kd, T_NEAR);
+
+        pop(c_iter);
+    }
+
     for (int jj = 0; jj < ur_c; jj++)
         store_dst(jj, 0, c_tail);
 }
@@ -666,9 +689,10 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_avg_step(int ur_c, int c_tail)
 {
     using namespace data_type;
 
-    Label l_kw, l_kh;
+    Label l_kw, l_kh, l_kd;
 
     int iw = jpp.iw;
+    int ih = jpp.ih;
     int c = jpp.c;
 
     const int num_ll = data_type_size(avg_proc_dt)/data_type_size(jpp.dst_dt);
@@ -684,7 +708,16 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_avg_step(int ur_c, int c_tail)
         }
     }
 
-    mov(aux_reg_src_h, reg_ptr_src_i8);
+    if (jpp.ndims == 5) {
+        push(c_iter);
+
+        mov(aux_reg_src_d, reg_ptr_src_i8);
+        xor_(kk, kk);
+        L(l_kd);
+        mov(aux_reg_src_h, aux_reg_src_d);
+    } else {
+        mov(aux_reg_src_h, reg_ptr_src_i8);
+    }
 
     xor_(kj, kj);
     L(l_kh);
@@ -713,6 +746,15 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::compute_avg_step(int ur_c, int c_tail)
         inc(kj);
         cmp(kj, reg_kh);
         jl(l_kh, T_NEAR);
+    }
+
+    if (jpp.ndims == 5) {
+        add(aux_reg_src_d, ih * iw * c * sizeof_src_dt());
+        inc(kk);
+        cmp(kk, reg_kd);
+        jl(l_kd, T_NEAR);
+
+        pop(c_iter);
     }
 
     for (int jj = 0; jj < ur_c; jj++) {
@@ -942,6 +984,7 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::generate() {
     READ_PARAM(reg_ptr_dst_i8, dst_i8);
     READ_PARAM(reg_kw, kw_range);
     READ_PARAM(reg_kh, kh_range);
+    READ_PARAM(reg_kd, kd_range);
 
 #   undef READ_PARAM
 
@@ -963,28 +1006,38 @@ status_t jit_uni_i8i8_pooling_fwd_ker_t<isa>::init_conf(jit_pool_conf_t &jpp,
     if (!mayiuse(isa))
         return status::unimplemented;
 
+    int ndims = src_d.ndims();
+    jpp.ndims = ndims;
+
     jpp.mb = src_d.dims()[0];
     jpp.c = src_d.dims()[1];
-    jpp.ih = src_d.dims()[2];
-    jpp.iw = src_d.dims()[3];
-    jpp.oh = dst_d.dims()[2];
-    jpp.ow = dst_d.dims()[3];
+    jpp.id = (ndims == 5) ? src_d.dims()[2] : 1;
+    jpp.ih = src_d.dims()[ndims - 2];
+    jpp.iw = src_d.dims()[ndims - 1];
+    jpp.od = (ndims == 5) ? dst_d.dims()[2] : 1;
+    jpp.oh = dst_d.dims()[ndims - 2];
+    jpp.ow = dst_d.dims()[ndims - 1];
 
-    jpp.stride_h = pd.strides[0];
-    jpp.stride_w = pd.strides[1];
-    jpp.kh = pd.kernel[0];
-    jpp.kw = pd.kernel[1];
+    jpp.stride_d = (ndims == 5) ? pd.strides[0] : 1;
+    jpp.stride_h = pd.strides[ndims - 4];
+    jpp.stride_w = pd.strides[ndims - 3];
+    jpp.kd = (ndims == 5) ? pd.kernel[0] : 1;
+    jpp.kh = pd.kernel[ndims - 4];
+    jpp.kw = pd.kernel[ndims - 3];
 
-    jpp.t_pad = pd.padding[0][0];
-    jpp.l_pad = pd.padding[0][1];
+    jpp.f_pad = (ndims == 5) ? pd.padding[0][0] : 0;
+    jpp.t_pad = pd.padding[0][ndims - 4];
+    jpp.l_pad = pd.padding[0][ndims - 3];
 
     int right_pad = (jpp.ow - 1) * jpp.stride_w
         + jpp.kw - 1 - (jpp.iw + jpp.l_pad - 1);
     int bottom_pad = (jpp.oh - 1) * jpp.stride_h
         + jpp.kh - 1 - (jpp.ih + jpp.t_pad - 1);
+    int back_pad = (jpp.od - 1) * jpp.stride_d
+        + jpp.kd - 1 - (jpp.id + jpp.f_pad - 1);
 
-    if (jpp.t_pad >= jpp.kh || jpp.l_pad >= jpp.kw
-         || bottom_pad >= jpp.kh || right_pad >= jpp.kw)
+    if (jpp.f_pad >= jpp.kd || jpp.t_pad >= jpp.kh || jpp.l_pad >= jpp.kw
+         || back_pad >= jpp.kd || bottom_pad >= jpp.kh || right_pad >= jpp.kw)
         return status::unimplemented;
 
     jpp.alg = pd.alg_kind;
@@ -1059,11 +1112,15 @@ void jit_uni_i8i8_pooling_fwd_t<isa>::execute_forward() const {
 
     const auto &jpp = pd()->jpp_;
 
-    parallel_nd(jpp.mb, jpp.oh, jpp.ow,
-            [&](int n, int oh, int ow) {
+    parallel_nd(jpp.mb, jpp.od, jpp.oh, jpp.ow,
+            [&](int n, int od, int oh, int ow) {
+        const int id = nstl::max(od*jpp.stride_d - jpp.f_pad, 0);
         const int ih = nstl::max(oh*jpp.stride_h - jpp.t_pad, 0);
         const int iw = nstl::max(ow*jpp.stride_w - jpp.l_pad, 0);
 
+        const int kd_start = nstl::max(0, jpp.f_pad - od * jpp.stride_d);
+        const int kd_end = nstl::min(jpp.kd,
+                jpp.id + jpp.f_pad - od * jpp.stride_d);
         const int kh_start = nstl::max(0, jpp.t_pad - oh * jpp.stride_h);
         const int kh_end = nstl::min(jpp.kh,
                 jpp.ih + jpp.t_pad - oh * jpp.stride_h);
@@ -1072,14 +1129,17 @@ void jit_uni_i8i8_pooling_fwd_t<isa>::execute_forward() const {
                 jpp.iw + jpp.l_pad - ow * jpp.stride_w);
 
         auto p = typename jit_uni_i8i8_pooling_fwd_ker_t<isa>::call_params_t();
-        p.src_i8 = &src_i8[
-            src_d.blk_off(n, 0, ih, iw) * src_d.data_type_size()];
-        p.dst_i8 = &dst_i8[
-            dst_d.blk_off(n, 0, oh, ow) * dst_d.data_type_size()];
+        size_t src_off = src_d.data_type_size() * ((jpp.ndims == 5) ? src_d.blk_off(n, 0, id, ih, iw)
+                                                                    : src_d.blk_off(n, 0, ih, iw));
+        size_t dst_off = dst_d.data_type_size() * ((jpp.ndims == 5) ? dst_d.blk_off(n, 0, od, oh, ow)
+                                                                    : dst_d.blk_off(n, 0, oh ,ow));
+        p.src_i8 = &src_i8[src_off];
+        p.dst_i8 = &dst_i8[dst_off];
         p.kw_range = (size_t)(kw_end - kw_start);
         p.kh_range = (size_t)(kh_end - kh_start);
+        p.kd_range = (size_t)(kd_end - kd_start);
         p.idivider = 1.0f / ((jpp.alg == pooling_avg_exclude_padding) ?
-            p.kh_range*p.kw_range : jpp.kw*jpp.kh);
+            p.kd_range*p.kh_range*p.kw_range : jpp.kd*jpp.kh*jpp.kw);
 
         ker_->ker_(&p);
     });
