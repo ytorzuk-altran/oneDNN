@@ -197,7 +197,7 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
     bool contain(mkldnn::impl::primitive_kind_t kind, int index) const
     { return find(kind, index, index + 1) == index; }
 
-    enum { capacity = 4 };
+    enum { capacity = 10 };
 
     int len_;
     entry_t entry_[capacity];
