@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2019 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -43,20 +43,33 @@ void ref_softmax_fwd_t<data_type>::execute_forward_dense() const {
     const memory_desc_wrapper data_d(pd()->src_pd());
     const size_t ou_stride = axis > 0
         ? data_d.blocking_desc().strides[0][axis - 1] : 1u;
-
     int outer_size_ = utils::array_product(pd()->src_pd()->desc()->dims, pd()->desc()->softmax_axis);
 
-    parallel_nd(outer_size_, [&](int ou) {
-        const data_t *src_data = src + ou * ou_stride;
-        data_t *dst_data = dst + ou * ou_stride;
-        data_t scalar = 0;
+    if (outer_size_ == 1) {
+        for (int ou = 0; ou < outer_size_; ou++) {
+            const data_t *src_data = src + ou * ou_stride;
+            data_t *dst_data = dst + ou * ou_stride;
+            data_t scalar = 0;
 
-        _max(channels_, src_data, &scalar);
-        _sub(channels_, scalar, src_data, dst_data);
-        _exp(channels_, dst_data, dst_data);
-        _sum(channels_, dst_data, &scalar);
-        _scal(channels_, data_t(1)/scalar, dst_data);
-    });
+            _max(channels_, src_data, &scalar);
+            _sub(channels_, scalar, src_data, dst_data);
+            _exp_parallel(channels_, dst_data, dst_data);
+            _sum(channels_, dst_data, &scalar);
+            _scal_parallel(channels_, data_t(1) / scalar, dst_data);
+        }
+    } else {
+        parallel_nd(outer_size_, [&](int ou) {
+            const data_t *src_data = src + ou * ou_stride;
+            data_t *dst_data = dst + ou * ou_stride;
+            data_t scalar = 0;
+
+            _max(channels_, src_data, &scalar);
+            _sub(channels_, scalar, src_data, dst_data);
+            _exp(channels_, dst_data, dst_data);
+            _sum(channels_, dst_data, &scalar);
+            _scal(channels_, data_t(1) / scalar, dst_data);
+        });
+    }
 }
 
 template <impl::data_type_t data_type>
@@ -165,13 +178,12 @@ void ref_softmax_fwd_t<data_type>::_sub(int n, data_t alpha, const data_t *x,
 }
 
 template <impl::data_type_t data_type>
-void ref_softmax_fwd_t<data_type>::_exp(int n, const data_t *a,
-        data_t *r) const {
+void ref_softmax_fwd_t<data_type>::_exp_parallel(int n, const data_t *a, data_t *r) const {
 #ifdef USE_MKL
     if (data_type == data_type::f32) {
 // TODO: mklml for win doesn't contain vmsExp symbol
 // Remove this limitation once it's updated
-#if !defined(_WIN32) && USE_VML_ERRMODE_NOERR
+#ifndef _WIN32
         vmsExp(n, a, r, VML_ERRMODE_NOERR);
 #else
         vsExp(n, a, r);
@@ -180,6 +192,12 @@ void ref_softmax_fwd_t<data_type>::_exp(int n, const data_t *a,
     }
 #endif
     parallel_nd(n, [&](int c) { r[c] = expf(a[c]); });
+}
+
+template <impl::data_type_t data_type>
+void ref_softmax_fwd_t<data_type>::_exp(int n, const data_t *a, data_t *r) const {
+    for (int c = 0; c < n; c++)
+        r[c] = expf(a[c]);
 }
 
 template <impl::data_type_t data_type>
@@ -201,7 +219,7 @@ void ref_softmax_fwd_t<data_type>::_sum(int n, const data_t *x,
 }
 
 template <impl::data_type_t data_type>
-void ref_softmax_fwd_t<data_type>::_scal(int n, data_t alpha, data_t *x) const {
+void ref_softmax_fwd_t<data_type>::_scal_parallel(int n, data_t alpha, data_t *x) const {
 #ifdef USE_CBLAS
     if (data_type == data_type::f32) {
         cblas_sscal(n, alpha, x, 1);
@@ -209,6 +227,12 @@ void ref_softmax_fwd_t<data_type>::_scal(int n, data_t alpha, data_t *x) const {
     }
 #endif
     parallel_nd(n, [&](int c) { x[c] *= alpha; });
+}
+
+template <impl::data_type_t data_type>
+void ref_softmax_fwd_t<data_type>::_scal(int n, data_t alpha, data_t *x) const {
+    for (int c = 0; c < n; c++)
+        x[c] *= alpha;
 }
 
 template struct ref_softmax_fwd_t<data_type::f32>;
