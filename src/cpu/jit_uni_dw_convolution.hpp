@@ -56,9 +56,16 @@ struct _jit_uni_dw_convolution_fwd_t : public cpu_primitive_t {
                                this->desc()->src_desc.data_type,
                                this->desc()->weights_desc.data_type)
                     && this->desc()->dst_desc.data_type == dst_type
+//<<<<<<< HEAD
                     && IMPLICATION(this->with_bias(), utils::one_of(
                         this->desc()->bias_desc.data_type, data_type::f32,
-                        data_type::bf16));
+                        data_type::bf16))
+                    && !this->attr()->has_asymmetric_quantization();
+
+//=======
+//                    && IMPLICATION(this->with_bias(), data_type::f32
+//                                       == this->desc()->bias_desc.data_type)
+//>>>>>>> 7ab353e... Introduced asymmetric quantization support for sse42/avx2 convolutions
 
             if (!ok)
                 return status::unimplemented;

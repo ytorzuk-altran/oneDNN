@@ -227,21 +227,35 @@
     EXPAND_FORMATS(src, offsets, weights, bias, dst), \
     {__VA_ARGS__} }
 #elif defined(_3D)
+#if defined(ASYMMETRIC_QUANTIZATION)
 #define PARAMS_3D(src, weights, bias, dst, ...) \
     test_convolution_params_t_3d { ENGINE, ALGORITHM, \
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
-    {__VA_ARGS__} }
+    {__VA_ARGS__}, true }
+#else
+#define PARAMS_3D(src, weights, bias, dst, ...) \
+    test_convolution_params_t_3d { ENGINE, ALGORITHM, \
+    EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
+    {__VA_ARGS__}, false }
+#endif
+#else
+#if defined(ASYMMETRIC_QUANTIZATION)
+#define PARAMS(src, weights, bias, dst, ...) \
+    test_convolution_params_t { ENGINE, ALGORITHM, \
+    EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
+    {__VA_ARGS__}, true }
 #else
 #define PARAMS(src, weights, bias, dst, ...) \
     test_convolution_params_t { ENGINE, ALGORITHM, \
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
-    {__VA_ARGS__} }
+    {__VA_ARGS__}, false }
+#endif
 #endif
 
 #define PARAMS_EXPECT_FAIL(src, weights, bias, dst, code, ...) \
     test_convolution_params_t { ENGINE, ALGORITHM, \
     EXPAND_FORMATS(src, weights, bias, dst), /* empty attributes */ {}, \
-    {__VA_ARGS__}, true, code }
+    {__VA_ARGS__}, false, true, code }
 
 #define PARAMS_ATTR(src, weights, bias, dst, round_mode, scale, policy, ...) \
     test_convolution_params_t { ENGINE, ALGORITHM, \

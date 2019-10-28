@@ -86,7 +86,7 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
                     *this->desc(), this->src_pd(), this->weights_pd(0),
-                    this->dst_pd(), mkldnn_get_max_threads());
+                    this->dst_pd(), *this->attr(), mkldnn_get_max_threads());
         }
 
         jit_gemm_conv_conf_t jcp_;
@@ -135,9 +135,6 @@ struct _gemm_x8s8s32x_convolution_fwd_t: public cpu_primitive_t {
                 }
                 return ok;
             };
-            auto contain = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind) != -1; };
-            auto position = [&](mkldnn::impl::primitive_kind_t kind) { return p.find(kind); };
-            auto count = [&](mkldnn::impl::primitive_kind_t kind) { return p.count(kind); };
 
             return all_post_ops_supported();
         }
@@ -192,7 +189,8 @@ private:
         void operator()(dst_data_t *dst, acc_data_t *acc,
             const char *bias, const float *scales,
             float nslope, float sum_scale, float signed_scale,
-            int g, size_t start, size_t end, const post_ops_t& p);
+            int g, size_t start, size_t end, const post_ops_t& p,
+            float* weights_zp, int32_t* weights_zp_compensation);
 
         size_t dst_os_stride_;
 
@@ -224,6 +222,7 @@ private:
         bool do_sum_;
         bool do_signed_scaling_;
         bool use_fast_post_processing;
+        bool with_weights_zp;
         size_t vlen_;
         jit_uni_eltwise_injector_f32<avx512_common> *eltwise_injector_;
         ref_eltwise_scalar_fwd_t *eltwise_;
@@ -283,7 +282,7 @@ struct _gemm_u8s8s32x_convolution_bwd_data_t: public cpu_primitive_t {
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
                     *this->desc(), this->diff_src_pd(), this->weights_pd(0),
-                    this->diff_dst_pd(), mkldnn_get_max_threads());
+                    this->diff_dst_pd(), *this->attr(), mkldnn_get_max_threads());
         }
 
         virtual bool support_bias() const override { return true; }

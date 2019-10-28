@@ -356,6 +356,24 @@ mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_output_scales(
         mkldnn_primitive_attr_t attr, int count, int mask,
         const float *scales);
 
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_output_compensations(
+        const_mkldnn_primitive_attr_t attr, int *count, int *mask, const int32_t **compensations);
+
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_output_compensations(
+        mkldnn_primitive_attr_t attr, int count, int mask, const int32_t *compensations);
+
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_input_zero_points(
+        const_mkldnn_primitive_attr_t attr, int *count, int *mask, const uint8_t **zero_points);
+
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_input_zero_points(
+        mkldnn_primitive_attr_t attr, int count, int mask, const uint8_t *zero_points);
+
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_get_weights_zero_points(
+        const_mkldnn_primitive_attr_t attr, int *count, int *mask, const float **zero_points);
+
+mkldnn_status_t MKLDNN_API mkldnn_primitive_attr_set_weights_zero_points(
+        mkldnn_primitive_attr_t attr, int count, int mask, const float *zero_points);
+
 /** Returns @p post_ops for given @p attr.
  *
  * @warning

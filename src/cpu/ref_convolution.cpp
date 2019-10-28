@@ -38,6 +38,12 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
     auto bias = reinterpret_cast<const char *>(this->input_memory(2));
     auto dst = reinterpret_cast<dst_data_t *>(this->memory());
 
+    const uint8_t* input_zero_points = pd()->attr()->input_zero_points_.zero_points_;
+    size_t input_zero_points_count = pd()->attr()->input_zero_points_.count_;
+
+    const float* weights_zero_points = pd()->attr()->weights_zero_points_.zero_points_;
+    size_t weights_zero_points_count = pd()->attr()->weights_zero_points_.count_;
+
     const memory_desc_wrapper src_d(pd()->src_pd());
     const memory_desc_wrapper dst_d(pd()->dst_pd());
     const memory_desc_wrapper weights_d(pd()->weights_pd(0));
@@ -72,10 +78,9 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
     const int padT = pd()->padT();
     const int padL = pd()->padL();
 
-    const bool with_relu = 0; // TODO: change if support post_ops
-    const float nslope = 0.f;
-
     const int ndims = pd()->desc()->src_desc.ndims;
+
+    const auto &p = pd()->attr()->post_ops_;
 
     auto ker = [=](int g, int mb, int oc, int od, int oh,
             int ow) {
@@ -92,23 +97,36 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
             if (ih < 0 || ih >= IH) continue;
             if (iw < 0 || iw >= IW) continue;
 
-            if (ndims == 5)
-                d += (acc_data_t)src[src_d.off(mb, g*IC + ic, id, ih, iw)]
-                    * (with_groups
-                    ? weights[weights_d.off(g, oc, ic, kd, kh, kw)]
-                    : weights[weights_d.off(oc, ic, kd, kh, kw)]);
-            else if (ndims == 4)
-                d += (acc_data_t)src[src_d.off(mb, g*IC + ic, ih, iw)]
-                    * (with_groups
-                    ? weights[weights_d.off(g, oc, ic, kh, kw)]
-                    : weights[weights_d.off(oc, ic, kh, kw)]);
-            else if (ndims == 3)
-                d += (acc_data_t)src[src_d.off(mb, g*IC + ic, iw)]
-                    * (with_groups
-                    ? weights[weights_d.off(g, oc, ic, kw)]
-                    : weights[weights_d.off(oc, ic, kw)]);
-           else
-               assert(false);
+            src_data_t s = 0;
+            wei_data_t w = 0;
+            if (ndims == 5) {
+                s = src[src_d.off(mb, g * IC + ic, id, ih, iw)];
+                w = (with_groups
+                     ? weights[weights_d.off(g, oc, ic, kd, kh, kw)]
+                     : weights[weights_d.off(oc, ic, kd, kh, kw)]);
+            } else if (ndims == 4) {
+                s = src[src_d.off(mb, g * IC + ic, ih, iw)];
+                w = (with_groups
+                     ? weights[weights_d.off(g, oc, ic, kh, kw)]
+                     : weights[weights_d.off(oc, ic, kh, kw)]);
+            } else if (ndims == 3) {
+                s = src[src_d.off(mb, g * IC + ic, iw)];
+                w = (with_groups
+                     ? weights[weights_d.off(g, oc, ic, kw)]
+                     : weights[weights_d.off(oc, ic, kw)]);
+            } else {
+                assert(false);
+            }
+
+            acc_data_t i_zp = 0;
+            if (input_zero_points)
+                i_zp = input_zero_points[input_zero_points_count == 1 ? 0 : g * IC + ic];
+
+            acc_data_t w_zp = 0;
+            if (weights_zero_points)
+                w_zp = weights_zero_points[weights_zero_points_count == 1 ? 0 : g * OC + oc];
+
+            d += ((acc_data_t)s - i_zp) * ((acc_data_t)w - w_zp);
         }
         return d;
     };
@@ -172,8 +190,19 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
                     const size_t weights_off = ic * weights_ic_stride
                             + kd * weights_kd_stride + kh * weights_kh_stride
                             + kw * weights_kw_stride;
-                    d += (acc_data_t)src_loc[src_off]
-                            * weights_loc[weights_off];
+
+                    src_data_t s = src_loc[src_off];
+                    wei_data_t w = weights_loc[weights_off];
+
+                    acc_data_t i_zp = 0;
+                    if (input_zero_points)
+                        i_zp = input_zero_points[input_zero_points_count == 1 ? 0 : g * IC + ic];
+
+                    acc_data_t w_zp = 0;
+                    if (weights_zero_points)
+                        w_zp = weights_zero_points[weights_zero_points_count == 1 ? 0 : g * OC + oc];
+
+                    d += ((acc_data_t)s - i_zp) * ((acc_data_t)w - w_zp);
                 }
             }
         } else {
@@ -197,7 +226,19 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
                 const ptrdiff_t weights_off = ic * weights_ic_stride
                         + kd * weights_kd_stride + kh * weights_kh_stride
                         + kw * weights_kw_stride;
-                d += (acc_data_t)src_loc[src_off] * weights_loc[weights_off];
+
+                src_data_t s = src_loc[src_off];
+                wei_data_t w = weights_loc[weights_off];
+
+                acc_data_t i_zp = 0;
+                if (input_zero_points)
+                    i_zp = input_zero_points[input_zero_points_count == 1 ? 0 : g * IC + ic];
+
+                acc_data_t w_zp = 0;
+                if (weights_zero_points)
+                    w_zp = weights_zero_points[weights_zero_points_count == 1 ? 0 : g * OC + oc];
+
+                d += ((acc_data_t)s - i_zp) * ((acc_data_t)w - w_zp);
             }
         }
         return d;
@@ -213,8 +254,49 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
             a_fp += ker_plain(g, mb, oc, od, oh, ow);
         else
             a_fp += ker(g, mb, oc, od, oh, ow);
-        if (with_relu && a_fp < 0)
-            a_fp = a_fp * nslope;
+
+        if (!pd()->attr()->output_scales_.has_default_values()) {
+            a_fp *= pd()->attr()->output_scales_.scales_[g * OC + oc];
+        }
+
+        int eltwise_inj_idx = 0;
+        int depthwise_inj_idx = 0;
+        for (int i = 0; i < p.len_; i++) {
+            auto &post_op = p.entry_[i];
+            if (post_op.is_eltwise()) {
+                a_fp = eltwise_injectors[eltwise_inj_idx]->compute_scalar(a_fp);
+                eltwise_inj_idx++;
+            } else if (post_op.is_depthwise()) {
+                auto depthwise_weights = post_op.depthwise.weights_data;
+                auto depthwise_bias = post_op.depthwise.biases_data;
+
+                a_fp = depthwise_injectors[depthwise_inj_idx]->compute_scalar(a_fp,
+                                                                              depthwise_weights + g * OC + oc,
+                                                                              depthwise_bias + g * OC + oc);
+                depthwise_inj_idx++;
+            } else if (post_op.is_quantization()) {
+                float cl = post_op.quantization.crop_low_data[g * OC + oc];
+                float ch = post_op.quantization.crop_high_data[g * OC + oc];
+                float isc = post_op.quantization.input_scale_data[g * OC + oc];
+                float ish = post_op.quantization.input_shift_data[g * OC + oc];
+                float osc = post_op.quantization.output_scale_data[g * OC + oc];
+                float osh = post_op.quantization.output_shift_data[g * OC + oc];
+
+                a_fp = nstl::min(ch, nstl::max(cl, a_fp));
+                a_fp = a_fp * isc + ish;
+                a_fp = roundf(a_fp);
+                a_fp = a_fp * osc + osh;
+            } else if (post_op.is_sum()) {
+                if (ndims == 5)
+                    a_fp += dst[dst_d.off(mb, g * OC + oc, od, oh, ow)];
+                else if (ndims == 4)
+                    a_fp += dst[dst_d.off(mb, g * OC + oc, oh, ow)];
+                else if (ndims == 3)
+                    a_fp += dst[dst_d.off(mb, g * OC + oc, ow)];
+                else
+                    assert(false);
+            }
+        }
 
         if (data_traits<dst_data_t>::data_type != data_type::f32) {
             switch (pd()->attr()->round_mode_) {

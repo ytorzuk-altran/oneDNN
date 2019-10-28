@@ -64,12 +64,13 @@ struct gemm_convolution_fwd_t: public cpu_primitive_t {
                 && this->src_pd_.desc()->format == src_format()
                 && this->dst_pd_.desc()->format == src_format()
                 && this->weights_pd_.desc()->format == wei_format()
-                && this->is_gemm_conv_format();
+                && this->is_gemm_conv_format()
+                && !this->attr()->has_asymmetric_quantization();
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
-                    *desc(), src_pd(), weights_pd(0), dst_pd(),
+                    *desc(), src_pd(), weights_pd(0), dst_pd(), *attr(),
                     mkldnn_get_max_threads());
         }
 
@@ -223,7 +224,7 @@ struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
 
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
-                    *desc(), diff_src_pd(), weights_pd(0), diff_dst_pd(),
+                    *desc(), diff_src_pd(), weights_pd(0), diff_dst_pd(), *attr(),
                     mkldnn_get_max_threads());
         }
 
@@ -317,7 +318,7 @@ struct gemm_convolution_bwd_weights_t: public cpu_primitive_t {
 
             auto scratchpad = scratchpad_registry().registrar();
             return jit_gemm_convolution_utils::init_conf(jcp_, scratchpad,
-                    *desc(), src_pd(), diff_weights_pd(0), diff_dst_pd(),
+                    *desc(), src_pd(), diff_weights_pd(0), diff_dst_pd(), *attr(),
                     mkldnn_get_max_threads());
         }
 

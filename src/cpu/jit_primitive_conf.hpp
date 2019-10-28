@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 
-#include "common/primitive_attr.hpp"
+#include "primitive_attr.hpp"
 #include "cpu_isa_traits.hpp"
 
 namespace mkldnn {
@@ -146,6 +146,11 @@ struct jit_conv_conf_t {
     int oh_blk_size;
     // s8s8 convolution
     bool signed_input;
+    int with_scales;
+    bool with_input_zp;
+    bool with_weights_zp;
+    bool is_per_channel_input_zp;
+    bool is_per_channel_weights_zp;
     float wei_adj_scale;
 
     cpu_isa_t isa;
@@ -410,6 +415,8 @@ struct jit_conv_call_s {
     size_t ch_work;
     size_t t_overflow;
     size_t b_overflow;
+    size_t l_overflow;
+    size_t r_overflow;
     size_t front_overflow;
     size_t back_overflow;
     size_t oh_blocks;
@@ -421,6 +428,9 @@ struct jit_conv_call_s {
 
     size_t oc_off;
     size_t oc_off_prf;
+    const void *input_zp;
+    const void *weights_zp;
+    const void *weights_zp_compensation;
 };
 
 struct jit_deconv_call_s {
@@ -527,6 +537,11 @@ struct jit_1x1_conv_conf_t {
 
     cpu_isa_t isa;
 
+    bool with_input_zp;
+    bool with_weights_zp;
+    bool is_per_channel_input_zp;
+    bool is_per_channel_weights_zp;
+
     /* u8s8s32x */
     int ic_dim, nb_ic, nb_ic_blocking, nb_ic_blocking_max;
     int oc_dim, nb_oc, nb_oc_blocking, nb_oc_blocking_max;
@@ -565,6 +580,9 @@ struct jit_gemm_conv_conf_t {
     bool outer_threading;
     conv_gemm_loop_order_t loop_order;
     int nthr_oc;
+
+    bool with_input_zp;
+    bool with_weights_zp;
 };
 
 struct jit_1x1_conv_call_s {

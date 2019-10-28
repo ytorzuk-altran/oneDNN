@@ -653,6 +653,7 @@ struct test_convolution_params_t {
     test_convolution_formats_t formats;
     test_convolution_attr_t attr;
     test_convolution_sizes_t sizes;
+    bool with_zero_points;
     bool expect_to_fail;
     mkldnn_status_t expected_status;
 };
@@ -663,6 +664,7 @@ struct test_convolution_params_t_3d {
     test_convolution_formats_t formats;
     test_convolution_attr_t attr;
     test_convolution_sizes_t_3d sizes;
+    bool with_zero_points;
     bool expect_to_fail;
     mkldnn_status_t expected_status;
 };

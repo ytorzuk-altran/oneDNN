@@ -21,6 +21,7 @@
 #include "mkldnn_thread.hpp"
 #include "type_helpers.hpp"
 #include <cstring>
+#include <common/memory_tracking.hpp>
 
 namespace mkldnn {
 namespace impl {
@@ -47,7 +48,8 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
 
     size_t offset = (size_t)jcp.ngroups * rnd_up(jcp.oc, jcp.oc_block) * rnd_up(jcp.ic, jcp.ic_block) * jcp.kd * jcp.kh * jcp.kw;
     auto w = const_cast<wei_data_t *>(weights);
-    int32_t* compensation = (jcp.signed_input) ? reinterpret_cast<int32_t *>(&w[offset]) : 0;
+    int32_t* compensation = (jcp.signed_input) ? reinterpret_cast<int32_t *>(&w[offset]) :
+                            (jcp.with_input_zp) ? pd()->attr()->output_compensations_.shifts_ : 0;
 
     if (bias && jcp.oc != jcp.oc_padded) {
         auto padded_bias = this->scratchpad().template get<bia_data_t>(key_conv_padded_bias);
@@ -68,7 +70,10 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
                 local_scales[c] = oscales[c] * factor;
         }
         oscales = local_scales;
+    }
 
+    const uint8_t* input_zp = pd()->attr()->input_zero_points_.zero_points_;
+    if (jcp.signed_input || jcp.with_input_zp) {
         if (jcp.oc != jcp.oc_padded) {
             auto padded_compensation = this->scratchpad().template get<int32_t>(key_conv_padded_compensation);
             utils::array_copy(padded_compensation, compensation, jcp.oc);
@@ -87,7 +92,42 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
         size_t n{0}, g{0}, ocbb{0}, oh{0}, od{0};
         nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups, ocbb, ocb_work,
                          od, jcp.od, oh, jcp.oh);
+
+        auto weights_zp_compensation = jcp.with_weights_zp ? this->scratchpad().template get<int32_t>(key_weights_zp_compensation) + ithr * jcp.od * jcp.oh * jcp.ow
+                                                           : nullptr;
+
+        size_t n_prev = n;
+        size_t g_prev = g;
+        size_t ocbb_start = ocbb;
+        size_t od_start = od;
+        size_t oh_start = oh;
+        if (jcp.with_weights_zp) {
+            utils::array_set(weights_zp_compensation, 0, jcp.od * jcp.oh * jcp.ow);
+        }
+
         for (size_t iwork = start; iwork < end; ++iwork) {
+            if (jcp.with_weights_zp) {
+                if (n != n_prev) {
+                    n_prev = n;
+                    ocbb_start = ocbb;
+                    od_start = od;
+                    oh_start = oh;
+                    if (jcp.with_weights_zp) {
+                        utils::array_set(weights_zp_compensation, 0, jcp.od * jcp.oh * jcp.ow);
+                    }
+                }
+
+                if (g != g_prev) {
+                    g_prev = g;
+                    ocbb_start = ocbb;
+                    od_start = od;
+                    oh_start = oh;
+                    if (jcp.with_weights_zp) {
+                        utils::array_set(weights_zp_compensation, 0, jcp.od * jcp.oh * jcp.ow);
+                    }
+                }
+            }
+
             int ocb = ocbb * jcp.nb_oc_blocking;
             int ocb_num = jcp.nb_oc_blocking;
 
@@ -117,8 +157,8 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
                                               : dst_d.blk_off(n, _oc*jcp.oc_block, oh, 0);
             par_conv.dst = &dst[dst_off];
 
-            const int wh = (!jcp.signed_input) ? i_t_overflow : 0;
-            const int wd = (!jcp.signed_input) ? i_front_overflow : 0;
+            const int wh = (!jcp.signed_input && !jcp.with_input_zp) ? i_t_overflow : 0;
+            const int wd = (!jcp.signed_input && !jcp.with_input_zp) ? i_front_overflow : 0;
 
             size_t wei_off = (jcp.ndims == 5) ? pd()->with_groups() ? weights_d.blk_off(g, ocb, 0, wd, wh, 0)
                                                                     : weights_d.blk_off(ocb, 0, wd, wh, 0)
@@ -140,13 +180,21 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
 
             par_conv.scales = &oscales[jcp.is_oc_scale * _oc * jcp.oc_block];
 
-            par_conv.compensation = (jcp.signed_input) ? compensation + _oc * jcp.oc_block : 0;
+            par_conv.compensation = (jcp.signed_input || jcp.with_input_zp) ? compensation + _oc * jcp.oc_block : 0;
             par_conv.t_overflow = i_t_overflow;
             par_conv.b_overflow = i_b_overflow;
             par_conv.front_overflow = i_front_overflow;
             par_conv.back_overflow = i_back_overflow;
 
             par_conv.oc_off = _oc * jcp.oc_block * sizeof(float);
+            if (jcp.with_input_zp) {
+                par_conv.input_zp = input_zp + _ic * jcp.ic_block;
+            }
+            if (jcp.with_weights_zp) {
+                if (ocbb == ocbb_start || ((ocbb == ocbb_start + 1) && (oh < oh_start || od < od_start)))
+                    par_conv.flags |= FLAG_OC_FIRST;
+                par_conv.weights_zp_compensation = weights_zp_compensation + od * jcp.oh * jcp.ow + oh * jcp.ow;
+            }
 
             kernel_->jit_ker(&par_conv);
             nd_iterator_step(n, jcp.mb, g, jcp.ngroups, ocbb, ocb_work, od, jcp.od, oh, jcp.oh);
@@ -173,7 +221,8 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
 
     size_t offset = (size_t)jcp.ngroups * rnd_up(jcp.oc, jcp.oc_block) * rnd_up(jcp.ic, jcp.ic_block) * jcp.kh * jcp.kw;
     auto w = const_cast<wei_data_t *>(weights);
-    int32_t* compensation = (jcp.signed_input) ? reinterpret_cast<int32_t *>(&w[offset]) : 0;
+    int32_t* compensation = (jcp.signed_input) ? reinterpret_cast<int32_t *>(&w[offset]) :
+                            (jcp.with_input_zp) ? pd()->attr()->output_compensations_.shifts_ : 0;
 
     auto dw_bias = jcp_dw.conv_biases;
     auto dw_weights = reinterpret_cast<const wei_data_t *>(jcp_dw.conv_weights);
@@ -202,7 +251,10 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
                 local_scales[c] = oscales[c] * factor;
         }
         oscales = local_scales;
+    }
 
+    const uint8_t* input_zp = pd()->attr()->input_zero_points_.zero_points_;
+    if (jcp.signed_input || jcp.with_input_zp) {
         if (jcp.oc != jcp.oc_padded) {
             auto padded_compensation = this->scratchpad().template get<int32_t>(key_conv_padded_compensation);
             utils::array_copy(padded_compensation, compensation, jcp.oc);
@@ -238,7 +290,7 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
 
                     par_conv.dst = &ws_p[(((oh + h) + 1) % jcp_dw.kh) * jcp.ow * jcp.oc_block];
 
-                    const int wh = (!jcp.signed_input) ? i_t_overflow : 0;
+                    const int wh = (!jcp.signed_input && !jcp.with_input_zp) ? i_t_overflow : 0;
                     par_conv.filt = &weights[pd()->with_groups()
                                         ? weights_d.blk_off(g, ocb, 0, wh, 0)
                                         : weights_d.blk_off(ocb, 0, wh, 0)];
@@ -254,7 +306,10 @@ void _jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type, dst_type>::execute_forwa
                     par_conv.kh_padding = nstl::max(0, kh_padding);
 
                     par_conv.scales = &oscales[jcp.is_oc_scale * _oc * jcp.oc_block];
-                    par_conv.compensation = (jcp.signed_input) ? compensation + _oc * jcp.oc_block : 0;
+                    par_conv.compensation = (jcp.signed_input || jcp.with_input_zp) ? compensation + _oc * jcp.oc_block : 0;
+                    if (jcp.with_input_zp) {
+                        par_conv.input_zp = input_zp + _ic * jcp.ic_block;
+                    }
                     par_conv.t_overflow = i_t_overflow;
                     par_conv.b_overflow = i_b_overflow;
 

@@ -1390,7 +1390,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
-typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o4i || fmt_o == gOhIw8o4i)>::type>
+typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o4i || fmt_o == gOhIw8o4i || fmt_o == OdhIw8o4i || fmt_o == gOdhIw8o4i)>::type>
 {
     PLAIN_TO_BLOCKED_IS_APPLICABLE();
 
@@ -1468,8 +1468,16 @@ typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o4i || fmt_o == gOhIw8o
             [&](int g, int nb_oc, int nb_ic, int d, int h, int w) {
             int i_off = wei_blk_off_like_gwei3D<fmt_o>(input_d,
                                                        g, i_mult_o * nb_oc, i_mult_i * nb_ic, d, h, w);
-            int o_off = wei_blk_off_like_gwei3D<fmt_o>(output_d,
-                                                       g, nb_oc, nb_ic, d, h, w);
+//            int o_off = wei_blk_off_like_gwei3D<fmt_o>(output_d,
+//                                                       g, nb_oc, nb_ic, d, h, w);
+
+            int o_off = g * NB_OC * D * H * NB_IC * W * blksize_o * blksize_i +
+                            nb_oc * D * H * NB_IC * W * blksize_o * blksize_i +
+                                    d * H * NB_IC * W * blksize_o * blksize_i +
+                                        h * NB_IC * W * blksize_o * blksize_i +
+                                            nb_ic * W * blksize_o * blksize_i +
+                                                    w * blksize_o * blksize_i;
+
             auto i = &input[i_off];
             auto o = &output[o_off];
             const int oc_block = nstl::min(blksize_o, OC - nb_oc * blksize_o);
@@ -1556,7 +1564,7 @@ template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 typename utils::enable_if<fmt_i == any
 && block_format_traits<format_traits<fmt_o>::blk_fmt>::blk_ndims == 2
-&& fmt_o != OhIw8o4i && fmt_o != gOhIw8o4i && fmt_o != OhIw8o32i && fmt_o != OhIw16o32i>::type>
+&& fmt_o != OhIw8o4i && fmt_o != gOhIw8o4i && fmt_o != OdhIw8o4i && fmt_o != gOdhIw8o4i && fmt_o != OhIw8o32i && fmt_o != OhIw16o32i>::type>
 {
     PLAIN_TO_BLOCKED_IS_APPLICABLE();
 

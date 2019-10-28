@@ -56,6 +56,7 @@ struct jit_uni_x8s8s32x_dw_conv_fwd_kernel: public jit_generator {
             const memory_desc_wrapper &dst_d,
             const memory_desc_wrapper &bias_pd,
             const primitive_attr_t &attr);
+    static void init_scratchpad(memory_tracking::registrar_t &scratchpad, const jit_conv_conf_t &jcp, const primitive_attr_t &attr);
 
     jit_conv_conf_t jcp;
     const primitive_attr_t &attr_;
@@ -80,6 +81,7 @@ private:
     reg64_t reg_ch_work = r13;
     reg64_t reg_bias_base = abi_not_param1;
     reg64_t reg_scales_base = rdx;
+    reg64_t reg_compensation = r13;
 
     reg64_t reg_input = r8;
     reg64_t reg_kernel = r12;
@@ -91,7 +93,6 @@ private:
 
     reg64_t reg_kh = rax;
     reg64_t reg_kw = rbx;
-    reg64_t iter_kh = rdx;
     reg64_t iter_kw = rsi;
     reg64_t reg_ur_w = rbp;
 
@@ -105,13 +106,17 @@ private:
     reg64_t reg_d_weights = aux1_reg_kernel;
     reg64_t reg_d_bias = aux_reg_input;
 
-    Vmm vmm_zero = Vmm(0);
+    reg64_t reg_overflow = rdx;
+
     Vmm vmm_bias = Vmm(3);
     Vmm vmm_scale = Vmm(2);
+    Vmm vmm_comp = Vmm(0);
     Vmm vmm_prev_dst = Vmm(2);
 
     Vmm vmm_d_weights = Vmm(2);
     Vmm vmm_d_bias = Vmm(3);
+
+    Vmm vmm_weights_zp = Vmm(2);
 
     inline Vmm get_ker_reg(int idx) { return Vmm(idx + 0); }
     inline Vmm get_src_reg(int idx) { return Vmm(idx + 1); }
@@ -121,7 +126,7 @@ private:
     inline void store_dst(const Xbyak::Address &op, Vmm vmm_dst, bool scalar_store);
 
     inline void load_src(int ur_ch_blocks, int ch_step, int ur_w);
-    inline void apply_filter(int ur_ch_blocks, int ch_step, int ur_w);
+    inline void apply_filter(int ur_ch_blocks, int ch_step);
     inline void apply_filter_unrolled(int ur_ch_blocks, int ch_step, int ur_w);
     inline void store_dst(int ur_ch_blocks, int ch_step, int ur_w);
     inline void loop_body(int ur_ch_blocks, int ch_step);

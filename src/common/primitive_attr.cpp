@@ -49,6 +49,49 @@ status_t scales_t::set(int count, int mask, const float *scales) {
     return status::success;
 }
 
+status_t shifts_t::set(int count, int mask, const int32_t *shifts) {
+    cleanup();
+
+    count_ = count;
+    mask_ = mask;
+
+    if (count_ == 1) {
+        shifts_ = shifts_buf_;
+        utils::array_set(shifts_, shifts[0], shifts_buf_size);
+    } else {
+        shifts_ = (int32_t *)impl::malloc(count_ * sizeof(*shifts_), 64);
+        if (shifts_ == nullptr)
+            return status::out_of_memory;
+
+        for (int c = 0; c < count_; ++c)
+            shifts_[c] = shifts[c];
+    }
+
+    return status::success;
+}
+
+template <typename T>
+status_t zero_points_t<T>::set(int count, int mask, const T *zero_points) {
+    cleanup();
+
+    count_ = count;
+    mask_ = mask;
+
+    if (count_ == 1) {
+        zero_points_ = zero_points_buf_;
+        utils::array_set(zero_points_, zero_points[0], zero_points_buf_size);
+    } else {
+        zero_points_ = (T *)impl::malloc(count_ * sizeof(*zero_points_), 64);
+        if (zero_points_ == nullptr)
+            return status::out_of_memory;
+
+        for (int c = 0; c < count_; ++c)
+            zero_points_[c] = zero_points[c];
+    }
+
+    return status::success;
+}
+
 }
 }
 
@@ -253,6 +296,69 @@ status_t mkldnn_primitive_attr_set_output_scales(primitive_attr_t *attr,
         return invalid_arguments;
 
     return attr->output_scales_.set(count, mask, scales);
+}
+
+status_t mkldnn_primitive_attr_get_output_compensations(const primitive_attr_t *attr,
+        int *count, int *mask, const int32_t **compensations) {
+    if (any_null(attr, count, mask, compensations))
+        return invalid_arguments;
+
+    *count = attr->output_compensations_.count_;
+    *mask = attr->output_compensations_.mask_;
+    *compensations = attr->output_compensations_.shifts_;
+
+    return success;
+}
+
+status_t mkldnn_primitive_attr_set_output_compensations(primitive_attr_t *attr,
+        int count, int mask, const int32_t *compensations) {
+    bool ok = !any_null(attr, compensations) && count > 0 && mask >= 0;
+    if (!ok)
+        return invalid_arguments;
+
+    return attr->output_compensations_.set(count, mask, compensations);
+}
+
+status_t mkldnn_primitive_attr_get_input_zero_points(const primitive_attr_t *attr,
+        int *count, int *mask, const uint8_t **zero_points) {
+    if (any_null(attr, count, mask, zero_points))
+        return invalid_arguments;
+
+    *count = attr->input_zero_points_.count_;
+    *mask = attr->input_zero_points_.mask_;
+    *zero_points = attr->input_zero_points_.zero_points_;
+
+    return success;
+}
+
+status_t mkldnn_primitive_attr_set_input_zero_points(primitive_attr_t *attr,
+        int count, int mask, const uint8_t *zero_points) {
+    bool ok = !any_null(attr, zero_points) && count > 0 && mask >= 0;
+    if (!ok)
+        return invalid_arguments;
+
+    return attr->input_zero_points_.set(count, mask, zero_points);
+}
+
+status_t mkldnn_primitive_attr_get_weights_zero_points(const primitive_attr_t *attr,
+        int *count, int *mask, const float **zero_points) {
+    if (any_null(attr, count, mask, zero_points))
+        return invalid_arguments;
+
+    *count = attr->weights_zero_points_.count_;
+    *mask = attr->weights_zero_points_.mask_;
+    *zero_points = attr->weights_zero_points_.zero_points_;
+
+    return success;
+}
+
+status_t mkldnn_primitive_attr_set_weights_zero_points(primitive_attr_t *attr,
+        int count, int mask, const float *zero_points) {
+    bool ok = !any_null(attr, zero_points) && count > 0 && mask >= 0;
+    if (!ok)
+        return invalid_arguments;
+
+    return attr->weights_zero_points_.set(count, mask, zero_points);
 }
 
 status_t mkldnn_primitive_attr_get_post_ops(const primitive_attr_t *attr,
@@ -486,3 +592,6 @@ status_t mkldnn_post_ops_get_params_quantization(const post_ops_t *post_ops, int
 
     return success;
 }
+
+template struct mkldnn::impl::zero_points_t<uint8_t>;
+template struct mkldnn::impl::zero_points_t<float>;

@@ -109,6 +109,12 @@ private:
     reg64_t reg_d_weights = aux_reg_kernel;
     reg64_t reg_d_bias = aux_reg_input;
 
+    reg64_t reg_input_zp = r14;
+    reg64_t reg_weights_zp_compensation = aux_reg_input;
+    reg64_t reg_weights_zp_compensation_base = r14;
+    reg64_t reg_table = aux_reg_kernel;
+    reg64_t reg_ci_flag = r14;
+
     Vmm vmm_one = Vmm(15);
     Vmm vmm_bias_alpha = Vmm(13);
     Vmm vmm_shift = Vmm(14);
@@ -130,12 +136,12 @@ private:
     inline void store_dst(const Xbyak::Address &op, Vmm vmm_dst, bool scalar_store, bool need_pack = true);
 
     inline void apply_filter(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step,
-                             int tail_size, bool h_padded);
-    inline void oh_step_unroll_kw(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step, bool h_padded);
-    inline void kh_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step);
-    inline void kd_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step);
-    inline void width_blk_step(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step);
-    inline void solve_common(int oc_blocks, int oc_step);
+                             int ic_tail_size, bool h_padded, bool first_oc_block);
+    inline void oh_step_unroll_kw(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step, bool h_padded, bool first_oc_block);
+    inline void kh_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step, bool first_oc_block);
+    inline void kd_loop(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step, bool first_oc_block);
+    inline void width_blk_step(int ur_w, int pad_l, int pad_r, int oc_blocks, int oc_step, bool first_oc_block);
+    inline void solve_common(int oc_blocks, int oc_step, bool first_oc_block);
 
     void generate();
 

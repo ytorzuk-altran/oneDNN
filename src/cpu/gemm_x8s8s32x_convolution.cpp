@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <common/memory_tracking.hpp>
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -31,6 +32,7 @@ namespace impl {
 namespace cpu {
 
 using namespace mkldnn::impl::utils;
+using namespace mkldnn::impl::utils;
 using namespace mkldnn::impl::math;
 using namespace mkldnn::impl::memory_tracking::names;
 
@@ -42,9 +44,16 @@ execute_forward() const {
     auto bia_base = reinterpret_cast<const char *>(this->input_memory(2));
     auto dst_base = reinterpret_cast<dst_data_t *>(this->memory());
 
-    auto scratchpad = this->scratchpad();
+    const memory_tracking::grantor_t scratchpad = this->scratchpad();
 
     const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+
+    if (jcp.with_input_zp) {
+        auto output_compensation = scratchpad.get<int32_t>(key_conv_padded_compensation);
+        for (int i = 0; i < this->pd()->attr()->output_compensations_.count_; i++) {
+            output_compensation[i] = (int32_t)this->pd()->attr()->output_compensations_.shifts_[i];
+        }
+    }
 
     assert(IMPLICATION(
             jcp.id != 1, jcp.oh_block == jcp.oh && jcp.ow_block == jcp.ow));
@@ -73,9 +82,10 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     , do_bias_(false)
     , do_eltwise_(false)
     , do_sum_(false)
+    , use_fast_post_processing(false)
+    , with_weights_zp(false)
     , eltwise_injector_(nullptr)
     , eltwise_(nullptr)
-    , use_fast_post_processing(false)
 {
     using namespace types;
 
@@ -111,8 +121,10 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
 
     const int eltwise_ind = post_ops.find(primitive_kind::eltwise);
     do_eltwise_ = eltwise_ind != -1;
-
     auto is_eltwise = [&](int idx) { return post_ops.entry_[idx].is_eltwise(); };
+
+    with_weights_zp = !pd->attr()->weights_zero_points_.has_default_values();
+
     switch (post_ops.len_) {
         case 0: use_fast_post_processing = true; break;
         case 1: use_fast_post_processing = is_eltwise(0) || post_ops.contain(mkldnn::impl::primitive_kind::sum, 0); break;
@@ -120,12 +132,13 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
         default: use_fast_post_processing = false; break;
     };
 
-    if (mayiuse(avx512_core) && use_fast_post_processing) {
+    if (mayiuse(avx512_core) && use_fast_post_processing && !with_weights_zp) {
         if (do_eltwise_) {
             eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_common>(
                     this, post_ops.entry_[eltwise_ind].eltwise, true,
                     Xbyak::util::rax, Xbyak::Opmask(2));
         }
+
         generate();
     } else {
         // use fallback code for unsupported cases
@@ -515,7 +528,7 @@ template <data_type_t src_type, data_type_t dst_type>
 void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
     (dst_data_t *dst, acc_data_t *acc, const char *bias,
         const float *scales, float nslope, float sum_scale, float signed_scale,
-        int g, size_t start, size_t end, const post_ops_t& p)
+        int g, size_t start, size_t end, const post_ops_t& p, float* weights_zp, int32_t* weights_zp_compensation)
 {
     using math::get_bias;
 
@@ -557,6 +570,9 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
                     if (jcp_.signed_input)
                         d *= signed_scale;
 
+                    if (with_weights_zp)
+                        d -= weights_zp[g * jcp_.oc + oc] * (float)weights_zp_compensation[os];
+
                     if (do_bias_)
                         d += get_bias(bias, g * jcp_.oc + oc,
                             bias_data_type_);
@@ -572,13 +588,16 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
         } else {
             float* acc_fp = reinterpret_cast<float*>(acc);
 
-            auto load = [&](int idx, size_t oc, size_t acc_off, size_t dst_off) {
+            auto load = [&](int idx, size_t oc, size_t os, size_t acc_off, size_t dst_off) {
                 float d;
                 if (idx == 0) {
                     d = (float) (acc[acc_off]);
 
                     if (jcp_.signed_input)
                         d *= signed_scale;
+
+                    if (with_weights_zp)
+                        d -= weights_zp[g * jcp_.oc + oc] * (float)weights_zp_compensation[os];
 
                     if (do_bias_)
                         d += get_bias(bias, g * jcp_.oc + oc,
@@ -611,7 +630,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
                             const size_t acc_off = os * jcp_.oc + oc;
                             const size_t dst_off = os * dst_os_stride_ + oc;
 
-                            float d = load(i, oc, acc_off, dst_off);
+                            float d = load(i, oc, os, acc_off, dst_off);
 
                             d = eltwise_injectors[eltwise_inj_idx]->compute_scalar(d);
 
@@ -630,7 +649,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
                             auto depthwise_weights = post_op.depthwise.weights_data;
                             auto depthwise_bias = post_op.depthwise.biases_data;
 
-                            float d = load(i, oc, acc_off, dst_off);
+                            float d = load(i, oc, os, acc_off, dst_off);
 
                             d = depthwise_injectors[depthwise_inj_idx]->compute_scalar(d, depthwise_weights + g * jcp_.oc + oc,
                                                                                           depthwise_bias + g * jcp_.oc + oc);
@@ -654,7 +673,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
                             auto posc = post_op.quantization.output_scale_data;
                             auto posh = post_op.quantization.output_shift_data;
 
-                            float d = load(i, oc, acc_off, dst_off);
+                            float d = load(i, oc, os, acc_off, dst_off);
 
                             int idx = g * jcp_.oc + oc;
                             d = nstl::min(pch[idx], nstl::max(pcl[idx], d));
@@ -673,7 +692,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
                             const size_t acc_off = os * jcp_.oc + oc;
                             const size_t dst_off = os * dst_os_stride_ + oc;
 
-                            float d = load(i, oc, acc_off, dst_off);
+                            float d = load(i, oc, os, acc_off, dst_off);
 
                             d += sum_scale * dst[dst_off];
 
@@ -706,6 +725,23 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
 
     const float *scales = pd()->attr()->output_scales_.scales_;
 
+    const uint8_t *input_zp_base = nullptr;
+    if (jcp.with_input_zp) {
+        input_zp_base = pd()->attr()->input_zero_points_.zero_points_;
+    }
+
+    float *weights_zp = nullptr;
+    int32_t *weights_zp_compensation = nullptr;
+    if (jcp.with_weights_zp) {
+        weights_zp = pd()->attr()->weights_zero_points_.zero_points_;
+        weights_zp_compensation = scratchpad.get<int32_t>(key_weights_zp_compensation) + ithr * jcp.oh * jcp.ow;
+    }
+
+    int32_t *output_compensation = nullptr;
+    if (jcp.with_input_zp) {
+        output_compensation = scratchpad.get<int32_t>(key_conv_padded_compensation);
+    }
+
     const auto &post_ops = pd()->attr()->post_ops_;
     const bool do_sum = post_ops.contain(primitive_kind::sum, 0);
     const float sum_scale = do_sum ? post_ops.entry_[0].sum.scale : 0;
@@ -727,7 +763,8 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
         + (ptrdiff_t)ithr * jcp.oh_block * jcp.ow_block * jcp.oc;
 
     const ptrdiff_t offset = (ptrdiff_t)jcp.ngroups * jcp.ks * jcp.ic * jcp.oc;
-    const int32_t *_wei_comp = (const int32_t *)(wei_base + offset);
+    const int32_t *_wei_comp = (jcp.with_input_zp) ? output_compensation
+                                                   : (const int32_t *)(wei_base + offset);
 
     int g{ 0 }, n{ 0 }, ohb{ 0 }, owb{ 0 }, od{ 0 };
     size_t start = 0, end = 0;
@@ -751,12 +788,17 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
         const int h_step = nstl::min(jcp.oh_block, jcp.oh - oh);
         const int w_step = nstl::min(jcp.ow_block, jcp.ow - ow);
 
-        if (jcp.im2col_sz) {
+
+        const uint8_t *__restrict input_zp = nullptr;
+        if (jcp.with_input_zp)
+            input_zp = input_zp_base + g * jcp.ic;
+
+        if (jcp.im2col_sz || jcp.with_weights_zp) {
             if (jcp.id == 1)
                 jit_gemm_convolution_utils::im2col_u8<src_data_t>(
-                        jcp, src, imtr, col, oh, h_step, ow, w_step);
+                        jcp, src, imtr, col, oh, h_step, ow, w_step, input_zp, weights_zp_compensation);
             else
-                jit_gemm_convolution_utils::im2col_u8_3d<src_data_t>(jcp, src, col, od);
+                jit_gemm_convolution_utils::im2col_u8_3d<src_data_t>(jcp, src, col, od, input_zp, weights_zp_compensation);
         }
 
         const int M = jcp.oc;
@@ -768,10 +810,10 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
         const int8_t off_a = 0, off_b = 0;
         const int32_t off_c = 0;
         const float onef = 1.0, zerof = 0.0;
-        mkldnn_gemm_s8u8s32("N", BT, jcp.signed_input ? "C" : "F",
+        mkldnn_gemm_s8u8s32("N", BT, (jcp.signed_input || jcp.with_input_zp) ? "C" : "F",
             &M, &N, &K, &onef, wei, &LDA, &off_a,
             jcp.im2col_sz ? col : (uint8_t *)src + od * jcp.ngroups * jcp.ic * N, &LDB, &off_b,
-            &zerof, acc, &M, jcp.signed_input ? wei_comp : &off_c);
+            &zerof, acc, &M, (jcp.signed_input || jcp.with_input_zp) ? wei_comp : &off_c);
 
 
         parallel(0, (size_t)jcp.os * jcp.oc, [&](int ithr, int nthr) {
@@ -780,7 +822,7 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
             (*pp_ker_)(dst + (od * jcp.oh * jcp.ow + oh * jcp.ow + ow) * pp_ker_->dst_os_stride_,
                     acc, bia_base, scales, nslope, sum_scale,
                     jcp.signed_input ? 1.f / jcp.wei_adj_scale : 1.f,
-                    g, start, end, post_ops);
+                    g, start, end, post_ops, weights_zp, weights_zp_compensation);
         });
 
         nd_iterator_step(n, jcp.mb, g, jcp.ngroups, od, jcp.od, ohb, nb_oh,

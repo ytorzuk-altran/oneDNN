@@ -197,14 +197,14 @@ void jit_avx512_core_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             auto zmm_bias = zmm_tmp;
             auto zmm_comp = zmm_bcast;
             if (jcp.with_bias) {
-                if (jcp.signed_input)
+                if (jcp.signed_input || jcp.with_input_zp)
                     mov(reg_bias_data,
                         EVEX_compress_addr(rsp,reg_bias_data_off));
                 cvt2ps(jcp.bia_dt, zmm_bias, bias_ptr(i_load), mask_flag);
                 if (jcp.signed_input && jcp.ver != ver_vnni)
                     vmulps(zmm_bias, zmm_bias, zmm_bias_alpha());
             }
-            if (jcp.signed_input) {
+            if (jcp.signed_input || jcp.with_input_zp) {
                 mov(reg_comp_data, EVEX_compress_addr(rsp, reg_comp_data_off));
                 cvt2ps(data_type::s32, zmm_comp, comp_ptr(i_load), mask_flag);
             }
@@ -212,7 +212,7 @@ void jit_avx512_core_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
             for (int i_ur = 0; i_ur < ur; ++i_ur) {
                 auto r = vreg_accum(i_load, i_ur);
                 vcvtdq2ps(r, r);
-                if (jcp.signed_input)
+                if (jcp.signed_input || jcp.with_input_zp)
                     vaddps(r, r, zmm_comp);
                 if (jcp.with_bias)
                     vaddps(r, r, zmm_bias);
@@ -503,8 +503,10 @@ void jit_avx512_core_x8s8s32x_1x1_conv_kernel::generate()
 
     if (jcp.with_bias)
         mov(reg_bias_data, ptr[param1 + GET_OFF(bias_data)]);
-    if (jcp.signed_input) {
+    if (jcp.signed_input || jcp.with_input_zp) {
         mov(EVEX_compress_addr(rsp, reg_bias_data_off), reg_bias_data);
+    }
+    if (jcp.signed_input || jcp.with_input_zp) {
         mov(reg_comp_data, ptr[param1 + GET_OFF(compensation)]);
         mov(EVEX_compress_addr(rsp, reg_comp_data_off), reg_comp_data);
     }
@@ -525,14 +527,14 @@ void jit_avx512_core_x8s8s32x_1x1_conv_kernel::generate()
         bcast_loop(load_loop_blk);
         add(reg_load_data, load_loop_blk * jcp.load_loop_load_step);
         if (jcp.with_bias) {
-            if (jcp.signed_input)
+            if (jcp.signed_input || jcp.with_input_zp)
                 mov(reg_bias_data, EVEX_compress_addr(rsp, reg_bias_data_off));
             add(reg_bias_data,
                 load_loop_blk * jcp.load_block * jcp.typesize_bia);
-            if (jcp.signed_input)
+            if (jcp.signed_input || jcp.with_input_zp)
                 mov(EVEX_compress_addr(rsp, reg_bias_data_off), reg_bias_data);
         }
-        if (jcp.signed_input) {
+        if (jcp.signed_input || jcp.with_input_zp) {
             mov(reg_comp_data, EVEX_compress_addr(rsp, reg_comp_data_off));
             add(reg_comp_data,
                 load_loop_blk * jcp.load_block * sizeof(int32_t));
@@ -671,6 +673,22 @@ status_t jit_avx512_core_x8s8s32x_1x1_conv_kernel::init_conf(
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
 
     jcp.signed_input = (src_d.data_type() == data_type::s8) ? true : false;
+
+    jcp.with_input_zp = !attr.input_zero_points_.has_default_values();
+    jcp.with_weights_zp = !attr.weights_zero_points_.has_default_values();
+
+    if (jcp.with_input_zp) {
+        if (attr.input_zero_points_.count_ != 1 && attr.input_zero_points_.count_ != jcp.ic * jcp.ngroups)
+            return status::unimplemented;
+
+        jcp.is_per_channel_input_zp = attr.input_zero_points_.count_ != 1;
+
+        if (attr.output_compensations_.count_ != jcp.oc * jcp.ngroups)
+            return status::unimplemented;
+    }
+
+    if (jcp.with_weights_zp)
+        return status::unimplemented;
 
     jcp.os = jcp.oh * jcp.ow;
     jcp.is = jcp.ih * jcp.iw;

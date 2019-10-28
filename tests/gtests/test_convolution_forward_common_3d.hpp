@@ -38,7 +38,9 @@ void compute_ref_conv_fwd_3d(const test_convolution_sizes_t_3d &c,
         const memory &src,
         const memory &weights,
         const memory &bias,
-        const memory &dst)
+        const memory &dst,
+        const std::vector<uint8_t>& input_zero_points,
+        const std::vector<float>& weights_zero_points)
 {
     const bool w_bias = bias_d.data.format != memory::format::format_undef;
     data_t_src *src_data = (data_t_src *)src.get_data_handle();
@@ -88,10 +90,14 @@ void compute_ref_conv_fwd_3d(const test_convolution_sizes_t_3d &c,
                                           + kh * c.kw
                                           + kw;
 
-                            a += ((data_t_acc)
-                                    src_data[map_index(src_d, iidx)])
-                                 * weights_data[map_index(
-                                    weights_d, widx)];
+                            size_t iidx_ = map_index(src_d, iidx);
+                            size_t widx_ = map_index(weights_d, widx);
+
+                            data_t_src s = src_data[iidx_];
+                            data_t_wei w = weights_data[widx_];
+
+                            a += ((data_t_acc)s - (data_t_acc)input_zero_points[g * c.ic / c.ng + ic]) *
+                                 ((data_t_acc)w - (data_t_acc)weights_zero_points[g * c.oc / c.ng + oc]);
                         }
                     }
                 }
@@ -217,6 +223,64 @@ protected:
         check_zero_tail<data_t_wei>(1, c_weights.get());
         check_zero_tail<data_t_dst>(1, c_dst.get());
 
+        std::vector<uint8_t> input_zero_points(p.sizes.ic);
+        std::fill(input_zero_points.begin(), input_zero_points.end(), 0);
+
+        std::vector<int8_t> weights_zero_points(p.sizes.oc);
+        std::vector<float> weights_zero_points_float(p.sizes.oc);
+        std::fill(weights_zero_points.begin(), weights_zero_points.end(), 0);
+
+        std::vector<int32_t> output_compensations(p.sizes.oc);
+        std::fill(output_compensations.begin(), output_compensations.end(), 0);
+
+        if (p.with_zero_points) {
+            fill_data<uint8_t>(input_zero_points.size(), &input_zero_points[0]);
+//            fill_data<int8_t>(weights_zero_points.size(), &weights_zero_points[0]);
+
+            for (int i = 0; i < p.sizes.oc; i++) {
+                weights_zero_points_float[i] = (float)weights_zero_points[i];
+            }
+
+            attr.mkl_attr.set_input_zero_points(1 << 1, input_zero_points);
+//            attr.mkl_attr.set_weights_zero_points(1 << 1, weights_zero_points_float);
+
+            size_t padded_ic_w = c_weights_desc.data.format == mkldnn_OdhIw8o4i ? c_weights_desc.data.layout_desc.blocking.padding_dims[1] :
+                                 c_src_desc.data.layout_desc.blocking.padding_dims[1];
+            size_t padded_oc_w = c_weights_desc.data.format == mkldnn_OdhIw8o4i ? c_weights_desc.data.layout_desc.blocking.padding_dims[0] :
+                                 c_dst_desc.data.layout_desc.blocking.padding_dims[1];
+
+            data_t_wei *weights_data = (data_t_wei *)c_weights.get().get_data_handle();
+            for (int g = 0; g < cd.ng; g++) {
+                for (int oc = 0; oc < cd.oc / cd.ng; oc++) {
+                    int32_t a = 0;
+                    for (int ic = 0; ic < cd.ic / cd.ng; ic++) {
+                        for (int kd = 0; kd < cd.kd; kd++) {
+                            for (int kh = 0; kh < cd.kh; kh++) {
+                                for (int kw = 0; kw < cd.kw; kw++) {
+                                    size_t widx = g * padded_oc_w / cd.ng * padded_ic_w / cd.ng * cd.kd * cd.kh * cd.kw
+                                                  + oc * padded_ic_w / cd.ng * cd.kd * cd.kh * cd.kw
+                                                  + ic * cd.kd * cd.kh * cd.kw + kd * cd.kh * cd.kw + kh * cd.kw + kw;
+
+                                    int widx_ = map_index(c_weights_desc, widx);
+
+                                    data_t_src izp = input_zero_points[g * cd.ic / cd.ng + ic];
+
+                                    data_t_wei w = weights_data[widx_];
+                                    a += w * izp;
+
+                                    data_t_wei wzp = weights_zero_points[g * cd.oc / cd.ng + oc];
+                                    a -= wzp * izp;
+                                }
+                            }
+                        }
+                    }
+                    output_compensations[g * cd.oc / cd.ng + oc] = -a;
+                }
+            }
+
+            attr.mkl_attr.set_output_compensations(1 << 1, output_compensations);
+        }
+
         if (data_type_src == memory::data_type::s8) {
             ASSERT_EQ(data_type_wei, memory::data_type::s8);
 
@@ -268,11 +332,13 @@ protected:
         if (data_type_src == memory::data_type::s8) {
             compute_ref_conv_fwd_3d<data_t_src, data_t_wei, data_t_acc, data_t_dst>(
                     cd, attr, c_src_desc, c_wei_aux_desc, c_bias_desc, c_dst_desc,
-                    c_src.get(), c_wei_aux.get(), c_bias.get(), ref_memory);
+                    c_src.get(), c_wei_aux.get(), c_bias.get(), ref_memory,
+                    input_zero_points, weights_zero_points_float);
         } else {
             compute_ref_conv_fwd_3d<data_t_src, data_t_wei, data_t_acc, data_t_dst>(
                     cd, attr, c_src_desc, c_weights_desc, c_bias_desc, c_dst_desc,
-                    c_src.get(), c_weights.get(), c_bias.get(), ref_memory);
+                    c_src.get(), c_weights.get(), c_bias.get(), ref_memory,
+                    input_zero_points, weights_zero_points_float);
         }
         check_zero_tail<data_t_dst>(1, ref_memory);
 
