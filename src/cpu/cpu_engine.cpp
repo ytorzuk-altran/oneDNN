@@ -286,7 +286,7 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(ref_convolution_bwd_weights_t<s16, s32, s16, s32>),
 #endif
     /* deconv */
-#if ENABLE_UNUSED_PRIM
+#ifdef ENABLE_UNUSED_PRIM
     INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8,f32>),
     INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8,s32>),
     INSTANCE(jit_avx512_core_x8s8s32x_1x1_deconvolution_fwd_t<u8,u8>),
