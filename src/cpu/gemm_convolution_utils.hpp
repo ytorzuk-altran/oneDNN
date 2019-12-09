@@ -44,7 +44,11 @@ void im2col_u8(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
         int hs, int hb, int ws, int wb, const uint8_t *__restrict input_zp, int32_t *__restrict weights_zp_compensation);
 
 template <typename T>
-void im2col_u8_3d(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
+void transpose_u8(const jit_gemm_conv_conf_t &jcp, const T *__restrict im,
+                  T *__restrict imtr, const uint8_t *__restrict input_zp);
+
+template <typename T>
+void im2col_u8_3d(const jit_gemm_conv_conf_t &jcp, const T *__restrict imtr,
         uint8_t *__restrict col, int od, const uint8_t *__restrict input_zp, int32_t *__restrict weights_zp_compensation);
 
 void col2im_s32(const jit_gemm_conv_conf_t &jcp, const int32_t *__restrict col,

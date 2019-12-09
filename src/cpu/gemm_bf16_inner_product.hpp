@@ -96,9 +96,13 @@ struct gemm_bf16_inner_product_fwd_t: public cpu_primitive_t {
              has_scale = !pd()->attr()->output_scales_.has_default_values();
         postops_in_ip_ = false
                 || !pd()->dst_is_acc_ || has_bias || has_eltwise || has_scale;
-        if (postops_in_ip_)
-            pp_kernel_ = new inner_product_utils::pp_kernel_t<
-                    data_type::f32, dst_data_type>(apd);
+        if (postops_in_ip_) {
+            if (mayiuse(avx512_core_bf16)) {
+                pp_kernel_ = new inner_product_utils::jit_pp_kernel_t<avx512_core_bf16, data_type::f32, dst_data_type>(apd);
+            } else {
+                pp_kernel_ = new inner_product_utils::jit_pp_kernel_t<avx512_common, data_type::f32, dst_data_type>(apd);
+            }
+        }
     }
 
     ~gemm_bf16_inner_product_fwd_t() {delete pp_kernel_;}
@@ -114,7 +118,7 @@ struct gemm_bf16_inner_product_fwd_t: public cpu_primitive_t {
     }
 
 private:
-    inner_product_utils::pp_kernel_t<data_type::f32, dst_data_type> *pp_kernel_;
+    inner_product_utils::uni_pp_kernel_t<data_type::f32, dst_data_type> *pp_kernel_;
     bool postops_in_ip_;
 
     void execute_forward() const;
