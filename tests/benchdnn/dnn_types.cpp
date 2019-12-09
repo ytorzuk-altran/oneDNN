@@ -467,7 +467,7 @@ mkldnn_primitive_attr_t create_mkldnn_attr(const attr_t &attr, int scale_cnt,
             const auto &e = attr.post_ops.entry[idx];
             switch (attr.post_ops.entry[idx].kind) {
             case attr_t::post_ops_t::SUM:
-                DNN_SAFE_V(mkldnn_post_ops_append_sum(ops, e.sum.scale));
+                DNN_SAFE_V(mkldnn_post_ops_append_sum(ops, e.sum.scale, mkldnn_f32));
                 break;
             case attr_t::post_ops_t::RELU:
             case attr_t::post_ops_t::TANH:

@@ -14,6 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <common/primitive_attr.hpp>
+#include <common/math_utils.hpp>
 #include "c_types_map.hpp"
 #include "type_helpers.hpp"
 #include "mkldnn_thread.hpp"
@@ -28,6 +30,7 @@ namespace cpu {
 
 using math::saturate;
 using math::get_bias;
+using math::get_sum;
 
 template <data_type_t src_type, data_type_t wei_type,
          data_type_t dst_type, data_type_t acc_type>
@@ -288,11 +291,11 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
                 a_fp = a_fp * osc + osh;
             } else if (post_op.is_sum()) {
                 if (ndims == 5)
-                    a_fp += dst[dst_d.off(mb, g * OC + oc, od, oh, ow)];
+                    a_fp += get_sum((char*)dst, dst_d.off(mb, g * OC + oc, od, oh, ow), post_op.sum.data_type);
                 else if (ndims == 4)
-                    a_fp += dst[dst_d.off(mb, g * OC + oc, oh, ow)];
+                    a_fp += get_sum((char*)dst, dst_d.off(mb, g * OC + oc, oh, ow), post_op.sum.data_type);
                 else if (ndims == 3)
-                    a_fp += dst[dst_d.off(mb, g * OC + oc, ow)];
+                    a_fp += get_sum((char*)dst, dst_d.off(mb, g * OC + oc, ow), post_op.sum.data_type);
                 else
                     assert(false);
             }

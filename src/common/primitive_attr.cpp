@@ -95,12 +95,13 @@ status_t zero_points_t<T>::set(int count, int mask, const T *zero_points) {
 }
 }
 
-status_t post_ops_t::append_sum(float scale) {
+status_t post_ops_t::append_sum(float scale, mkldnn::impl::data_type_t data_type) {
     if (len_ == capacity)
         return out_of_memory;
 
     entry_[len_].kind = primitive_kind::sum;
     entry_[len_].sum.scale = scale;
+    entry_[len_].sum.data_type = data_type;
 
     len_++;
 
@@ -408,11 +409,11 @@ primitive_kind_t mkldnn_post_ops_get_kind(const post_ops_t *post_ops,
     return post_ops->entry_[index].kind;
 }
 
-status_t mkldnn_post_ops_append_sum(post_ops_t *post_ops, float scale) {
+status_t mkldnn_post_ops_append_sum(post_ops_t *post_ops, float scale, mkldnn::impl::data_type_t data_type) {
     if (post_ops == nullptr)
         return invalid_arguments;
 
-    return post_ops->append_sum(scale);
+    return post_ops->append_sum(scale, data_type);
 }
 
 namespace {
@@ -428,7 +429,7 @@ bool simple_get_params_check(const post_ops_t *post_ops, int index,
 }
 
 status_t mkldnn_post_ops_get_params_sum(const post_ops_t *post_ops, int index,
-        float *scale) {
+        float *scale, mkldnn_data_type_t *data_type) {
     bool ok = true
         && simple_get_params_check(post_ops, index, primitive_kind::sum)
         && !any_null(scale);
@@ -436,6 +437,7 @@ status_t mkldnn_post_ops_get_params_sum(const post_ops_t *post_ops, int index,
         return invalid_arguments;
 
     *scale = post_ops->entry_[index].sum.scale;
+    *data_type = post_ops->entry_[index].sum.data_type;
     return success;
 }
 

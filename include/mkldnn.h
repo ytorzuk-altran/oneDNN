@@ -437,7 +437,7 @@ mkldnn_primitive_kind_t MKLDNN_API mkldnn_post_ops_get_kind(
  *      destination.
  */
 mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_sum(
-        mkldnn_post_ops_t post_ops, float scale);
+        mkldnn_post_ops_t post_ops, float scale, mkldnn_data_type_t data_type);
 
 /** Gets the parameters of the accumulation (sum) post operation with index
  * @p index in the sequence of @p post_ops.
@@ -447,7 +447,7 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_sum(
  *      operation, the function returns #mkldnn_invalid_arguments.
  */
 mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_sum(
-        const_mkldnn_post_ops_t post_ops, int index, float *scale);
+        const_mkldnn_post_ops_t post_ops, int index, float *scale, mkldnn_data_type_t* data_type);
 
 /** Appends eltwise post operation to the @p post_ops with given parameters
  * @p kind, @p alpha, and @p beta (@sa mkldnn_eltwise_forward_desc_init and

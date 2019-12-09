@@ -586,7 +586,7 @@ void jit_uni_x8s8s32x_dw_conv_fwd_kernel<isa>::store_dst(int ur_ch_blocks, int c
                         Vmm vmm_dst = get_acc_reg(r * ur_ch_blocks*ur_w + ur_w * ii + jj);
                         int o_off = ii * jcp.ch_block + jj * jcp.oc + r * (jcp.ch_block / 2);
 
-                        cvt2ps(jcp.dst_dt, vmm_prev_dst, ptr[reg_output + o_off * jcp.typesize_out], is_scalar_store);
+                        cvt2ps(post_op.sum.data_type, vmm_prev_dst, ptr[reg_output + o_off * jcp.typesize_out], is_scalar_store);
 
                         if (p_sum_scale == 1.f) {
                             uni_vaddps(vmm_dst, vmm_dst, vmm_prev_dst);

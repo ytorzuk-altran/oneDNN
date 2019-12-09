@@ -220,6 +220,7 @@ private:
         bool do_bias_;
         bool do_eltwise_;
         bool do_sum_;
+        mkldnn::impl::data_type_t sum_data_type_;
         bool do_signed_scaling_;
         bool use_fast_post_processing;
         bool with_weights_zp;

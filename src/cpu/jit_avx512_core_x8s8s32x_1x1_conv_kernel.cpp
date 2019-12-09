@@ -314,7 +314,7 @@ void jit_avx512_core_x8s8s32x_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                         auto zmm_prev_dst = zmm_zero;
 
                         auto r = vreg_accum(i_load, i_ur);
-                        cvt2ps(jcp.dst_dt, zmm_prev_dst, output_ptr(i_load, i_ur),
+                        cvt2ps(post_op.sum.data_type, zmm_prev_dst, output_ptr(i_load, i_ur),
                             mask_flag);
 
                         if (*p_sum_scale == 1.f)

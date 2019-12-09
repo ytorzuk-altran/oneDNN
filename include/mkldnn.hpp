@@ -403,13 +403,13 @@ struct post_ops: public handle<mkldnn_post_ops_t> {
                     index));
     }
 
-    void append_sum(float scale = 1.) {
-        error::wrap_c_api(mkldnn_post_ops_append_sum(get(), scale),
+    void append_sum(float scale = 1., mkldnn_data_type_t data_type = mkldnn_f32) {
+        error::wrap_c_api(mkldnn_post_ops_append_sum(get(), scale, data_type),
                 "could not append sum");
     }
 
-    void get_params_sum(int index, float &scale) const {
-        error::wrap_c_api(mkldnn_post_ops_get_params_sum(get(), index, &scale),
+    void get_params_sum(int index, float &scale, mkldnn_data_type_t& data_type) const {
+        error::wrap_c_api(mkldnn_post_ops_get_params_sum(get(), index, &scale, &data_type),
                 "could not get sum params");
     }
 

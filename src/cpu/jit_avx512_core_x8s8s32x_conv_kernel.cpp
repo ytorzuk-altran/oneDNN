@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
+#include <common/primitive_attr.hpp>
 #include "c_types_map.hpp"
 #include "memory_tracking.hpp"
 #include "nstl.hpp"
@@ -338,7 +339,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::store_output(
                                       + j * jcp.oc_without_padding * jcp.ngroups);
                     auto addr = EVEX_compress_addr(reg_out, aux_output_offset);
                     Zmm zmm = zmm_out(j, k);
-                    cvt2ps(jcp.dst_dt, vmm_prev_dst, addr, mask_flag);
+                    cvt2ps(post_op.sum.data_type, vmm_prev_dst, addr, mask_flag);
                     if (*p_sum_scale == 1.f)
                         vaddps(zmm, vmm_prev_dst);
                     else

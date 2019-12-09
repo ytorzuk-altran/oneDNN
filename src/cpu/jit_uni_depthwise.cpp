@@ -15,6 +15,7 @@
 *******************************************************************************/
 
 #include <mkldnn_types.h>
+#include <common/primitive_attr.hpp>
 #include "mkldnn_types.h"
 #include "mkldnn_thread.hpp"
 #include "nstl.hpp"
@@ -797,7 +798,17 @@ void jit_uni_dw_conv_row_f32<isa>::apply_postprocessing(int ur_w, int oc_step) {
         }
     }
 
+    const auto &p = attr_.post_ops_;
     if (jcp.with_sum) {
+        mkldnn::impl::data_type_t sum_dt = jcp.dst_dt;
+        int start_idx = p.find(primitive_kind::convolution) + 1;
+        for (int i = start_idx; i < p.len_; i++) {
+            auto &post_op = p.entry_[i];
+            if (post_op.is_sum()) {
+                sum_dt = post_op.sum.data_type;
+            }
+        }
+
         for (int r = 0; r < repeats; r++) {
             int tail_size = isa == sse42 ? nstl::min(jcp.ch_block / 2, oc_step - r * jcp.ch_block / 2) : oc_step;
             bool is_scalar_store = isa == sse42 ? tail_size < jcp.ch_block / 2 : tail_size < jcp.ch_block;
@@ -809,14 +820,14 @@ void jit_uni_dw_conv_row_f32<isa>::apply_postprocessing(int ur_w, int oc_step) {
 
                         Vmm vmm_in = vmm_sum | ktail_mask | T_z;
 
-                        cvt2ps(jcp.dst_dt, vmm_in, ptr[reg_output + o_off * jcp.typesize_out], false);
+                        cvt2ps(sum_dt, vmm_in, ptr[reg_output + o_off * jcp.typesize_out], false);
                         uni_vaddps(get_acc_reg(r * ur_w + ow), get_acc_reg(r * ur_w + ow), vmm_sum);
                     } else {
                         for (int oc = 0; oc < tail_size; oc++) {
                             int o_off = ow * ow_stride_ + r * (jcp.ch_block / 2) + oc;
 
                             uni_vpxor(vmm_sum, vmm_sum, vmm_sum);
-                            cvt2ps(jcp.dst_dt, vmm_sum, ptr[reg_output + o_off * jcp.typesize_out], true);
+                            cvt2ps(sum_dt, vmm_sum, ptr[reg_output + o_off * jcp.typesize_out], true);
 
                             if (oc >= jcp.ch_block / 2) {
                                 vperm2i128(Ymm(vmm_sum.getIdx()), Ymm(vmm_sum.getIdx()), Ymm(vmm_sum.getIdx()), 0x01);
@@ -830,7 +841,7 @@ void jit_uni_dw_conv_row_f32<isa>::apply_postprocessing(int ur_w, int oc_step) {
                     int o_off = ow * ow_stride_ + r * (jcp.ch_block / 2);
 
                     uni_vpxor(vmm_sum, vmm_sum, vmm_sum);
-                    cvt2ps(jcp.dst_dt, vmm_sum, ptr[reg_output + o_off * jcp.typesize_out], false);
+                    cvt2ps(sum_dt, vmm_sum, ptr[reg_output + o_off * jcp.typesize_out], false);
 
                     uni_vaddps(get_acc_reg(r * ur_w + ow), get_acc_reg(r * ur_w + ow), vmm_sum);
                 }
@@ -838,7 +849,6 @@ void jit_uni_dw_conv_row_f32<isa>::apply_postprocessing(int ur_w, int oc_step) {
         }
     }
 
-    const auto &p = attr_.post_ops_;
     int eltwise_inj_idx = 0;
     int depthwise_inj_idx = 0;
     int start_idx = p.find(primitive_kind::convolution) + 1;

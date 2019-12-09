@@ -42,8 +42,6 @@ template <cpu_isa_t isa>
 struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_i8i8_pooling_fwd_ker_t)
 
-    const primitive_attr_t &attr;
-
     struct call_params_t {
         const char *src_i8;
         const char *dst_i8;
@@ -136,8 +134,9 @@ struct jit_uni_i8i8_pooling_fwd_ker_t: public jit_generator {
 
     Vmm vreg_mask_dst = vreg_src(1);
 
-    void (*ker_)(const call_params_t *);
     jit_pool_conf_t jpp;
+    const primitive_attr_t &attr;
+    void (*ker_)(const call_params_t *);
 
     void init_tmp_reg();
     void init_mask();

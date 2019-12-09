@@ -15,6 +15,7 @@
 *******************************************************************************/
 
 #include <common/memory_tracking.hpp>
+#include <common/primitive_attr.hpp>
 #include "mkldnn_types.h"
 
 #include "c_types_map.hpp"
@@ -82,6 +83,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     , do_bias_(false)
     , do_eltwise_(false)
     , do_sum_(false)
+    , sum_data_type_(mkldnn_f32)
     , use_fast_post_processing(false)
     , with_weights_zp(false)
     , eltwise_injector_(nullptr)
@@ -103,6 +105,14 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::pp_ker_t(
     do_signed_scaling_ = jcp_.signed_input;
 
     do_sum_ = post_ops.contain(primitive_kind::sum, 0);
+    if (do_sum_) {
+        for (int i = 0; i < post_ops.len_; i++) {
+            auto &post_op = post_ops.entry_[i];
+            if (post_op.is_eltwise()) {
+                sum_data_type_ = post_op.sum.data_type;
+            }
+        }
+    }
     do_bias_ = pd->with_bias();
     bias_data_type_ = pd->desc()->bias_desc.data_type;
     if (do_bias_) {
@@ -304,14 +314,14 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::generate()
             else
                 vreg_prev_dst_ = vreg_prev_dst_ | kreg_rem_mask_vlen;
 
-            switch (dst_type) {
+            switch (sum_data_type_) {
             case data_type::f32:
             case data_type::s32: vmovups(vreg_prev_dst_, dst_addr); break;
             case data_type::s8: vpmovsxbd(vreg_prev_dst_, dst_addr); break;
             case data_type::u8: vpmovzxbd(vreg_prev_dst_, dst_addr); break;
             default: assert(!"unsupported data type");
             }
-            if (dst_type != data_type::f32)
+            if (sum_data_type_ != data_type::f32)
                 vcvtdq2ps(vreg_prev_dst(idx), vreg_prev_dst(idx));
 
             vfmadd231ps(vreg_dst(idx), vreg_prev_dst(idx), vreg_sum_scale);
@@ -579,7 +589,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
 
                     d *= scales[(g * jcp_.oc + oc) * scale_idx_mult_];
                     if (do_sum_)
-                        d += sum_scale * dst[dst_off];
+                        d += sum_scale * get_sum((char*)dst, dst_off, sum_data_type_);
                     if (do_eltwise_)
                         d = eltwise_->compute_scalar(d);
                     dst[dst_off] = qz_a1b0<float, dst_data_t>()(d, rmode_);
@@ -694,7 +704,7 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
 
                             float d = load(i, oc, os, acc_off, dst_off);
 
-                            d += sum_scale * dst[dst_off];
+                            d += sum_scale * get_sum((char*)dst, dst_off, post_op.sum.data_type);
 
                             store(i, d, acc_off, dst_off);
                         }

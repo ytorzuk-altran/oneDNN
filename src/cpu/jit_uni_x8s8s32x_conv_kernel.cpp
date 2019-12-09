@@ -533,7 +533,7 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::width_blk_step(int ur_w, int pad_l, 
                         if (is_scalar_store) {
                             for (int oc = 0; oc < tail_size; oc++) {
                                 uni_vpxor(vmm_prev_dst, vmm_prev_dst, vmm_prev_dst);
-                                cvt2ps(jcp.dst_dt, vmm_prev_dst, ptr[reg_output + (o_off + oc) * jcp.typesize_out], true);
+                                cvt2ps(post_op.sum.data_type, vmm_prev_dst, ptr[reg_output + (o_off + oc) * jcp.typesize_out], true);
 
                                 if (oc < jcp.oc_block / 2) {
                                     uni_vpslldq(vmm_prev_dst, vmm_prev_dst, oc * sizeof(float));
@@ -550,7 +550,7 @@ void jit_uni_x8s8s32x_conv_fwd_kernel<isa>::width_blk_step(int ur_w, int pad_l, 
                                 }
                             }
                         } else {
-                            cvt2ps(jcp.dst_dt, vmm_prev_dst, ptr[reg_output + o_off * jcp.typesize_out], false);
+                            cvt2ps(post_op.sum.data_type, vmm_prev_dst, ptr[reg_output + o_off * jcp.typesize_out], false);
 
                             if (p_sum_scale == 1.f) {
                                 uni_vaddps(vmm_dst, vmm_dst, vmm_prev_dst);

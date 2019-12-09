@@ -192,7 +192,10 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
 
         mkldnn::impl::primitive_kind_t kind;
         union {
-            struct { float scale; } sum;
+            struct {
+                float scale;
+                mkldnn::impl::data_type_t data_type;
+            } sum;
             eltwise_t eltwise;
             struct {
                 mkldnn::impl::alg_kind_t alg;
@@ -267,7 +270,7 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
 
     mkldnn_post_ops(): len_(0) {}
 
-    mkldnn::impl::status_t append_sum(float scale);
+    mkldnn::impl::status_t append_sum(float scale, mkldnn::impl::data_type_t data_type);
     mkldnn::impl::status_t append_eltwise(float scale,
             mkldnn::impl::alg_kind_t alg, float alpha, float beta);
     mkldnn::impl::status_t append_depthwise(mkldnn::impl::alg_kind_t alg,
