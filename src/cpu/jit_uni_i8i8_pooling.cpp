@@ -1056,6 +1056,9 @@ status_t jit_uni_i8i8_pooling_fwd_ker_t<isa>::init_conf(jit_pool_conf_t &jpp,
     jpp.ur_c_tail = jpp.nb_c - (jpp.nb_c / jpp.ur_c)*jpp.ur_c +
             (jpp.c_tail != 0);
 
+    if (!mayiuse(avx512_common) && jpp.dst_dt != mkldnn_f32 && jpp.c_tail != 0)
+        return status::unimplemented;
+
     size_t tail_mask = (1ULL << jpp.c_tail) - 1;
 
     switch (jpp.alg) {
