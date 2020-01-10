@@ -1491,6 +1491,79 @@ typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o4i || fmt_o == gOhIw8o
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+        typename utils::enable_if<fmt_i == any && (fmt_o == hwio || fmt_o == dhwio || fmt_o == hwigo || fmt_o == dhwigo)>::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+                              const memory_desc_wrapper &output_d, const primitive_attr_t *attr)
+    {
+        const size_t D_mask = utils::array_product(input_d.dims(),
+                                                   math::ilog2q(attr->output_scales_.mask_ + 1));
+        const int oc = (input_d.dims()[fmt_o == hwigo || fmt_o == dhwigo + 0]);
+        const int g = (fmt_o == hwigo || fmt_o == dhwigo) ? (input_d.dims()[0]) : 1;
+
+        return output_d.format() == fmt_o
+               && (input_d.data_type() == f32 || input_d.data_type() == s8)
+               && (output_d.data_type() == f32 || output_d.data_type() == s8)
+               && (D_mask == 1 || D_mask == (size_t)g * oc);
+    }
+
+    GET_SCRATCHPAD_SIZE_ZERO();
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+                            const data_t<type_i> *input, data_t<type_o> *output,
+                            const memory_tracking::grantor_t &scratchpad) {
+        DECLARE_COMMON_PARAMS();
+
+        static constexpr bool w_groups
+                = format_traits<fmt_o>::data_kind == dk::gwei;
+        int is_3d = format_traits<fmt_o>::ndims_sp == 3;
+
+        const auto &dims = input_d.dims();
+        const auto &pdims = output_d.blocking_desc().padding_dims; MAYBE_UNUSED(pdims);
+
+        const int G = w_groups ? dims[0] : 1;
+        const int OC = dims[w_groups + 0];
+        const int IC = dims[w_groups + 1];
+        const int D = is_3d ? dims[w_groups + 2] : 1;
+        const int H = dims[w_groups + 2 + is_3d];
+        const int W = dims[w_groups + 3 + is_3d];
+
+        const float *scales = pd->attr()->output_scales_.scales_;
+        const size_t D_mask = utils::array_product(input_d.dims(),
+                math::ilog2q(pd->attr()->output_scales_.mask_ + 1));
+
+        parallel_nd(G, OC, [&](int g, int oc) {
+            for (int ic = 0; ic < IC; ic++)
+            for (int d = 0; d < D; d++)
+            for (int h = 0; h < H; h++)
+            for (int w = 0; w < W; w++) {
+                int i_off = g * OC * IC * D * H * W +
+                                oc * IC * D * H * W +
+                                     ic * D * H * W +
+                                          d * H * W +
+                                              h * W +
+                                                  w;
+                int o_off = d * H * W * IC * G * OC +
+                                h * W * IC * G * OC +
+                                    w * IC * G * OC +
+                                        ic * G * OC +
+                                             g * OC +
+                                                 oc;
+                auto i = input[i_off];
+                auto &o = output[o_off];
+
+                const float s = scales[(D_mask == 1) ? 0 : g * OC + oc];
+
+                o = qz_b0<data_t<type_i>, data_t<type_o>>()(
+                        i, s, rmode);
+            }
+        });
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 typename utils::enable_if<fmt_i == any && (fmt_o == OhIw8o32i || fmt_o == OhIw16o32i) && type_i == mkldnn_bin && type_o == mkldnn_bin>::type>
 {
     PLAIN_TO_BLOCKED_IS_APPLICABLE();
@@ -1564,7 +1637,8 @@ template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 typename utils::enable_if<fmt_i == any
 && block_format_traits<format_traits<fmt_o>::blk_fmt>::blk_ndims == 2
-&& fmt_o != OhIw8o4i && fmt_o != gOhIw8o4i && fmt_o != OdhIw8o4i && fmt_o != gOdhIw8o4i && fmt_o != OhIw8o32i && fmt_o != OhIw16o32i>::type>
+&& fmt_o != OhIw8o4i && fmt_o != gOhIw8o4i && fmt_o != OdhIw8o4i && fmt_o != gOdhIw8o4i && fmt_o != OhIw8o32i && fmt_o != OhIw16o32i
+&& fmt_o != hwigo && fmt_o != dhwigo>::type>
 {
     PLAIN_TO_BLOCKED_IS_APPLICABLE();
 
