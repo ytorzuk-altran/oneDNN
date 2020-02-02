@@ -41,10 +41,10 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
     auto bias = reinterpret_cast<const char *>(this->input_memory(2));
     auto dst = reinterpret_cast<dst_data_t *>(this->memory());
 
-    const uint8_t* input_zero_points = pd()->attr()->input_zero_points_.zero_points_;
+    const uint8_t* input_zero_points = pd()->attr()->input_zero_points_.shifts_;
     size_t input_zero_points_count = pd()->attr()->input_zero_points_.count_;
 
-    const float* weights_zero_points = pd()->attr()->weights_zero_points_.zero_points_;
+    const float* weights_zero_points = pd()->attr()->weights_zero_points_.shifts_;
     size_t weights_zero_points_count = pd()->attr()->weights_zero_points_.count_;
 
     const memory_desc_wrapper src_d(pd()->src_pd());
@@ -278,12 +278,13 @@ void ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>
                                                                               depthwise_bias + g * OC + oc);
                 depthwise_inj_idx++;
             } else if (post_op.is_quantization()) {
-                float cl = post_op.quantization.crop_low_data[g * OC + oc];
-                float ch = post_op.quantization.crop_high_data[g * OC + oc];
-                float isc = post_op.quantization.input_scale_data[g * OC + oc];
-                float ish = post_op.quantization.input_shift_data[g * OC + oc];
-                float osc = post_op.quantization.output_scale_data[g * OC + oc];
-                float osh = post_op.quantization.output_shift_data[g * OC + oc];
+                auto quant = post_op.quantization;
+                float cl = quant.crop_low_data->shifts_[quant.crop_low_data->count_ == 1 ? 0 : g * OC + oc];
+                float ch = quant.crop_high_data->shifts_[quant.crop_high_data->count_ == 1 ? 0 : g * OC + oc];
+                float isc = quant.input_scale_data->scales_[quant.input_scale_data->count_ == 1 ? 0 : g * OC + oc];
+                float ish = quant.input_shift_data->shifts_[quant.input_shift_data->count_ == 1 ? 0 : g * OC + oc];
+                float osc = quant.output_scale_data->scales_[quant.output_scale_data->count_ == 1 ? 0 : g * OC + oc];
+                float osh = quant.output_shift_data->shifts_[quant.output_shift_data->count_ == 1 ? 0 : g * OC + oc];
 
                 a_fp = nstl::min(ch, nstl::max(cl, a_fp));
                 a_fp = a_fp * isc + ish;

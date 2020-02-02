@@ -27,6 +27,7 @@
 #include "jit_primitive_conf.hpp"
 #include "jit_generator.hpp"
 #include "jit_uni_eltwise.hpp"
+#include "jit_uni_quantization.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -132,6 +133,10 @@ struct jit_uni_dw_conv_row_f32: public jit_generator {
         for (auto inj : depthwise_injectors)
             delete inj;
         depthwise_injectors.clear();
+
+        for (auto inj : quantization_injectors)
+            delete inj;
+        quantization_injectors.clear();
     }
 
     static bool post_ops_ok(jit_conv_conf_t &jcp,
@@ -220,6 +225,7 @@ private:
 
     nstl::vector<jit_uni_eltwise_injector_f32<isa>*> eltwise_injectors;
     nstl::vector<jit_uni_depthwise_injector_f32<isa>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<isa>*> quantization_injectors;
 };
 
 }

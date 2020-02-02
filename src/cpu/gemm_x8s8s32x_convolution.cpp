@@ -676,20 +676,27 @@ void _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::pp_ker_t::operator ()
                             const size_t acc_off = os * jcp_.oc + oc;
                             const size_t dst_off = os * dst_os_stride_ + oc;
 
-                            auto pcl = post_op.quantization.crop_low_data;
-                            auto pch = post_op.quantization.crop_high_data;
-                            auto pisc = post_op.quantization.input_scale_data;
-                            auto pish = post_op.quantization.input_shift_data;
-                            auto posc = post_op.quantization.output_scale_data;
-                            auto posh = post_op.quantization.output_shift_data;
+                            auto quant = post_op.quantization;
+                            auto pcl = quant.crop_low_data->shifts_;
+                            auto pch = quant.crop_high_data->shifts_;
+                            auto pisc = quant.input_scale_data->scales_;
+                            auto pish = quant.input_shift_data->shifts_;
+                            auto posc = quant.output_scale_data->scales_;
+                            auto posh = quant.output_shift_data->shifts_;
 
                             float d = load(i, oc, os, acc_off, dst_off);
 
-                            int idx = g * jcp_.oc + oc;
-                            d = nstl::min(pch[idx], nstl::max(pcl[idx], d));
-                            d = d * pisc[idx] + pish[idx];
+                            int cl_idx = quant.crop_low_data->count_ == 1 ? 0 : g * jcp_.oc + oc;
+                            int ch_idx = quant.crop_high_data->count_ == 1 ? 0 : g * jcp_.oc + oc;
+                            int isc_idx = quant.input_scale_data->count_ == 1 ? 0 : g * jcp_.oc + oc;
+                            int ish_idx = quant.input_shift_data->count_ == 1 ? 0 : g * jcp_.oc + oc;
+                            int osc_idx = quant.output_scale_data->count_ == 1 ? 0 : g * jcp_.oc + oc;
+                            int osh_idx = quant.output_shift_data->count_ == 1 ? 0 : g * jcp_.oc + oc;
+
+                            d = nstl::min(pch[ch_idx], nstl::max(pcl[cl_idx], d));
+                            d = d * pisc[isc_idx] + pish[ish_idx];
                             d = roundf(d);
-                            d = d * posc[idx] + posh[idx];
+                            d = d * posc[osc_idx] + posh[osh_idx];
 
                             store(i, d, acc_off, dst_off);
                         }
@@ -737,13 +744,13 @@ execute_forward_thr(const int ithr, const int nthr, const src_data_t *src_base,
 
     const uint8_t *input_zp_base = nullptr;
     if (jcp.with_input_zp) {
-        input_zp_base = pd()->attr()->input_zero_points_.zero_points_;
+        input_zp_base = pd()->attr()->input_zero_points_.shifts_;
     }
 
     float *weights_zp = nullptr;
     int32_t *weights_zp_compensation = nullptr;
     if (jcp.with_weights_zp) {
-        weights_zp = pd()->attr()->weights_zero_points_.zero_points_;
+        weights_zp = pd()->attr()->weights_zero_points_.shifts_;
         weights_zp_compensation = scratchpad.get<int32_t>(key_weights_zp_compensation) + ithr * jcp.oh * jcp.ow;
     }
 

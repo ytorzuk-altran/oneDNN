@@ -169,6 +169,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::store_output(
 
     int eltwise_inj_idx = 0;
     int depthwise_inj_idx = 0;
+    int quantization_inj_idx = 0;
     for (int i = 0; i < p.len_; i++) {
         auto& post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
@@ -196,139 +197,28 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::store_output(
 
             depthwise_inj_idx++;
         } else if (post_op.is_quantization()) {
-            if (jcp.ver == ver_vnni) {
-                bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
-                bool do_rounding = do_dequantization || jcp.dst_dt == mkldnn_f32 || i != p.len_ - 1;
+            bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
+            bool do_rounding = do_dequantization || jcp.dst_dt == mkldnn_f32 || i != p.len_ - 1;
 
-                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data));
-                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data));
-
-                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
-
-                for (int k = 0; k < nb_oc_block; k++) {
-                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
-                    for (int j = 0; j < ur_w; j++) {
-                        Vmm vmm_dst = vmm_out(j, k);
-
-                        uni_vmaxps(vmm_dst, vmm_dst, vmm_d_weights);
-                    }
-
-                    uni_vmovups(vmm_d_weights, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
-                    for (int j = 0; j < ur_w; j++) {
-                        Vmm vmm_dst = vmm_out(j, k);
-
-                        uni_vminps(vmm_dst, vmm_dst, vmm_d_weights);
-                    }
-                }
-
-                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data));
-                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data));
-
-                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
-
-                for (int k = 0; k < nb_oc_block; k++) {
-                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
-                    for (int j = 0; j < ur_w; j++) {
-                        Vmm vmm_dst = vmm_out(j, k);
-
-                        uni_vmulps(vmm_dst, vmm_dst, vmm_d_weights);
-                    }
-
-                    uni_vmovups(vmm_d_weights, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
-                    for (int j = 0; j < ur_w; j++) {
-                        Vmm vmm_dst = vmm_out(j, k);
-
-                        uni_vaddps(vmm_dst, vmm_dst, vmm_d_weights);
-                        if (do_rounding)
-                            uni_vroundps(vmm_dst, vmm_dst, 0);
-                    }
-                }
-
-                if (do_dequantization) {
-                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data));
-                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data));
-
-                    add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                    add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
-
-                    for (int k = 0; k < nb_oc_block; k++) {
-                        uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
-                        for (int j = 0; j < ur_w; j++) {
-                            Vmm vmm_dst = vmm_out(j, k);
-
-                            uni_vmulps(vmm_dst, vmm_dst, vmm_d_weights);
-                        }
-
-                        uni_vmovups(vmm_d_weights, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
-                        for (int j = 0; j < ur_w; j++) {
-                            Vmm vmm_dst = vmm_out(j, k);
-
-                            uni_vaddps(vmm_dst, vmm_dst, vmm_d_weights);
-                        }
-                    }
-                }
-            } else {
-                bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
-                bool do_rounding = do_dequantization || jcp.dst_dt == mkldnn_f32 || i != p.len_ - 1;
-
-                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data));
-                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data));
-
-                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
-
-                for (int k = 0; k < nb_oc_block; k++) {
-                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
-                    uni_vmovups(vmm_d_bias, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
-
-                    for (int j = 0; j < ur_w; j++) {
-                        Vmm vmm_dst = vmm_out(j, k);
-
-                        uni_vmaxps(vmm_dst, vmm_dst, vmm_d_weights);
-                        uni_vminps(vmm_dst, vmm_dst, vmm_d_bias);
-                    }
-                }
-
-                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data));
-                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data));
-
-                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
-
-                for (int k = 0; k < nb_oc_block; k++) {
-                    uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
-                    uni_vmovups(vmm_d_bias, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
-
-                    for (int j = 0; j < ur_w; j++) {
-                        Vmm vmm_dst = vmm_out(j, k);
-
-                        uni_vfmadd213ps(vmm_dst, vmm_d_weights, vmm_d_bias);
-                        if (do_rounding)
-                            uni_vroundps(vmm_dst, vmm_dst, 0);
-                    }
-                }
-
-                if (do_dequantization) {
-                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data));
-                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data));
-
-                    add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                    add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
-
-                    for (int k = 0; k < nb_oc_block; k++) {
-                        uni_vmovups(vmm_d_weights, ptr[reg_d_weights + k * oc_block * sizeof(float)]);
-                        uni_vmovups(vmm_d_bias, ptr[reg_d_bias + k * oc_block * sizeof(float)]);
-
-                        for (int j = 0; j < ur_w; j++) {
-                            Vmm vmm_dst = vmm_out(j, k);
-
-                            uni_vfmadd213ps(vmm_dst, vmm_d_weights, vmm_d_bias);
-                        }
-                    }
-                }
+            quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(0, k).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + ur_w, k * oc_block * sizeof(float));
             }
+
+            quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(0, k).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + ur_w, k * oc_block * sizeof(float), do_rounding);
+            }
+
+            quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(0, k).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + ur_w, k * oc_block * sizeof(float));
+            }
+
+            quantization_inj_idx++;
         } else if (post_op.is_sum(false)) {
             for (int k = 0; k < nb_oc_block; k++) {
                 const bool mask_flag = last_oc_block_flag && k == nb_oc_block - 1;
@@ -866,6 +756,22 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::generate()
                     this,
                     post_op.depthwise.alg
             ));
+        } else if (post_op.is_quantization()) {
+            int max_ur_w = nstl::max(jcp.ur_w, jcp.ur_w_tail);
+            int nb_oc_block = jcp.is_depthwise ? jcp.nb_ch_blocking : jcp.nb_oc_blocking;
+            int last_accum_idx = vmm_out(max_ur_w - 1, nb_oc_block - 1).getIdx();
+            if (last_accum_idx >= 30)
+                quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_common>(
+                        this,
+                        post_op,
+                        zmm_d_weights, zmm_d_weights, reg_d_weights, reg_d_bias
+                ));
+            else
+                quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_common>(
+                        this,
+                        post_op,
+                        zmm_d_weights, zmm_d_bias, reg_d_weights, reg_d_bias
+                ));
         }
     }
 
@@ -1252,11 +1158,12 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
             && jcp.ngroups % jcp.ch_block == 0; // for groups not multiple of 16
                                                 // would require byte masking
                                                 // for load from src
+    bool with_quantization = attr.post_ops_.find(primitive_kind::quantization) != -1;
     jcp.is_resrc_depthwise = jcp.is_depthwise && jcp.stride_w < jcp.kw
             && jcp.kw < 4 && jcp.dilate_w == 0;
     if (jcp.is_depthwise) {
         jcp.max_regs_ur = 31 - jcp.is_fast_depthwise - !jcp.is_resrc_depthwise
-                - 2 * (jcp.signed_input || jcp.with_input_zp) - (jcp.ver != ver_vnni);
+                - 2 * (jcp.signed_input || jcp.with_input_zp) - (jcp.ver != ver_vnni) - with_quantization;
     } else {
         jcp.max_regs_ur = jcp.ver == ver_vnni ? 31 : 28;
     }

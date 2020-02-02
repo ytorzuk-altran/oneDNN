@@ -544,16 +544,19 @@ mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_binarization(
  * where quantization_op is configured with given parameters.
  */
 mkldnn_status_t MKLDNN_API mkldnn_post_ops_append_quantization(
-        mkldnn_post_ops_t post_ops, mkldnn_alg_kind_t alg, const float* crop_low, const float* crop_high,
-        const float* input_scale, const float* input_shift, const float* output_scale, const float* output_shift);
+        mkldnn_post_ops_t post_ops, mkldnn_alg_kind_t alg,
+        int crop_low_count, const float* crop_low, int crop_high_count, const float* crop_high,
+        int input_scale_count, const float* input_scale, int input_shift_count, const float* input_shift,
+        int output_scale_count, const float* output_scale, int output_shift_count, const float* output_shift);
 
 /** Gets the quantization parameters of the post operation with index @p index in
  * the sequence of @p post_ops.
  */
 mkldnn_status_t MKLDNN_API mkldnn_post_ops_get_params_quantization(
-        const_mkldnn_post_ops_t post_ops, int index,
-        mkldnn_alg_kind_t *alg, const float** crop_low, const float** crop_high,
-        const float** input_scale, const float** input_shift, const float** output_scale, const float** output_shift);
+        const_mkldnn_post_ops_t post_ops, int index, mkldnn_alg_kind_t *alg,
+        int* crop_low_count, const float** crop_low, int* crop_high_count, const float** crop_high,
+        int* input_scale_count, const float** input_scale, int* input_shift_count, const float** input_shift,
+        int* output_scale_count, const float** output_scale, int* output_shift_count, const float** output_shift);
 
 /** @} */
 

@@ -49,6 +49,10 @@ struct _jit_avx512_common_conv_fwd_kernel : public jit_generator {
         for (auto inj : depthwise_injectors)
             delete inj;
         depthwise_injectors.clear();
+
+        for (auto inj : quantization_injectors)
+            delete inj;
+        quantization_injectors.clear();
     }
 
     DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx512_common_conv_fwd_kernel)
@@ -134,11 +138,12 @@ private:
     reg64_t reg_d_weights = imm_addr64;
     reg64_t reg_d_bias = reg_kj;
 
-    Vmm vmm_d_weights = Vmm(31);
-    Vmm vmm_d_bias = Vmm(30);
+    Xbyak::Zmm zmm_d_weights = Xbyak::Zmm(31);
+    Xbyak::Zmm zmm_d_bias = Xbyak::Zmm(30);
 
     nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
     nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<avx512_common>*> quantization_injectors;
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);

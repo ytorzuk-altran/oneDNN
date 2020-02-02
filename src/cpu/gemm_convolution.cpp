@@ -179,27 +179,33 @@ void gemm_convolution_fwd_t::execute_forward() const {
                             depthwise_inj_idx++;
                             need_bias = false;
                         } else if (post_op.is_quantization()) {
-                            auto pcl = post_op.quantization.crop_low_data;
-                            auto pch = post_op.quantization.crop_high_data;
-                            auto pisc = post_op.quantization.input_scale_data;
-                            auto pish = post_op.quantization.input_shift_data;
-                            auto posc = post_op.quantization.output_scale_data;
-                            auto posh = post_op.quantization.output_shift_data;
+                            auto quant = post_op.quantization;
+                            auto pcl = quant.crop_low_data->shifts_;
+                            auto pch = quant.crop_high_data->shifts_;
+                            auto pisc = quant.input_scale_data->scales_;
+                            auto pish = quant.input_shift_data->shifts_;
+                            auto posc = quant.output_scale_data->scales_;
+                            auto posh = quant.output_shift_data->shifts_;
 
                             parallel_nd(step.oc, [&](const int oc) {
                                 data_t b = need_bias ? bias[oc_start + oc] : 0;
                                 data_t *d_ = _dst + oc * M;
 
-                                int idx = oc_start + oc;
+                                int cl_idx = quant.crop_low_data->count_ == 1 ? 0 : oc_start + oc;
+                                int ch_idx = quant.crop_high_data->count_ == 1 ? 0 : oc_start + oc;
+                                int isc_idx = quant.input_scale_data->count_ == 1 ? 0 : oc_start + oc;
+                                int ish_idx = quant.input_shift_data->count_ == 1 ? 0 : oc_start + oc;
+                                int osc_idx = quant.output_scale_data->count_ == 1 ? 0 : oc_start + oc;
+                                int osh_idx = quant.output_shift_data->count_ == 1 ? 0 : oc_start + oc;
 
                                 PRAGMA_OMP_SIMD()
                                 for (int oS = 0; oS < m; ++oS) {
                                     d_[oS] += b;
 
-                                    d_[oS] = nstl::min(pch[idx], nstl::max(pcl[idx], d_[oS]));
-                                    d_[oS] = d_[oS] * pisc[idx] + pish[idx];
+                                    d_[oS] = nstl::min(pch[ch_idx], nstl::max(pcl[cl_idx], d_[oS]));
+                                    d_[oS] = d_[oS] * pisc[isc_idx] + pish[ish_idx];
                                     d_[oS] = roundf(d_[oS]);
-                                    d_[oS] = d_[oS] * posc[idx] + posh[idx];
+                                    d_[oS] = d_[oS] * posc[osc_idx] + posh[osh_idx];
                                 }
                             });
 

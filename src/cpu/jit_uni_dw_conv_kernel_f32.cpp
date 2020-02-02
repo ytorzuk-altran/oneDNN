@@ -248,6 +248,7 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(int ur_ch_blocks, in
 
     int eltwise_inj_idx = 0;
     int depthwise_inj_idx = 0;
+    int quantization_inj_idx = 0;
     const auto &p = attr_.post_ops_;
 
     for (int i = 0; i < p.len_; i++) {
@@ -280,58 +281,25 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(int ur_ch_blocks, in
 
             depthwise_inj_idx++;
         } else if (post_op.is_quantization()) {
-            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data));
-            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data));
-
-            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
-            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
-
+            quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
-                uni_vmovups(vmm_d_weights, ptr[reg_d_weights + ch * jcp.ch_block * sizeof(float)]);
-                uni_vmovups(vmm_d_bias, ptr[reg_d_bias + ch * jcp.ch_block * sizeof(float)]);
-
-                for (int ow = 0; ow < ur_w; ow++) {
-                    Vmm vmm_dst = get_acc_reg(ch*ur_w + ow);
-
-                    uni_vmaxps(vmm_dst, vmm_dst, vmm_d_weights);
-                    uni_vminps(vmm_dst, vmm_dst, vmm_d_bias);
-                }
+                int s_idx = get_acc_reg(ch*ur_w).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + ur_w, ch * jcp.ch_block * sizeof(float));
             }
 
-            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data));
-            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data));
-
-            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
-            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
-
+            quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
-                uni_vmovups(vmm_d_weights, ptr[reg_d_weights + ch * jcp.ch_block * sizeof(float)]);
-                uni_vmovups(vmm_d_bias, ptr[reg_d_bias + ch * jcp.ch_block * sizeof(float)]);
-
-                for (int ow = 0; ow < ur_w; ow++) {
-                    Vmm vmm_dst = get_acc_reg(ch*ur_w + ow);
-
-                    uni_vfmadd213ps(vmm_dst, vmm_d_weights, vmm_d_bias);
-                    uni_vroundps(vmm_dst, vmm_dst, 0);
-                }
+                int s_idx = get_acc_reg(ch*ur_w).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + ur_w, ch * jcp.ch_block * sizeof(float), true);
             }
 
-            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data));
-            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data));
-
-            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
-            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
-
+            quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
-                uni_vmovups(vmm_d_weights, ptr[reg_d_weights + ch * jcp.ch_block * sizeof(float)]);
-                uni_vmovups(vmm_d_bias, ptr[reg_d_bias + ch * jcp.ch_block * sizeof(float)]);
-
-                for (int ow = 0; ow < ur_w; ow++) {
-                    Vmm vmm_dst = get_acc_reg(ch*ur_w + ow);
-
-                    uni_vfmadd213ps(vmm_dst, vmm_d_weights, vmm_d_bias);
-                }
+                int s_idx = get_acc_reg(ch*ur_w).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + ur_w, ch * jcp.ch_block * sizeof(float));
             }
+
+            quantization_inj_idx++;
         }
     }
 }
@@ -421,6 +389,12 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::generate() {
             depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<isa>(
                     this,
                     post_op.depthwise.alg
+            ));
+        } else if (post_op.is_quantization()) {
+            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<isa>(
+                    this,
+                    post_op,
+                    vmm_d_weights, vmm_d_bias, reg_d_weights, reg_d_bias
             ));
         }
     }
