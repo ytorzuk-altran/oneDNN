@@ -2013,13 +2013,13 @@ unsigned int MKLDNN_API mkldnn_get_cache_size(int level, int per_core);
  *      because it returns mkldnn_status_t for error handling.
  *      XERBLA is not supported: no error message will be printed
  *      in case of incorrect parameters. */
-mkldnn_status_t MKLDNN_API mkldnn_sgemm(const char *transa, const char *transb,
-        const int *M, const int *N, const int *K,
-        const float *alpha, const float *A, const int *lda,
-        const float *B, const int *ldb,
-        const float *beta, float *C, const int *ldc);
+mkldnn_status_t MKLDNN_API mkldnn_sgemm(char transa, char transb,
+        int M, int N, int K,
+        float alpha, const float *A, int lda,
+        const float *B, int ldb,
+        float beta, float* C, int ldc);
 
-/** gemm_s8u8s32 and gemm_s8s8s32 perform a matrix-matrix multiplication
+/** gemm_u8s8s32 and gemm_s8s8s32 perform a matrix-matrix multiplication
  * operation and add the result to a scalar-matrix product. For the final
  * result, a vector is added to each row or column of the output matrix.
  * The operation is defined as:
@@ -2045,42 +2045,17 @@ mkldnn_status_t MKLDNN_API mkldnn_sgemm(const char *transa, const char *transb,
  *      because it returns mkldnn_status_t for error handling.
  *      XERBLA is not supported: no error message will be printed
  *      in case of incorrect parameters. */
-mkldnn_status_t MKLDNN_API mkldnn_gemm_s8u8s32(const char *transa,
-        const char *transb, const char *offsetc, const int *M, const int *N,
-        const int *K, const float *alpha, const int8_t *A, const int *lda,
-        const int8_t *ao, const uint8_t *B, const int *ldb, const int8_t *bo,
-        const float *beta, int32_t *c, const int *ldc, const int32_t *co);
+mkldnn_status_t MKLDNN_API mkldnn_gemm_u8s8s32(char transa,
+        char transb, char offsetc, int M, int N,
+        int K, float alpha, const uint8_t *A, int lda,
+        uint8_t ao, const int8_t *B, int ldb, int8_t bo,
+        float beta, int32_t *c, int ldc, const int32_t *co);
 
-mkldnn_status_t MKLDNN_API mkldnn_gemm_s8s8s32(const char *transa,
-        const char *transb, const char *offsetc, const int *M, const int *N,
-        const int *K, const float *alpha, const int8_t *A, const int *lda,
-        const int8_t *ao, const int8_t *B, const int *ldb, const int8_t *bo,
-        const float *beta, int32_t *c, const int *ldc, const int32_t *co);
-
-/** gemm_bf16bf16f32 performs a matrix-matrix multiplication operation defined
- * as
- *
- * C := alpha*op( A )*op( B ) + beta*C
- *
- * where
- *  - op( X ) is one of op( X ) = X or op( X ) = X**T,
- *  - alpha and beta are scalars,
- *  - A, B and C are matrices, with op( A ) an m by k matrix, op( B ) a k by n
- *    matrix and C an m by n matrix.
- *
- * The matrices are assumed to be stored in column-major order (the elements
- * in a matrix columns are contiguous in memory).
- *
- * @note
- *      The API is different from the standard BLAS routine
- *      because it returns mkldnn_status_t for error handling.
- *      XERBLA is not supported: no error message will be printed
- *      in case of incorrect parameters. */
-mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(const char *transa,
-        const char *transb, const int *M, const int *N, const int *K,
-        const float *alpha, const mkldnn_bfloat16_t *A, const int *lda,
-        const mkldnn_bfloat16_t *B, const int *ldb, const float *beta,
-        float *c, const int *ldc);
+mkldnn_status_t MKLDNN_API mkldnn_gemm_s8s8s32(char transa,
+        char transb, char offsetc, int M, int N,
+        int K, float alpha, const int8_t *A, int lda,
+        int8_t ao, const int8_t *B, int ldb, int8_t bo,
+        float beta, int32_t *c, int ldc, const int32_t *co);
 
 /** @} */
 

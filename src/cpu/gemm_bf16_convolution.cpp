@@ -362,7 +362,7 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward() const {
                       + ithr * rnd_up(jcp.oc * jcp.oh_block * jcp.ow_block, 16)
                 : (acc_data_t *)dst_local;
 
-            mkldnn_gemm_bf16bf16f32("N", "N", &m, &N, &K, &one,
+            gemm_bf16bf16f32("N", "N", &m, &N, &K, &one,
                     jcp.im2col_sz ? _col : _src + od * m, &LDA, _weights, &K,
                     &this->beta_, _acc, &LDC);
 
@@ -436,7 +436,7 @@ void gemm_bf16_convolution_bwd_data_t<diff_src_data_type>::
                      + (n * jcp.ngroups + g) * dst_step + od * m;
 
                 const acc_data_t zero = 0.0, one = 1.0;
-                mkldnn_gemm_bf16bf16f32("N", "T", &m, &N, &K, &one,
+                gemm_bf16bf16f32("N", "T", &m, &N, &K, &one,
                     _diff_dst, &M, _weights, &N, &zero,
                     jcp.im2col_sz ? _col: acc + od * m, &LDC);
 
@@ -604,7 +604,7 @@ void gemm_bf16_convolution_bwd_weights_t<diff_wei_data_type>::
                     }
 
                     const acc_data_t zero = 0.0, one = 1.0;
-                    mkldnn_gemm_bf16bf16f32(
+                    gemm_bf16bf16f32(
                         "T", "N", &M, &N, &k, &one,
                         jcp.im2col_sz ? _col : _src + od * k,
                         &LDA, _diff_dst, &K,

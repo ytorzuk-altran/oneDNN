@@ -52,7 +52,7 @@ void gemm_bf16_inner_product_fwd_t<dst_data_type>::execute_forward() const {
         : scratchpad().template get<acc_data_t>(key_iprod_int_dat_in_acc_dt);
 
     float alpha = 1.0, beta = 0.0;
-    mkldnn_gemm_bf16bf16f32(wei_tr ? "T" : "N", "N", &M, &N, &K,
+    gemm_bf16bf16f32(wei_tr ? "T" : "N", "N", &M, &N, &K,
             &alpha, weights, wei_tr ? &K : &M, src, &K, &beta, acc, &M);
 
     const float *scales = pd()->attr()->output_scales_.scales_;
@@ -85,7 +85,7 @@ void gemm_bf16_inner_product_bwd_data_t<diff_src_data_type>::
         : scratchpad().template get<acc_data_t>(key_iprod_int_dat_in_acc_dt);
 
     float alpha = 1.0, beta = 0.0;
-    mkldnn_gemm_bf16bf16f32(wei_tr ? "T" : "N", "N", &M, &N, &K, &alpha,
+    gemm_bf16bf16f32(wei_tr ? "T" : "N", "N", &M, &N, &K, &alpha,
             weights, wei_tr ? &K : &M, diff_dst, &K, &beta, acc, &M);
 
     if (!pd()->diff_src_is_acc_) {
@@ -131,7 +131,7 @@ void gemm_bf16_inner_product_bwd_weights_t<diff_wei_data_type>::
         : scratchpad().template get<acc_data_t>(key_iprod_int_dat_in_acc_dt);
 
     float alpha = 1.0, beta = 0.0;
-    mkldnn_gemm_bf16bf16f32("N", "T", &M, &N, &K, &alpha,
+    gemm_bf16bf16f32("N", "T", &M, &N, &K, &alpha,
             wei_tr ? diff_dst : src, &M, wei_tr ? src : diff_dst, &N, &beta,
             acc, &M);
 

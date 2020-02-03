@@ -3856,6 +3856,43 @@ struct deformable_convolution_forward: public primitive {
 
 /// @} Primitives
 
+/// @} mkldnn_api_service
+
+/// @addtogroup mkldnn_api_blas BLAS functions
+///
+/// A subset of Basic Linear ALgebra (BLAS) functions that perform
+/// matrix-matrix multiplication.
+///
+/// @{
+
+/// @copydoc mkldnn_sgemm()
+inline mkldnn_status_t sgemm(char transa, char transb, int M, int N,
+        int K, float alpha, const float *A, int lda,
+        const float *B, int ldb, float beta, float *C, int ldc) {
+    return static_cast<mkldnn_status_t>(mkldnn_sgemm(
+            transa, transb, M, N, K, alpha, A, lda, B, ldb, beta, C, ldc));
+}
+
+/// @copydoc mkldnn_gemm_u8s8s32()
+inline mkldnn_status_t gemm_u8s8s32(char transa, char transb, char offsetc, int M,
+        int N, int K, float alpha, const uint8_t *A,
+        int lda, uint8_t ao, const int8_t *B, int ldb, int8_t bo,
+        float beta, int32_t *C, int ldc, const int32_t *co) {
+    return static_cast<mkldnn_status_t>(mkldnn_gemm_u8s8s32(transa, transb, offsetc, M, N,
+            K, alpha, A, lda, ao, B, ldb, bo, beta, C, ldc, co));
+}
+
+/// @copydoc mkldnn_gemm_s8s8s32()
+inline mkldnn_status_t gemm_s8s8s32(char transa, char transb, char offsetc, int M,
+        int N, int K, float alpha, const int8_t *A,
+        int lda, int8_t ao, const int8_t *B, int ldb, int8_t bo,
+        float beta, int32_t *C, int ldc, const int32_t *co) {
+    return static_cast<mkldnn_status_t>(mkldnn_gemm_s8s8s32(transa, transb, offsetc, M, N,
+            K, alpha, A, lda, ao, B, ldb, bo, beta, C, ldc, co));
+}
+
+/// @} dnnl_api_blas
+
 /// @addtogroup cpp_api_stream Stream
 /// Execution stream operations.
 ///
