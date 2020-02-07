@@ -21,7 +21,7 @@
 #include "jit_generator.hpp"
 #include "type_helpers.hpp"
 
-#include "jit_uni_softmax.hpp"
+#include "jit_uni_fork_softmax.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -33,20 +33,20 @@ using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::utils;
 
 template <cpu_isa_t isa>
-jit_uni_softmax_fwd_t<isa>::jit_uni_softmax_fwd_t(const pd_t *apd,
+jit_uni_fork_softmax_fwd_t<isa>::jit_uni_fork_softmax_fwd_t(const pd_t *apd,
         const input_vector &inputs, const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs)
 {
-    kernel_ = new jit_uni_softmax_kernel_f32<isa>(pd()->jpp_);
+    kernel_ = new jit_uni_fork_softmax_kernel_f32<isa>(pd()->jpp_);
 }
 
 template <cpu_isa_t isa>
-jit_uni_softmax_fwd_t<isa>::~jit_uni_softmax_fwd_t() {
+jit_uni_fork_softmax_fwd_t<isa>::~jit_uni_fork_softmax_fwd_t() {
     delete kernel_;
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_fwd_t<isa>::execute_forward() const
+void jit_uni_fork_softmax_fwd_t<isa>::execute_forward() const
 {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
     auto dst = reinterpret_cast<data_t *>(this->memory(0));
@@ -117,9 +117,9 @@ void jit_uni_softmax_fwd_t<isa>::execute_forward() const
     }
 }
 
-template struct jit_uni_softmax_fwd_t<sse42>;
-template struct jit_uni_softmax_fwd_t<avx2>;
-template struct jit_uni_softmax_fwd_t<avx512_common>;
+template struct jit_uni_fork_softmax_fwd_t<sse42>;
+template struct jit_uni_fork_softmax_fwd_t<avx2>;
+template struct jit_uni_fork_softmax_fwd_t<avx512_common>;
 
 }
 }

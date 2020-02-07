@@ -25,7 +25,7 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 #include "jit_primitive_conf.hpp"
-#include "jit_uni_softmax_kernel_f32.hpp"
+#include "jit_uni_fork_softmax_kernel_f32.hpp"
 #include "mkldnn_types.h"
 
 
@@ -34,7 +34,7 @@ namespace impl {
 namespace cpu {
 
 template <cpu_isa_t isa>
-struct jit_uni_softmax_fwd_t : public cpu_primitive_t {
+struct jit_uni_fork_softmax_fwd_t : public cpu_primitive_t {
     struct pd_t : public cpu_softmax_fwd_pd_t {
         pd_t(engine_t *engine, const softmax_desc_t *adesc,
              const primitive_attr_t *attr,
@@ -43,7 +43,7 @@ struct jit_uni_softmax_fwd_t : public cpu_primitive_t {
 
         DECLARE_COMMON_PD_T(
                 JIT_IMPL_NAME_HELPER("jit:", isa, ""),
-                jit_uni_softmax_fwd_t<isa>);
+                jit_uni_fork_softmax_fwd_t<isa>);
 
         virtual status_t init() override {
             using namespace prop_kind;
@@ -76,15 +76,15 @@ struct jit_uni_softmax_fwd_t : public cpu_primitive_t {
             if (!ok) return status::unimplemented;
 
 
-            return jit_uni_softmax_kernel_f32<isa>::init_conf(jpp_, desc_,
+            return jit_uni_fork_softmax_kernel_f32<isa>::init_conf(jpp_, desc_,
                                                               src_pd()->desc(), dst_pd()->desc());
         }
         jit_softmax_conf_t jpp_;
     };
 
-    jit_uni_softmax_fwd_t(const pd_t *apd, const input_vector &inputs,
+    jit_uni_fork_softmax_fwd_t(const pd_t *apd, const input_vector &inputs,
                        const output_vector &outputs);
-    ~jit_uni_softmax_fwd_t();
+    ~jit_uni_fork_softmax_fwd_t();
 
     using data_t = prec_traits<data_type::f32>::type;
 
@@ -96,7 +96,7 @@ struct jit_uni_softmax_fwd_t : public cpu_primitive_t {
 private:
     void execute_forward() const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd(); }
-    jit_uni_softmax_kernel_f32<isa> *kernel_;
+    jit_uni_fork_softmax_kernel_f32<isa> *kernel_;
 };
 
 }

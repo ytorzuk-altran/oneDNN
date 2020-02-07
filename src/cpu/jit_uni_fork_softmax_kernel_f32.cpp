@@ -19,7 +19,7 @@
 #include "nstl.hpp"
 #include "utils.hpp"
 #include "jit_generator.hpp"
-#include "jit_uni_softmax_kernel_f32.hpp"
+#include "jit_uni_fork_softmax_kernel_f32.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -30,7 +30,7 @@ using namespace Xbyak;
 #define GET_OFF(field) offsetof(jit_softmax_call_s, field)
 
 template <cpu_isa_t isa>
-status_t jit_uni_softmax_kernel_f32<isa>::init_conf(jit_softmax_conf_t &jpp,
+status_t jit_uni_fork_softmax_kernel_f32<isa>::init_conf(jit_softmax_conf_t &jpp,
                    const softmax_desc_t &pd, const memory_desc_wrapper &src_d,
                    const memory_desc_wrapper &dst_d) {
     auto ndims = pd.data_desc.ndims;
@@ -82,37 +82,37 @@ status_t jit_uni_softmax_kernel_f32<isa>::init_conf(jit_softmax_conf_t &jpp,
 }
 
 template <cpu_isa_t isa>
-int jit_uni_softmax_kernel_f32<isa>::id_vreg_max(int ur_inner) {
+int jit_uni_fork_softmax_kernel_f32<isa>::id_vreg_max(int ur_inner) {
     return 5+ur_inner;
 }
 
 template <cpu_isa_t isa>
-int jit_uni_softmax_kernel_f32<isa>::id_vreg_denom(int ur_inner) {
+int jit_uni_fork_softmax_kernel_f32<isa>::id_vreg_denom(int ur_inner) {
     return 5+jpp.ur_inner + ur_inner;
 }
 
 template <cpu_isa_t isa>
-int jit_uni_softmax_kernel_f32<isa>::id_vreg_src(int ur_inner) {
+int jit_uni_fork_softmax_kernel_f32<isa>::id_vreg_src(int ur_inner) {
     return 5+2*jpp.ur_inner;
 }
 
 template <cpu_isa_t isa>
-auto jit_uni_softmax_kernel_f32<isa>::vreg_max(int ur_inner) -> Vmm {
+auto jit_uni_fork_softmax_kernel_f32<isa>::vreg_max(int ur_inner) -> Vmm {
     return Vmm(id_vreg_max(ur_inner));
 }
 
 template <cpu_isa_t isa>
-auto jit_uni_softmax_kernel_f32<isa>::vreg_denom(int ur_inner) -> Vmm {
+auto jit_uni_fork_softmax_kernel_f32<isa>::vreg_denom(int ur_inner) -> Vmm {
     return Vmm(id_vreg_denom(ur_inner));
 }
 
 template <cpu_isa_t isa>
-auto jit_uni_softmax_kernel_f32<isa>::vreg_src(int ur_inner) -> Vmm {
+auto jit_uni_fork_softmax_kernel_f32<isa>::vreg_src(int ur_inner) -> Vmm {
     return Vmm(id_vreg_src(ur_inner));
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::prepare_table() {
+void jit_uni_fork_softmax_kernel_f32<isa>::prepare_table() {
     const unsigned int cvals[] = {
             0x3f800000, // [0] 1.0f
             0x3f000000, // [1] 0.5f
@@ -139,7 +139,7 @@ void jit_uni_softmax_kernel_f32<isa>::prepare_table() {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::simd_expf(const Vmm &vmm_src) {
+void jit_uni_fork_softmax_kernel_f32<isa>::simd_expf(const Vmm &vmm_src) {
     uni_vminps(vmm_src, vmm_src, ptr[imm_addr64 + 10 * vlen]);
     uni_vmaxps(vmm_src, vmm_src, ptr[imm_addr64 + 11 * vlen]);
     uni_vmovups(vmm_aux0, vmm_src);
@@ -186,7 +186,7 @@ void jit_uni_softmax_kernel_f32<isa>::simd_expf(const Vmm &vmm_src) {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::scalar_expf(const Xmm &xmm_src) {
+void jit_uni_fork_softmax_kernel_f32<isa>::scalar_expf(const Xmm &xmm_src) {
     minss(xmm_src, ptr[imm_addr64 + 10 * vlen]);
     maxss(xmm_src, ptr[imm_addr64 + 11 * vlen]);
     movups(xmm_aux0, xmm_src);
@@ -233,7 +233,7 @@ void jit_uni_softmax_kernel_f32<isa>::scalar_expf(const Xmm &xmm_src) {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::simd_loop_max(int ur_inner) {
+void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_max(int ur_inner) {
     Label loop_channel_blocks;
     Label loop_channel_tail;
     Label loop_channel_end;
@@ -285,7 +285,7 @@ void jit_uni_softmax_kernel_f32<isa>::simd_loop_max(int ur_inner) {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::simd_loop_exp(int ur_inner) {
+void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_exp(int ur_inner) {
     Label loop_channel_blocks;
     Label loop_channel_tail;
     Label loop_channel_end;
@@ -344,7 +344,7 @@ void jit_uni_softmax_kernel_f32<isa>::simd_loop_exp(int ur_inner) {
 
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::simd_loop_div(int ur_inner) {
+void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_div(int ur_inner) {
     Label loop_channel_blocks;
     Label loop_channel_tail;
     Label loop_channel_end;
@@ -404,7 +404,7 @@ void jit_uni_softmax_kernel_f32<isa>::simd_loop_div(int ur_inner) {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::scalar_loop_max() {
+void jit_uni_fork_softmax_kernel_f32<isa>::scalar_loop_max() {
     Label loop_channel_tail;
     Label loop_channel_end;
 
@@ -429,7 +429,7 @@ void jit_uni_softmax_kernel_f32<isa>::scalar_loop_max() {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::scalar_loop_exp() {
+void jit_uni_fork_softmax_kernel_f32<isa>::scalar_loop_exp() {
     Label loop_channel_tail;
     Label loop_channel_end;
 
@@ -461,7 +461,7 @@ void jit_uni_softmax_kernel_f32<isa>::scalar_loop_exp() {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::scalar_loop_div() {
+void jit_uni_fork_softmax_kernel_f32<isa>::scalar_loop_div() {
     Label loop_channel_tail;
     Label loop_channel_end;
 
@@ -488,7 +488,7 @@ void jit_uni_softmax_kernel_f32<isa>::scalar_loop_div() {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::dense_loop(int ou_block) {
+void jit_uni_fork_softmax_kernel_f32<isa>::dense_loop(int ou_block) {
     for (int ou = 0; ou < ou_block; ou++) {
         movups(xmm_max, xmm_float_min);
         for (int ch = 0; ch < (int)jpp.channels; ch++) {
@@ -534,7 +534,7 @@ void jit_uni_softmax_kernel_f32<isa>::dense_loop(int ou_block) {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::generate() {
+void jit_uni_fork_softmax_kernel_f32<isa>::generate() {
     this->preamble();
 
     mov(reg_src_base_ptr, ptr[abi_param1 + GET_OFF(src)]);
@@ -545,7 +545,7 @@ void jit_uni_softmax_kernel_f32<isa>::generate() {
     mov(reg_min, float2int(-FLT_MAX));
     movq(xmm_float_min, reg_min);
 
-    mov(imm_addr64, jit_uni_softmax_kernel_f32<isa>::l_table);
+    mov(imm_addr64, jit_uni_fork_softmax_kernel_f32<isa>::l_table);
     uni_vmovups(vmm_one, ptr[imm_addr64 + 0 * vlen]);
 
     cmp(reg_work_amount, jpp.ur_inner*simd_w);
@@ -602,7 +602,7 @@ void jit_uni_softmax_kernel_f32<isa>::generate() {
 }
 
 template <cpu_isa_t isa>
-void jit_uni_softmax_kernel_f32<isa>::generate_dense() {
+void jit_uni_fork_softmax_kernel_f32<isa>::generate_dense() {
     this->preamble();
 
     mov(reg_src_base_ptr, ptr[abi_param1 + GET_OFF(src)]);
@@ -612,7 +612,7 @@ void jit_uni_softmax_kernel_f32<isa>::generate_dense() {
     mov(reg_min, float2int(-FLT_MAX));
     movq(xmm_float_min, reg_min);
 
-    mov(imm_addr64, jit_uni_softmax_kernel_f32<isa>::l_table);
+    mov(imm_addr64, jit_uni_fork_softmax_kernel_f32<isa>::l_table);
     uni_vmovups(vmm_one, ptr[imm_addr64 + 0 * vlen]);
 
     int outer_tail = jpp.outer_size % jpp.outer_block;
@@ -655,9 +655,9 @@ void jit_uni_softmax_kernel_f32<isa>::generate_dense() {
     prepare_table();
 }
 
-template struct jit_uni_softmax_kernel_f32<sse42>;
-template struct jit_uni_softmax_kernel_f32<avx2>;
-template struct jit_uni_softmax_kernel_f32<avx512_common>;
+template struct jit_uni_fork_softmax_kernel_f32<sse42>;
+template struct jit_uni_fork_softmax_kernel_f32<avx2>;
+template struct jit_uni_fork_softmax_kernel_f32<avx512_common>;
 
 }
 }

@@ -32,12 +32,12 @@ namespace cpu {
 using namespace Xbyak;
 
 template <cpu_isa_t isa>
-struct jit_uni_softmax_kernel_f32 : public jit_generator {
+struct jit_uni_fork_softmax_kernel_f32 : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_softmax_kernel_f32)
     using Vmm = typename utils::conditional3<isa == sse42, Xmm,
             isa == avx2, Ymm, Zmm>::type;
 
-    jit_uni_softmax_kernel_f32(jit_softmax_conf_t ajpp) : jpp(ajpp) {
+    jit_uni_fork_softmax_kernel_f32(jit_softmax_conf_t ajpp) : jpp(ajpp) {
         if (jpp.inner_size > 1)
             this->generate();
         else
