@@ -457,8 +457,9 @@ void jit_uni_softmax_fwd_t<isa>::execute_forward() const {
     auto dst = reinterpret_cast<data_t*>(this->memory(0));
 
     const auto ou_stride = pd()->outer_stride();
+    const auto outer_size = utils::array_product(pd()->src_pd()->desc()->dims, pd()->desc()->softmax_axis);
 
-    parallel_nd(pd()->outer_size(), [&](int ou) {
+    parallel_nd(outer_size, [&](int ou) {
         const data_t *src_ptr = src + ou * ou_stride;
         data_t *dst_ptr = dst + ou * ou_stride;
         softmax_driver_->exec(src_ptr, dst_ptr);
