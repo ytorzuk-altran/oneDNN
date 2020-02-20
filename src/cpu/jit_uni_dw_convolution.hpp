@@ -90,12 +90,10 @@ struct _jit_uni_dw_convolution_fwd_t : public cpu_primitive_t {
     protected:
         virtual status_t set_default_params() override {
             using namespace memory_format;
-            auto desired_act_fmt
-                    = utils::one_of(isa, avx512_common, avx512_core) ? nChw16c
-                                                                     : nChw8c;
-            auto desired_wei_fmt
-                    = utils::one_of(isa, avx512_common, avx512_core) ? Goihw16g
-                                                                     : Goihw8g;
+            auto desired_act_fmt = ndims() == 5 ? utils::one_of(isa, avx512_common, avx512_core) ? nCdhw16c : nCdhw8c
+                                                : utils::one_of(isa, avx512_common, avx512_core) ? nChw16c : nChw8c;
+            auto desired_wei_fmt = ndims() == 5 ? utils::one_of(isa, avx512_common, avx512_core) ? Goidhw16g : Goidhw8g
+                                                : utils::one_of(isa, avx512_common, avx512_core) ? Goihw16g : Goihw8g;
 
             if (this->src_pd_.desc()->format == any)
                 CHECK(this->src_pd_.set_format(desired_act_fmt));

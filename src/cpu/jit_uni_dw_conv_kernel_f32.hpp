@@ -81,6 +81,10 @@ private:
     reg64_t reg_d_weights = imm_addr64;
     reg64_t reg_d_bias = iter_kh;
 
+    reg64_t reg_kd = abi_not_param1;
+    reg64_t aux_reg_inp_d = reg_input;
+    reg64_t aux_reg_ker_d = reg_kernel;
+
     Vmm vmm_d_weights = Vmm(0);
     Vmm vmm_d_bias = Vmm(1);
 

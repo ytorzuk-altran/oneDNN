@@ -127,6 +127,9 @@ status_t jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::init_conf(
     const bool with_groups = weights_d.ndims() == src_d.ndims() + 1;
     if (!with_groups) return status::unimplemented;
 
+    int ndims = src_d.ndims();
+    jcp.ndims = ndims;
+
     jcp.ngroups = weights_d.dims()[0];
     jcp.mb = src_d.dims()[0];
 
@@ -134,24 +137,31 @@ status_t jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::init_conf(
     jcp.oc_without_padding = jcp.oc;
     jcp.ic = src_d.dims()[1];
 
-    jcp.ih = src_d.dims()[2];
-    jcp.iw = src_d.dims()[3];
-    jcp.oh = dst_d.dims()[2];
-    jcp.ow = dst_d.dims()[3];
+    jcp.id = (ndims == 5) ? src_d.dims()[2] : 1;
+    jcp.ih = src_d.dims()[ndims - 2];
+    jcp.iw = src_d.dims()[ndims - 1];
+    jcp.od = (ndims == 5) ? dst_d.dims()[2] : 1;
+    jcp.oh = dst_d.dims()[ndims - 2];
+    jcp.ow = dst_d.dims()[ndims - 1];
 
-    jcp.kh = weights_d.dims()[3];
-    jcp.kw = weights_d.dims()[4];
+    jcp.kd = (ndims == 5) ? weights_d.dims()[3] : 1;
+    jcp.kh = weights_d.dims()[ndims - 1];
+    jcp.kw = weights_d.dims()[ndims];
 
-    jcp.t_pad = cd.padding[0][0];
-    jcp.l_pad = cd.padding[0][1];
-    jcp.b_pad = cd.padding[1][0];
-    jcp.r_pad = cd.padding[1][1];
+    jcp.f_pad = (ndims == 5) ? cd.padding[0][0] : 0;
+    jcp.t_pad = cd.padding[0][ndims - 4];
+    jcp.l_pad = cd.padding[0][ndims - 3];
+    jcp.back_pad = (ndims == 5) ? cd.padding[1][0] : 0;
+    jcp.b_pad = cd.padding[1][ndims - 4];
+    jcp.r_pad = cd.padding[1][ndims - 3];
 
-    jcp.stride_h = cd.strides[0];
-    jcp.stride_w = cd.strides[1];
+    jcp.stride_d = (ndims == 5) ? cd.strides[0] : 1;
+    jcp.stride_h = cd.strides[ndims - 4];
+    jcp.stride_w = cd.strides[ndims - 3];
 
-    jcp.dilate_h = cd.dilates[0];
-    jcp.dilate_w = cd.dilates[1];
+    jcp.dilate_d = (ndims == 5) ? cd.dilates[0] : 0;
+    jcp.dilate_h = cd.dilates[ndims - 4];
+    jcp.dilate_w = cd.dilates[ndims - 3];
 
     jcp.src_fmt = src_d.format();
     jcp.with_bias = cd.bias_desc.format != memory_format::undef;
@@ -176,10 +186,10 @@ status_t jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::init_conf(
         jcp.ngroups = rnd_up(jcp.ngroups, simd_w);
     }
 
-    auto desired_act_fmt
-            = one_of(isa, avx512_common, avx512_core) ? nChw16c : nChw8c;
-    auto desired_wei_fmt
-            = one_of(isa, avx512_common, avx512_core) ? Goihw16g : Goihw8g;
+    auto desired_act_fmt = (ndims == 5) ? one_of(isa, avx512_common, avx512_core) ? nCdhw16c : nCdhw8c
+                                        : one_of(isa, avx512_common, avx512_core) ? nChw16c : nChw8c;
+    auto desired_wei_fmt = (ndims == 5) ? one_of(isa, avx512_common, avx512_core) ? Goidhw16g : Goidhw8g
+                                        : one_of(isa, avx512_common, avx512_core) ? Goihw16g : Goihw8g;
 
     bool args_ok = true
         && jcp.oc == jcp.ngroups
