@@ -37,7 +37,7 @@ ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(alg_kind_t alg, float alpha,
     assert(utils::one_of(alg_, eltwise_relu, eltwise_tanh, eltwise_elu,
                 eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                 eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
-                eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_not));
+                eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_not, eltwise_swish));
 }
 
 ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(
@@ -60,6 +60,7 @@ float ref_eltwise_scalar_fwd_t::compute_scalar(float s) {
         case eltwise_gelu: return gelu_fwd(s);
         case eltwise_clamp: return clamp_fwd(s, alpha_, beta_);
         case eltwise_not: return not_fwd(s);
+        case eltwise_swish: return swish_fwd(s, alpha_);
         default: assert(!"unknown eltwise alg_kind");
     }
 
@@ -94,6 +95,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_nCspBc_padded() const {
             case eltwise_exp: d = exp_fwd(s); break;
             case eltwise_clamp: d = clamp_fwd(s, alpha, beta); break;
             case eltwise_not: d = not_fwd(s); break;
+            case eltwise_swish: d = swish_fwd(s, alpha); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     };
@@ -202,6 +204,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic() const {
             case eltwise_gelu: d = gelu_fwd(s); break;
             case eltwise_clamp: d = clamp_fwd(s, alpha, beta); break;
             case eltwise_not: d = not_fwd(s); break;
+            case eltwise_swish: d = swish_fwd(s, alpha); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     });
@@ -295,6 +298,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense() const {
         case eltwise_gelu: d = gelu_fwd(s); break;
         case eltwise_clamp: d = clamp_fwd(s, alpha, beta); break;
         case eltwise_not: d = not_fwd(s); break;
+        case eltwise_swish: d = swish_fwd(s, alpha); break;
         default: assert(!"unknown eltwise alg_kind");
         }
     });
@@ -394,6 +398,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_generic() const {
             case eltwise_exp: ds = exp_bwd(dd, s); break;
             case eltwise_gelu: ds = gelu_bwd(dd, s); break;
             case eltwise_clamp: ds = clamp_bwd(dd, s, alpha, beta); break;
+            case eltwise_swish: ds = swish_bwd(dd, s, alpha); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     });
@@ -489,6 +494,7 @@ void ref_eltwise_bwd_t<data_type>::execute_backward_dense() const {
         case eltwise_exp: ds = exp_bwd(dd, s); break;
         case eltwise_gelu: ds = gelu_bwd(dd, s); break;
         case eltwise_clamp: ds = clamp_bwd(dd, s, alpha, beta); break;
+        case eltwise_swish: ds = swish_bwd(dd, s, alpha); break;
         default: assert(!"unknown eltwise alg_kind");
         }
     });

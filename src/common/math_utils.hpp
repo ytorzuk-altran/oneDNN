@@ -282,6 +282,19 @@ inline U not_fwd(T s) {
 }
 
 template <typename T, typename A,
+        typename U = typename utils::remove_reference<T>::type>
+inline U swish_fwd(T s, A alpha) {
+    return (U)(s / (1 + ::expf(-alpha * (float)s)));
+}
+
+template <typename T, typename A,
+        typename U = typename utils::remove_reference<T>::type>
+inline U swish_bwd(T dd, T s, A alpha) {
+    float v = 1 / (1.0f + ::expf((float)-s * alpha));
+    return dd * (v + s * alpha * v * (1 - v));
+}
+
+template <typename T, typename A,
          typename U = typename utils::remove_reference<T>::type>
 inline U scale_shift_fwd(T s_val, A w_val, A b_val) {
     return (U)(s_val*w_val + b_val);
@@ -298,8 +311,8 @@ inline bool eltwise_fwd_preserves_zero(alg_kind_t alg, bool jit_impl = false) {
     using namespace utils;
     const bool preserves_zero = true
         && !one_of(alg, eltwise_linear, eltwise_soft_relu, eltwise_logistic,
-                eltwise_exp, eltwise_clamp, eltwise_not)
-        && IMPLICATION(jit_impl, !one_of(alg, eltwise_elu, eltwise_tanh, eltwise_clamp, eltwise_not));
+                eltwise_exp, eltwise_clamp, eltwise_not, eltwise_swish)
+        && IMPLICATION(jit_impl, !one_of(alg, eltwise_elu, eltwise_tanh, eltwise_clamp, eltwise_not, eltwise_swish));
     return preserves_zero;
 }
 
