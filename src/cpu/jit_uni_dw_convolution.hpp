@@ -170,7 +170,7 @@ struct _jit_uni_dw_convolution_bwd_data_t : public cpu_primitive_t {
             status_t status = jit_uni_dw_conv_bwd_data_kernel<isa,
                     diff_dst_type>::init_conf(jcp_, *this->desc(),
                     *this->diff_src_pd_.desc(), *this->weights_pd_.desc(),
-                    *this->diff_dst_pd_.desc());
+                    *this->diff_dst_pd_.desc(), *this->attr());
             if (status != status::success)
                 return status;
 
@@ -210,7 +210,7 @@ struct _jit_uni_dw_convolution_bwd_data_t : public cpu_primitive_t {
             const input_vector &inputs, const output_vector &outputs)
         : cpu_primitive_t(apd, inputs, outputs) {
         kernel_ = new jit_uni_dw_conv_bwd_data_kernel<isa, diff_dst_type>(
-                pd()->jcp_);
+                pd()->jcp_, *pd()->attr());
     }
     ~_jit_uni_dw_convolution_bwd_data_t() { delete kernel_; };
 

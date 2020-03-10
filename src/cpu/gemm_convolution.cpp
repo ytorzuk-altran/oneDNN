@@ -297,6 +297,7 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
 
     const size_t work_amount = (size_t)jcp.ngroups * MB;
     const bool is_problem_3d = pd()->ndims() == 5;
+    const auto &p = pd()->attr()->post_ops_;
 
     parallel(jcp.nthr, work_amount, [&](const int ithr, const int nthr) {
         data_t *_col = col + (ptrdiff_t)ithr * jcp.im2col_sz;
@@ -332,6 +333,26 @@ void gemm_convolution_bwd_data_t::execute_backward_data() const {
                     else
                         jit_gemm_convolution_utils::col2im_3d(jcp, _col,
                             _diff_src, od);
+                }
+            }
+            if (p.len_ > 0) {
+                int depthwise_inj_idx = 0;
+                for (int i = 0; i < p.len_; i++) {
+                    auto &post_op = p.entry_[i];
+                    if (post_op.is_depthwise()) {
+                        auto depthwise_weights = post_op.depthwise.weights_data;
+                        auto depthwise_bias = post_op.depthwise.biases_data;
+                        parallel_nd(jcp.ic, [&](const int ic) {
+                            for (int id = 0; id < jcp.id; ++id) {
+                                data_t *d_ = _diff_src + ic * jcp.id * jcp.is + id * jcp.is;
+                                for (int iS = 0; iS < jcp.is; ++iS) {
+                                    d_[iS] = depthwise_injectors[depthwise_inj_idx]->compute_scalar(d_[iS],
+                                            depthwise_weights + g * jcp.ic + ic, depthwise_bias + g * jcp.ic + ic);
+                                }
+                            }
+                        });
+                        depthwise_inj_idx++;
+                    }
                 }
             }
             nd_iterator_step(g, jcp.ngroups, n, MB);

@@ -253,23 +253,32 @@ struct jit_avx512_common_conv_fwd_kernel {
 
 struct jit_avx512_common_conv_bwd_data_kernel_f32: public jit_generator {
 
-    jit_avx512_common_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp): jcp(ajcp)
-    {
+    jit_avx512_common_conv_bwd_data_kernel_f32(jit_conv_conf_t ajcp, const primitive_attr_t &attr)
+    : jcp(ajcp), attr_(attr) {
         generate();
         jit_ker = (void (*)(jit_conv_call_s *))getCode();
     }
 
+    ~jit_avx512_common_conv_bwd_data_kernel_f32() {
+        for (auto inj : depthwise_injectors)
+            delete inj;
+        depthwise_injectors.clear();
+    }
+
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_common_conv_bwd_data_kernel_f32)
 
+    static bool post_ops_ok(const primitive_attr_t &attr);
     static status_t init_conf(jit_conv_conf_t &jcp,
             const convolution_desc_t &cd,
             const memory_desc_wrapper &diff_src_d,
             const memory_desc_wrapper &weights_d,
-            const memory_desc_wrapper &diff_dst_d);
+            const memory_desc_wrapper &diff_dst_d,
+            const primitive_attr_t &attr);
     static void init_scratchpad(memory_tracking::registrar_t &scratchpad,
             const jit_conv_conf_t &jcp);
 
     jit_conv_conf_t jcp;
+    const primitive_attr_t &attr_;
     void (*jit_ker)(jit_conv_call_s *);
 
 private:
@@ -338,6 +347,11 @@ private:
     }
 
     Xbyak::Zmm zmm_wei = Xbyak::Zmm(31);
+
+    reg64_t reg_d_weights = aux_reg_ker;
+    reg64_t reg_d_bias = reg_kj;
+
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);

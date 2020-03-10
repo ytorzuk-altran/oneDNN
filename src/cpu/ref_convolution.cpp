@@ -366,6 +366,8 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
 
     const int ndims = pd()->desc()->diff_src_desc.ndims;
 
+    const auto &p = pd()->attr()->post_ops_;
+
     auto ker = [=](int g, int mb, int ic, int id, int ih,
             int iw) {
         acc_data_t d = 0;
@@ -531,6 +533,19 @@ void ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             a += ker_plain(g, mb, ic, id, ih, iw);
         else
             a += ker(g, mb, ic, id, ih, iw);
+
+        int depthwise_inj_idx = 0;
+        for (int i = 0; i < p.len_; i++) {
+            auto &post_op = p.entry_[i];
+            if (post_op.is_depthwise()) {
+                auto depthwise_weights = post_op.depthwise.weights_data;
+                auto depthwise_bias = post_op.depthwise.biases_data;
+
+                a = depthwise_injectors[depthwise_inj_idx]->compute_scalar(a, depthwise_weights + g * IC + ic, depthwise_bias + g * IC + ic);
+            }
+            depthwise_inj_idx++;
+        }
+
         diff_src[ds_idx] = saturate<diff_src_data_t>(a);
     });
 }

@@ -416,6 +416,7 @@ struct jit_conv_call_s {
     const void *src_row2; /* hack, non-const for backward_data */
 
     size_t oc_off;
+    size_t ic_off;
     size_t oc_off_prf;
     const void *input_zp;
     const void *weights_zp;

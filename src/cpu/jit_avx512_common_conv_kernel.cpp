@@ -1919,7 +1919,7 @@ void jit_avx512_common_conv_bwd_data_kernel_f32::prepare_output(int ur_w)
 
 void jit_avx512_common_conv_bwd_data_kernel_f32::store_output(int ur_w)
 {
-    Label no_update_label;
+    Label no_update_label, skip_post_ops;
 
     mov(reg_channel, ptr[param + GET_OFF(channel)]);
     cmp(reg_channel, 0);
@@ -1933,8 +1933,32 @@ void jit_avx512_common_conv_bwd_data_kernel_f32::store_output(int ur_w)
                         reg_long_offt));
         }
     }
+    jmp(skip_post_ops, T_NEAR);
 
     L(no_update_label);
+    const auto &p = attr_.post_ops_;
+    int depthwise_inj_idx = 0;
+    for (int i = 0; i < p.len_; i++) {
+        auto& post_op = p.entry_[i];
+        if (post_op.is_depthwise()) {
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+
+            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
+            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
+
+            for (int k = 0; k < jcp.nb_ic_blocking; k++) {
+                depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
+                        k*jcp.ur_w, k*jcp.ur_w + ur_w, reg_d_weights, reg_d_bias);
+
+                add(reg_d_weights, jcp.ic_block * sizeof(float));
+                add(reg_d_bias, jcp.ic_block * sizeof(float));
+            }
+        }
+        depthwise_inj_idx++;
+    }
+    L(skip_post_ops);
+
     for (int k = 0; k < jcp.nb_ic_blocking; k++) {
         for (int j = 0; j < ur_w; j++) {
             Zmm zmm = zmm_out(j, k);
@@ -2528,6 +2552,16 @@ inline void jit_avx512_common_conv_bwd_data_kernel_f32::compute_loop(
 
 void jit_avx512_common_conv_bwd_data_kernel_f32::generate()
 {
+    const auto &p = attr_.post_ops_;
+    for (int i = 0; i < p.len_; i++) {
+        auto &post_op = p.entry_[i];
+        if (post_op.is_depthwise()) {
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
+                    this,
+                    post_op.depthwise.alg
+            ));
+        }
+    }
     int iw = jcp.iw;
     int kw = jcp.kw;
     int ur_w = jcp.ur_w;
@@ -2611,12 +2645,27 @@ void jit_avx512_common_conv_bwd_data_kernel_f32::generate()
     postamble();
 }
 
+bool jit_avx512_common_conv_bwd_data_kernel_f32::post_ops_ok(const primitive_attr_t &attr) {
+    const auto &p = attr.post_ops_;
+    if (p.len_ > 1)
+        return false;
+
+    auto all_post_ops_supported = [&]() {
+        bool ok = true;
+
+        for (int i = 0; i < p.len_; i++) {
+            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::depthwise);
+        }
+        return ok;
+    };
+
+    return all_post_ops_supported();
+}
+
 status_t jit_avx512_common_conv_bwd_data_kernel_f32::init_conf(
-        jit_conv_conf_t &jcp,
-        const convolution_desc_t &cd,
-        const memory_desc_wrapper &diff_src_d,
-        const memory_desc_wrapper &weights_d,
-        const memory_desc_wrapper &diff_dst_d)
+        jit_conv_conf_t &jcp, const convolution_desc_t &cd,
+        const memory_desc_wrapper &diff_src_d, const memory_desc_wrapper &weights_d,
+        const memory_desc_wrapper &diff_dst_d, const primitive_attr_t &attr)
 {
     if (!mayiuse(avx512_common)) return status::unimplemented;
 
@@ -2702,6 +2751,9 @@ status_t jit_avx512_common_conv_bwd_data_kernel_f32::init_conf(
         && diff_src_d.format() == src_format
         && diff_dst_d.format() == src_format;
     if (!args_ok)
+        return status::unimplemented;
+
+    if (!post_ops_ok(attr))
         return status::unimplemented;
 
     jcp.nb_ic = jcp.ic / jcp.ic_block;

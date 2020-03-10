@@ -401,6 +401,8 @@ void jit_avx2_convolution_bwd_data_t::execute_backward_data() const {
                     par_conv.filt = &weights[wht_blk_off(weights_d, g, oc,
                             jcp.nb_ic_blocking * icbb, d_b_overflow, k_lo, 0)];
 
+                    par_conv.ic_off = (g * jcp.nb_ic + jcp.nb_ic_blocking * icbb) * jcp.ic_block * sizeof(float);
+
                     par_conv.src_prf = nullptr;
                     par_conv.dst_prf = nullptr;
                     par_conv.filt_prf = nullptr;
