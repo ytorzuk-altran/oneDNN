@@ -283,20 +283,29 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(int ur_ch_blocks, in
         } else if (post_op.is_quantization()) {
             quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
-                int s_idx = get_acc_reg(ch*ur_w).getIdx();
-                quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + ur_w, ch * jcp.ch_block * sizeof(float));
+                for (int k = 0; k < repeats; k++) {
+                    int s_idx = get_acc_reg(k*ur_ch_blocks*ur_w + ch*ur_w).getIdx();
+                    quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + ur_w,
+                                                                               (k * (jcp.ch_block / 2) + ch * jcp.ch_block) * sizeof(float));
+                }
             }
 
             quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
-                int s_idx = get_acc_reg(ch*ur_w).getIdx();
-                quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + ur_w, ch * jcp.ch_block * sizeof(float), true);
+                for (int k = 0; k < repeats; k++) {
+                    int s_idx = get_acc_reg(k*ur_ch_blocks*ur_w + ch*ur_w).getIdx();
+                    quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + ur_w,
+                                                                                            (k * (jcp.ch_block / 2) + ch * jcp.ch_block) * sizeof(float), true);
+                }
             }
 
             quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
-                int s_idx = get_acc_reg(ch*ur_w).getIdx();
-                quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + ur_w, ch * jcp.ch_block * sizeof(float));
+                for (int k = 0; k < repeats; k++) {
+                    int s_idx = get_acc_reg(k*ur_ch_blocks*ur_w + ch*ur_w).getIdx();
+                    quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + ur_w,
+                                                                                             (k * (jcp.ch_block / 2) + ch * jcp.ch_block) * sizeof(float));
+                }
             }
 
             quantization_inj_idx++;
