@@ -26,7 +26,6 @@
 #include "jit_primitive_conf.hpp"
 #include "jit_uni_eltwise.hpp"
 #include "jit_uni_depthwise.hpp"
-#include "jit_uni_depthwise.hpp"
 #include "jit_uni_quantization.hpp"
 
 namespace mkldnn {
@@ -114,6 +113,8 @@ private:
 
     const Xbyak::Opmask ktail_mask = Xbyak::Opmask(2);
     const Xbyak::Opmask kblend_mask = Xbyak::Opmask(3);
+    Xbyak::Opmask mask_post_op_reserved = Xbyak::Opmask(1);
+    Xbyak::Reg64 eltwise_reserved = rax;
 
     const Vmm vmm_wei = Vmm(31);
     /* used during bias section of store_output */

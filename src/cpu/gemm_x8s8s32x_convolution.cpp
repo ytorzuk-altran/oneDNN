@@ -153,10 +153,10 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::jit_pp_ker_t<isa>::jit_pp_
         auto &post_op = post_ops_.entry_[i];
         if (post_op.is_eltwise()) {
             jit_eltwise_injectors_.push_back(new jit_uni_eltwise_injector_f32<isa>(
-                    this, post_op.eltwise.alg, post_op.eltwise.alpha, post_op.eltwise.beta));
+                    this, post_op.eltwise, true, eltwise_reserved, mask_post_op_reserved));
         } else if (post_op.is_depthwise()) {
             jit_depthwise_injectors_.push_back(new jit_uni_depthwise_injector_f32<isa>(
-                    this, post_op.depthwise.alg));
+                    this, post_op.depthwise.alg, mask_post_op_reserved));
         }
     }
 

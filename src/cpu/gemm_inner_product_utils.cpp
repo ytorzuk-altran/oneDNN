@@ -62,11 +62,11 @@ jit_pp_kernel_t<isa, acc_type, dst_type>::jit_pp_kernel_t(
         auto &post_op = post_ops_.entry_[i];
         if (post_op.is_eltwise()) {
             eltwise_injectors_.push_back(new jit_uni_eltwise_injector_f32<isa == avx512_core_bf16 ? avx512_common : isa>(
-                    this, post_op.eltwise, true, eltwise_reserved_1_, eltwise_reserved_2_));
+                    this, post_op.eltwise, true, eltwise_reserved, mask_post_op_reserved));
         } else if (post_op.is_depthwise()) {
             only_eltwise = false;
             depthwise_injectors_.push_back(new jit_uni_depthwise_injector_f32<isa == avx512_core_bf16 ? avx512_common : isa>(
-                    this, post_op.depthwise.alg));
+                    this, post_op.depthwise.alg, mask_post_op_reserved));
         } else {
             only_eltwise = false;
         }

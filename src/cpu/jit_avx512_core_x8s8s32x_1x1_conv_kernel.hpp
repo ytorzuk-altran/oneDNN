@@ -111,6 +111,8 @@ struct jit_avx512_core_x8s8s32x_1x1_conv_kernel: public jit_generator {
     mask_t ktail_mask = k6;
 
     mask_t vmask = k7;
+    mask_t mask_post_op_reserved = k1;
+    Xbyak::Reg64 eltwise_reserved = rax;
 
     Xbyak::Zmm zmm_tmp = Xbyak::Zmm(28);
     Xbyak::Zmm zmm_one = Xbyak::Zmm(29);

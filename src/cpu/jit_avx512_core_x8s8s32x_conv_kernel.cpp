@@ -746,15 +746,11 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::generate()
         auto &post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
             eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common>(
-                    this,
-                    post_op.eltwise.alg,
-                    post_op.eltwise.alpha,
-                    post_op.eltwise.beta
+                    this, post_op.eltwise, true, eltwise_reserved, mask_post_op_reserved
             ));
         } else if (post_op.is_depthwise()) {
             depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
-                    this,
-                    post_op.depthwise.alg
+                    this, post_op.depthwise.alg, mask_post_op_reserved
             ));
         } else if (post_op.is_quantization()) {
             int max_ur_w = nstl::max(jcp.ur_w, jcp.ur_w_tail);

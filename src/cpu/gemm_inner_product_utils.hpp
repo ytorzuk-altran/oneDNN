@@ -114,9 +114,6 @@ private:
 
     Vmm vreg_zero, vreg_scale;
 
-    Xbyak::Reg64 eltwise_reserved_1_ = r11;
-    Xbyak::Opmask eltwise_reserved_2_ = k2;
-
     //  dst_type == data_type::bf16 && isa != avx512_core_bf16
     Xbyak::Zmm bf16_emu_reserv_1 = Xbyak::Zmm(28);
     Xbyak::Zmm bf16_emu_reserv_2 = Xbyak::Zmm(29);
@@ -136,6 +133,8 @@ private:
     Vmm vreg_store_mask = Vmm(1);
 
     //  post_ops
+    Xbyak::Opmask mask_post_op_reserved = k2;
+    Xbyak::Reg64 eltwise_reserved = r11;
     Xbyak::Reg64 reg_d_weights = r14;
     Xbyak::Reg64 reg_d_bias = r15;
     Vmm vreg_d_weights, vreg_d_bias;

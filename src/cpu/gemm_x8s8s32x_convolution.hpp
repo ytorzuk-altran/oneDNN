@@ -258,6 +258,8 @@ private:
         Vmm vreg_store_mask = Vmm(1);
 
         //  post_ops
+        Xbyak::Opmask mask_post_op_reserved = k2;
+        Xbyak::Reg64 eltwise_reserved = rax;
         Xbyak::Reg64 reg_d_weights = r14;
         Xbyak::Reg64 reg_d_bias = r15;
         Vmm vreg_d_weights, vreg_d_bias;
