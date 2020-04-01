@@ -63,7 +63,7 @@ void jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type,
     assert(jcp.nb_ch % jcp.nb_ch_blocking == 0);
 
     const float *oscales = pd()->attr()->output_scales_.scales_;
-    if (jcp.signed_input) {
+    if (jcp.signed_input && jcp.ver != ver_vnni) {
         auto local_scales = ctx.get_scratchpad_grantor().template get<float>(
                 key_conv_adjusted_scales);
         size_t count = pd()->attr()->output_scales_.count_;
@@ -220,7 +220,7 @@ void jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type,
     assert(jcp.nb_ch % jcp.nb_ch_blocking == 0);
 
     const float *oscales = pd()->attr()->output_scales_.scales_;
-    if (jcp.signed_input) {
+    if (jcp.signed_input && jcp.ver != ver_vnni) {
         auto local_scales = ctx.get_scratchpad_grantor().template get<float>(
                 key_conv_adjusted_scales);
         size_t count = pd()->attr()->output_scales_.count_;
@@ -346,7 +346,7 @@ void jit_uni_x8s8s32x_convolution_fwd_t<isa, src_type,
     assert(jcp.nb_ch % jcp.nb_ch_blocking == 0);
 
     const float *oscales = pd()->attr()->output_scales_.scales_;
-    if (jcp.signed_input) {
+    if (jcp.signed_input && jcp.ver != ver_vnni) {
         auto local_scales = ctx.get_scratchpad_grantor().template get<float>(
                 key_conv_adjusted_scales);
         size_t count = pd()->attr()->output_scales_.count_;

@@ -54,7 +54,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
 
     auto scratchpad = ctx.get_scratchpad_grantor();
 
-    if (pd()->jcp_.signed_input) {
+    if (pd()->jcp_.signed_input && pd()->jcp_.ver != ver_vnni) {
         auto local_scales
                 = scratchpad.template get<float>(key_conv_adjusted_scales);
         auto scales = pd()->attr()->output_scales_.scales_;
@@ -243,7 +243,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
         p.bias_data = &bias[_ocb * jcp.oc_block * bia_dt_size];
         p.compensation = (jcp.signed_input || jcp.with_input_zp) ? &compensation[_ocb * jcp.oc_block]
                                                                  : nullptr;
-        p.scales = (jcp.signed_input)
+        p.scales = (jcp.signed_input && jcp.ver != ver_vnni)
                 ? &local_scales[jcp.is_oc_scale * _ocb * jcp.oc_block]
                 : &oscales[jcp.is_oc_scale * _ocb * jcp.oc_block];
         if (pd()->rtus_.reduce_src_) {
