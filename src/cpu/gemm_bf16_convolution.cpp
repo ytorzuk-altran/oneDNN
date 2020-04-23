@@ -334,6 +334,8 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward() const {
         : nullptr;
 
     const jit_gemm_conv_conf_t &jcp = this->pd()->jcp_;
+    auto src_offset = this->pd()->src_pd()->desc()->layout_desc.blocking.offset_padding;
+    auto dst_offset = this->pd()->dst_pd()->desc()->layout_desc.blocking.offset_padding;
 
     float *bias = nullptr;
     if (pd()->desc()->bias_desc.data_type == data_type::bf16) {
@@ -384,9 +386,9 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward() const {
         for (size_t iwork = start; iwork < end; ++iwork) {
             int oh = ohb * jcp.oh_block;
             int ow = owb * jcp.ow_block;
-            const src_data_t *_src = src + (n * jcp.ngroups + g) * src_step;
+            const src_data_t *_src = src + (n * jcp.ngroups + g) * src_step + src_offset;
             const wei_data_t *_weights = weights + g * weights_g_size;
-            dst_data_t *_dst_im = dst + (n * jcp.ngroups + g) * dst_step;
+            dst_data_t *_dst_im = dst + (n * jcp.ngroups + g) * dst_step + dst_offset;
             const int h_step = nstl::min(jcp.oh_block, jcp.oh - oh);
             const int w_step = nstl::min(jcp.ow_block, jcp.ow - ow);
             if (jcp.im2col_sz) {
