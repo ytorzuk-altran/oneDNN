@@ -30,7 +30,7 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
-namespace { template <cpu_isa_t isa> struct uni_bnorm_driver_t; }
+template <cpu_isa_t isa> struct uni_bnorm_driver_t;
 
 template <cpu_isa_t isa, data_type_t d_type>
 struct jit_uni_batch_normalization_fwd_t : public cpu_primitive_t {

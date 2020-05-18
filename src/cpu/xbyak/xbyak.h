@@ -71,7 +71,7 @@
 
 // #define XBYAK_DISABLE_AVX512
 
-//#define XBYAK_USE_MMAP_ALLOCATOR
+// #define XBYAK_USE_MMAP_ALLOCATOR
 #if !defined(__GNUC__) || defined(__MINGW32__)
 	#undef XBYAK_USE_MMAP_ALLOCATOR
 #endif

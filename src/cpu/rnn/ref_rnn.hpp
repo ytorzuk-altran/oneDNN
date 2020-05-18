@@ -24,7 +24,6 @@
 #include "type_helpers.hpp"
 #include "utils.hpp"
 
-#include "../cpu_isa_traits.hpp"
 #include "../gemm/os_blas.hpp"
 
 #include "cpu_rnn_pd.hpp"

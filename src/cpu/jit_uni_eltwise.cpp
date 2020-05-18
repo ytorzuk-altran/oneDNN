@@ -24,7 +24,7 @@
 #include "jit_uni_eltwise.hpp"
 #include "jit_avx512_core_bf16cvt.hpp"
 
-#define GET_OFF(field) offsetof(jit_args, field)
+#define GET_OFF(field) offsetof(jit_eltwise_args, field)
 
 namespace mkldnn {
 namespace impl {
@@ -822,7 +822,7 @@ template struct jit_uni_eltwise_injector_f32<avx2>;
 template struct jit_uni_eltwise_injector_f32<sse42>;
 
 
-struct jit_args {
+struct jit_eltwise_args {
     const void *from;
     const void *for_comparison;
     const void *to;
@@ -832,8 +832,8 @@ struct jit_args {
 struct jit_uni_eltwise_kernel_f32 : public c_compatible {
     const eltwise_desc_t &desc_;
 
-    void (*ker_)(const jit_args *);
-    void operator()(const jit_args *args) { assert(ker_); ker_(args); }
+    void (*ker_)(const jit_eltwise_args *);
+    void operator()(const jit_eltwise_args *args) { assert(ker_); ker_(args); }
 
     jit_uni_eltwise_kernel_f32(const eltwise_desc_t &desc)
         : desc_(desc), ker_(nullptr) {}
@@ -1334,7 +1334,7 @@ void jit_uni_eltwise_fwd_t<isa, d_type>::execute_forward() const {
         start = nstl::min(nelems, start * cache_line);
         end = nstl::min(nelems, end * cache_line);
 
-        auto arg = jit_args();
+        auto arg = jit_eltwise_args();
         arg.from = (const void*)&src[start];
         arg.for_comparison = (const void*)&src[start];
         arg.to = (const void*)&dst[start];
@@ -1401,7 +1401,7 @@ void jit_uni_eltwise_bwd_t<isa, d_type>::execute_backward() const {
         start = nstl::min(nelems, start * cache_line);
         end = nstl::min(nelems, end * cache_line);
 
-        auto arg = jit_args();
+        auto arg = jit_eltwise_args();
         arg.from = (const void*)&diff_dst[start];
         arg.to = (const void*)&diff_src[start];
         arg.for_comparison = (const void*)&src[start];

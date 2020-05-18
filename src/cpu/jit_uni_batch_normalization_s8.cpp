@@ -412,10 +412,10 @@ struct jit_bnorm_t: public jit_generator {
 };
 
 template <cpu_isa_t isa>
-struct uni_bnorm_driver_t: public c_compatible {
-    uni_bnorm_driver_t(const batch_normalization_pd_t *bdesc)
+struct uni_bnorm_driver_s8_t: public c_compatible {
+    uni_bnorm_driver_s8_t(const batch_normalization_pd_t *bdesc)
         : bdesc_(bdesc), ker_(bdesc_) {}
-    ~uni_bnorm_driver_t() {}
+    ~uni_bnorm_driver_s8_t() {}
 
     // TODO: for problems where thread pieces don't fit L2 cache, add spatial
     // re-balance using less pieces.
@@ -497,7 +497,7 @@ template <cpu_isa_t isa>
 jit_uni_batch_normalization_s8_fwd_t<isa>::jit_uni_batch_normalization_s8_fwd_t(
         const pd_t *apd, const input_vector &inputs,
         const output_vector &outputs) : cpu_primitive_t(apd, inputs, outputs) {
-    bnorm_driver_ = new uni_bnorm_driver_t<isa>(pd());
+    bnorm_driver_ = new uni_bnorm_driver_s8_t<isa>(pd());
 }
 
 template <cpu_isa_t isa>

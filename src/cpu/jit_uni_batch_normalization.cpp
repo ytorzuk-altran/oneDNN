@@ -1112,6 +1112,8 @@ struct jit_bnorm_t: public jit_generator {
     ~jit_bnorm_t() { delete bf16_emu_; }
 };
 
+}
+
 template <cpu_isa_t isa>
 struct uni_bnorm_driver_t: public c_compatible {
     uni_bnorm_driver_t(const batch_normalization_pd_t *bdesc)
@@ -1306,8 +1308,6 @@ private:
 
     size_t dt_size_;
 };
-
-}
 
 using namespace data_type;
 using namespace memory_format;

@@ -24,7 +24,7 @@
 
 #include "jit_uni_depthwise.hpp"
 
-#define GET_OFF(field) offsetof(jit_args, field)
+#define GET_OFF(field) offsetof(jit_depthwise_args, field)
 
 namespace mkldnn {
 namespace impl {
@@ -34,7 +34,7 @@ using namespace Xbyak;
 using namespace mkldnn::impl::memory_format;
 using namespace mkldnn::impl::utils;
 
-struct jit_args {
+struct jit_depthwise_args {
     const float *from;
     const float *to;
     const float *weights;
@@ -44,10 +44,10 @@ struct jit_args {
 
 struct jit_uni_depthwise_kernel_f32 : public c_compatible {
     const depthwise_desc_t &desc_;
-    void (*ker_)(const jit_args *);
+    void (*ker_)(const jit_depthwise_args *);
     bool with_bias_;
 
-    void operator()(const jit_args *args) { assert(ker_); ker_(args); }
+    void operator()(const jit_depthwise_args *args) { assert(ker_); ker_(args); }
 
     jit_uni_depthwise_kernel_f32(const depthwise_desc_t &desc, bool with_bias)
         : desc_(desc), ker_(nullptr), with_bias_(with_bias) {}
@@ -627,7 +627,7 @@ void jit_uni_depthwise_fwd_t<isa>::execute_forward() const {
 
     parallel_nd(MB, CB, D, H,
         [&](int mb, int cb, int d, int h) {
-        auto arg = jit_args();
+        auto arg = jit_depthwise_args();
 
         size_t data_off = data_d.ndims() == 4
                           ? data_d.blk_off(mb, cb, h)
