@@ -235,7 +235,7 @@ struct jit_uni_scale_shift_kernel_f32 : public jit_uni_depthwise_kernel_f32,
         assert(isa == sse42 || isa == avx2 || isa == avx512_common);
 
         bool isFlat = (desc.src_desc.format == nchw && desc.dst_desc.format == nchw) ||
-                      (desc.src_desc.format == ncdhw && desc.dst_desc.format == ncdhw);
+                      (desc.src_desc.format == ncdhw && desc.dst_desc.format == ncdhw) || desc.src_desc.ndims == 6;
 
         Reg64 param = abi_param1;
 
@@ -376,7 +376,7 @@ struct jit_uni_prelu_kernel_f32 : public jit_uni_depthwise_kernel_f32,
         assert(isa == sse42 || isa == avx2 || isa == avx512_common);
 
         bool isFlat = (desc.src_desc.format == nchw && desc.dst_desc.format == nchw) ||
-                      (desc.src_desc.format == ncdhw && desc.dst_desc.format == ncdhw);
+                      (desc.src_desc.format == ncdhw && desc.dst_desc.format == ncdhw) || desc.src_desc.ndims == 6;
 
         Reg64 param = abi_param1;
 
@@ -527,10 +527,11 @@ status_t jit_uni_depthwise_fwd_t<isa>::pd_t::init() {
     using namespace alg_kind;
 
     memory_format_t desired_blk_fmt, desired_pln_fmt;
-    if (desc()->src_desc.ndims == 5) {
+    int ndims = desc()->src_desc.ndims;
+    if (ndims == 5) {
         desired_blk_fmt = isa == avx512_common ? nCdhw16c : nCdhw8c;
         desired_pln_fmt = ncdhw;
-    } else if (desc()->src_desc.ndims == 4) {
+    } else if (ndims == 4) {
         desired_blk_fmt = isa == avx512_common ? nChw16c : nChw8c;
         desired_pln_fmt = nchw;
     } else {
@@ -544,8 +545,9 @@ status_t jit_uni_depthwise_fwd_t<isa>::pd_t::init() {
                 prop_kind::forward_inference)
         && utils::everyone_is(data_type::f32, desc()->src_desc.data_type, desc()->dst_desc.data_type)
         && desc()->src_desc.format == desc()->dst_desc.format
-        && utils::one_of(desc()->src_desc.format, desired_blk_fmt, desired_pln_fmt)
-        && utils::one_of(desc()->dst_desc.format, desired_blk_fmt, desired_pln_fmt)
+        && IMPLICATION(ndims < 6, utils::one_of(desc()->src_desc.format, desired_blk_fmt, desired_pln_fmt))
+        && IMPLICATION(ndims < 6, utils::one_of(desc()->dst_desc.format, desired_blk_fmt, desired_pln_fmt))
+        && ndims <= 6
         && utils::one_of(desc()->weights_desc.format, x)
         && IMPLICATION(this->with_bias(), x == desc()->bias_desc.format)
         && attr()->has_default_values();
@@ -608,9 +610,10 @@ void jit_uni_depthwise_fwd_t<isa>::execute_forward() const {
     const int D = pd()->D();
     const int H = pd()->H();
     const int W = pd()->W();
+    const int W1 = data_d.ndims() == 6 ? pd()->input_pd()->desc()->dims[5] : 1;
 
     const int simd_w = isa == avx512_common ? 16 : 8;
-    const int ch_block_size = (data_d.format() == nchw) || (data_d.format() == ncdhw) ? 1 : simd_w;
+    const int ch_block_size = (data_d.format() == nchw) || (data_d.format() == ncdhw) || (data_d.ndims() == 6) ? 1 : simd_w;
     const int CB = div_up(C, ch_block_size);
 
     if (pd()->want_padded_weights()) {
@@ -631,7 +634,7 @@ void jit_uni_depthwise_fwd_t<isa>::execute_forward() const {
 
         size_t data_off = data_d.ndims() == 4
                           ? data_d.blk_off(mb, cb, h)
-                          : data_d.ndims() == 5
+                          : data_d.ndims() >= 5
                             ? data_d.blk_off(mb, cb, d, h)
                             : data_d.blk_off(mb, cb * ch_block_size);
 
@@ -640,7 +643,7 @@ void jit_uni_depthwise_fwd_t<isa>::execute_forward() const {
         arg.weights = &weights[weights_d.blk_off(cb * ch_block_size)];
         if (bias)
             arg.bias = &bias[bias_d.blk_off(cb * ch_block_size)];
-        arg.work_amount = data_d.format() == nc ? nstl::min(ch_block_size, C - cb * ch_block_size) : (size_t)W;
+        arg.work_amount = data_d.format() == nc ? nstl::min(ch_block_size, C - cb * ch_block_size) : (size_t)(W * W1);
 
         (*kernel_)(&arg);
     });

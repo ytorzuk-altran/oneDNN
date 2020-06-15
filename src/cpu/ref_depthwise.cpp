@@ -96,10 +96,11 @@ void ref_depthwise_fwd_t<data_type>::execute_forward() const {
     const int D = pd()->D();
     const int H = pd()->H();
     const int W = pd()->W();
+    const int W1 = data_d.ndims() == 6 ? pd()->input_pd()->desc()->dims[5] : 1;
     const auto alg_kind = pd()->desc()->alg_kind;
 
-    parallel_nd(MB, C, D, H, W,
-        [&](int n, int c, int d, int h, int w) {
+    parallel_nd(MB, C, D, H, W, W1,
+        [&](int n, int c, int d, int h, int w, int w1) {
         size_t data_off = data_d.ndims() == 2
                         ? data_d.off(n, c)
                         : data_d.ndims() == 3
@@ -108,6 +109,8 @@ void ref_depthwise_fwd_t<data_type>::execute_forward() const {
                         ? data_d.off(n, c, h, w)
                         : data_d.ndims() == 5
                         ? data_d.off(n, c, d, h, w)
+                        : data_d.ndims() == 6
+                        ? data_d.off(n, c, d, h, w, w1)
                         : data_d.off(n);
 
         int wei_idx = data_d.ndims() == 1 ? n : c;
