@@ -1037,12 +1037,13 @@ typename utils::enable_if<(fmt_i == nchw || fmt_i == nhwc) && fmt_o == nhwc && (
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
-typename utils::enable_if<fmt_i == nhwc && fmt_o == nchw>::type>
+typename utils::enable_if<fmt_i == nhwc && fmt_o == nchw && (type_i != mkldnn_bin || type_o != mkldnn_f32)>::type>
 {
     static bool is_applicable(const memory_desc_wrapper &input_d,
         const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
         int smask = attr ? attr->output_scales_.mask_ : 0;
-        return (smask == 0 || smask == 2) && order_keep && input_d._md->format == nhwc && output_d._md->format == nchw;
+        return (smask == 0 || smask == 2) && order_keep && input_d._md->format == nhwc && output_d._md->format == nchw
+               && (input_d.data_type() != bin || output_d.data_type() != f32);
     }
 
     GET_SCRATCHPAD_SIZE_ZERO();
@@ -1084,6 +1085,55 @@ typename utils::enable_if<fmt_i == nhwc && fmt_o == nchw>::type>
                 auto o = &output[output_d.blk_off(n, 0, h, w)];
                 ker(i, o);
         });
+
+        return success;
+    }
+};
+
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+typename utils::enable_if<fmt_i == nhwc && fmt_o == nchw && type_i == mkldnn_bin && type_o == mkldnn_f32>::type>
+{
+    static bool is_applicable(const memory_desc_wrapper &input_d, const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
+        int smask = attr ? attr->output_scales_.mask_ : 0;
+        return smask == 0 && order_keep && input_d._md->format == nhwc && output_d._md->format == nchw && input_d.data_type() == bin
+               && output_d.data_type() == f32;
+    }
+
+    GET_SCRATCHPAD_SIZE_ZERO();
+
+    static status_t execute(const cpu_reorder_pd_t *pd,
+        const data_t<type_i> *input, data_t<type_o> *output,
+        const memory_tracking::grantor_t &scratchpad) {
+            DECLARE_COMMON_PARAMS();
+
+            const auto &dims = input_d.dims();
+            const int N = dims[0];
+            const int C = dims[1];
+            const int H = dims[2];
+            const int W = dims[3];
+
+            const int nbits = 8;
+            const int CB = div_up(C, nbits);
+
+            auto extract_bit = [&](uint8_t val, uint8_t bit) -> float {
+                return static_cast<float>((val >> bit) & 0x01);
+            };
+
+            parallel_nd(N, H, W, [&](int n, int h, int w) {
+                auto iidx = input_d.blk_off(n, 0, h, w);
+                auto oidx = output_d.blk_off(n, 0, h, w);
+
+                auto i = &input[iidx / 8];
+                auto o = &output[oidx];
+
+                for (int cb = 0; cb < CB; ++cb) {
+                    for (int c = cb * nbits, shift = 0; c < std::min(C, (cb + 1) * nbits); c++, shift++) {
+                        ptrdiff_t out_off = c * output_d.blocking_desc().strides[0][1];
+                        o[out_off] = extract_bit(i[cb], shift);
+                    }
+                }
+            });
 
         return success;
     }
