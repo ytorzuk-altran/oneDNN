@@ -17,6 +17,8 @@
 #ifndef MKLDNN_THREAD_PARALLEL_ND_HPP
 #define MKLDNN_THREAD_PARALLEL_ND_HPP
 
+#include <functional>
+
 /* This header must be included by mkldnn_thread.hpp only */
 
 /* Functions:
@@ -36,58 +38,21 @@ namespace mkldnn {
 namespace impl {
 
 /* general parallelization */
-template <typename F>
-void parallel(int nthr, size_t work_amount, F f) {
-    if (nthr == 0) nthr = mkldnn_get_max_threads();
-#if MKLDNN_THR == MKLDNN_THR_SEQ
-    assert(nthr == 1);
-    f(0, 1);
-#elif MKLDNN_THR == MKLDNN_THR_OMP
-    if (nthr == 1) { f(0, 1); return; }
-#   pragma omp parallel num_threads(nthr)
-    f(mkldnn_get_thread_num(), mkldnn_get_num_threads());
-#elif MKLDNN_THR == MKLDNN_THR_TBB
-    if (work_amount < (size_t)nthr) nthr = (int)work_amount;
-    int max_nthr = mkldnn_get_max_threads();
-    if (nthr == 0 || nthr > max_nthr) nthr = max_nthr;
-    if (nthr == 1) { f(0, 1); return; }
-    tbb::parallel_for(0, nthr, [&](int ithr) { f(ithr, nthr); }, tbb::static_partitioner());
-#elif MKLDNN_THR == MKLDNN_THR_TBB_AUTO
-    if (nthr == 1) { f(0, 1); return; }
-    tbb::parallel_for(0, nthr, [&](int ithr) { f(ithr, nthr); });
-#endif
-}
+void parallel(int nthr, size_t work_amount, const std::function<void(size_t, size_t)>& f);
 
-template <typename F>
-void parallel(int nthr, F f) {
-    if (nthr == 0) nthr = mkldnn_get_max_threads();
-#if MKLDNN_THR == MKLDNN_THR_SEQ
-    assert(nthr == 1);
-    f(0, 1);
-#elif MKLDNN_THR == MKLDNN_THR_OMP
-    if (nthr == 1) { f(0, 1); return; }
-#   pragma omp parallel num_threads(nthr)
-    f(mkldnn_get_thread_num(), mkldnn_get_num_threads());
-#elif MKLDNN_THR == MKLDNN_THR_TBB
-    if (nthr == 1) { f(0, 1); return; }
-    tbb::parallel_for(0, nthr, [&](int ithr) { f(ithr, nthr); }, tbb::static_partitioner());
-#elif MKLDNN_THR == MKLDNN_THR_TBB_AUTO
-    if (nthr == 1) { f(0, 1); return; }
-    tbb::parallel_for(0, nthr, [&](int ithr) { f(ithr, nthr); });
-#endif
-}
+void parallel(int nthr, const std::function<void(size_t, size_t)>& f);
 
 /* for_nd section */
 
-template <typename T0, typename F>
-void for_nd(const int ithr, const int nthr, const T0 &D0, F f) {
+template <typename T0>
+void for_nd(const int ithr, const int nthr, const T0 &D0, const std::function<void(size_t)>& f) {
     T0 start{0}, end{0};
     balance211(D0, nthr, ithr, start, end);
     for (T0 d0 = start; d0 < end; ++d0) f(d0);
 }
 
-template <typename T0, typename T1, typename F>
-void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1, F f) {
+template <typename T0, typename T1>
+void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1, const std::function<void(size_t, size_t)>& f) {
     const size_t work_amount = (size_t)D0 * D1;
     if (work_amount == 0) return;
     size_t start{0}, end{0};
@@ -101,9 +66,9 @@ void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1, F f) {
     }
 }
 
-template <typename T0, typename T1, typename T2, typename F>
+template <typename T0, typename T1, typename T2>
 void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
-        const T2 &D2, F f) {
+        const T2 &D2, const std::function<void(size_t, size_t, size_t)>& f) {
     const size_t work_amount = (size_t)D0 * D1 * D2;
     if (work_amount == 0) return;
     size_t start{0}, end{0};
@@ -117,9 +82,9 @@ void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
     }
 }
 
-template <typename T0, typename T1, typename T2, typename T3, typename F>
+template <typename T0, typename T1, typename T2, typename T3>
 void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
-        const T2 &D2, const T3 &D3, F f) {
+        const T2 &D2, const T3 &D3, const std::function<void(size_t, size_t, size_t, size_t)>& f) {
     const size_t work_amount = (size_t)D0 * D1 * D2 * D3;
     if (work_amount == 0) return;
     size_t start{0}, end{0};
@@ -133,10 +98,9 @@ void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
     }
 }
 
-template <typename T0, typename T1, typename T2, typename T3, typename T4,
-         typename F>
+template <typename T0, typename T1, typename T2, typename T3, typename T4>
 void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
-        const T2 &D2, const T3 &D3, const T4 &D4, F f) {
+        const T2 &D2, const T3 &D3, const T4 &D4, const std::function<void(size_t, size_t, size_t, size_t, size_t)>& f) {
     const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4;
     if (work_amount == 0) return;
     size_t start{0}, end{0};
@@ -151,9 +115,9 @@ void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
 }
 
 template <typename T0, typename T1, typename T2, typename T3, typename T4,
-         typename T5, typename F>
+         typename T5>
 void for_nd(const int ithr, const int nthr, const T0 &D0, const T1 &D1,
-        const T2 &D2, const T3 &D3, const T4 &D4, const T5 &D5, F f) {
+        const T2 &D2, const T3 &D3, const T4 &D4, const T5 &D5, const std::function<void(size_t, size_t, size_t, size_t, size_t, size_t)>& f) {
     const size_t work_amount = (size_t)D0 * D1 * D2 * D3 * D4 * D5;
     if (work_amount == 0) return;
     size_t start{0}, end{0};
@@ -197,8 +161,8 @@ void parallel_nd(Args &&...args) {
 // gcc 4.8 has a bug with passing parameter pack to lambdas.
 // So have to explicitly instantiate all the cases.
 
-template <typename T0, typename F>
-void parallel_nd(const T0 &D0, F f) {
+template <typename T0>
+void parallel_nd(const T0 &D0, const std::function<void(size_t)>& f) {
 #if MKLDNN_THR == MKLDNN_THR_TBB
     int nthr = mkldnn_get_max_threads();
     size_t work_amount = D0;
@@ -219,8 +183,8 @@ void parallel_nd(const T0 &D0, F f) {
 #endif
 }
 
-template <typename T0, typename T1, typename F>
-void parallel_nd(const T0 &D0, const T1 &D1, F f) {
+template <typename T0, typename T1>
+void parallel_nd(const T0 &D0, const T1 &D1, const std::function<void(size_t, size_t)>& f) {
 #if MKLDNN_THR == MKLDNN_THR_TBB
     int nthr = mkldnn_get_max_threads();
     size_t work_amount = D0 * D1;
@@ -241,8 +205,8 @@ void parallel_nd(const T0 &D0, const T1 &D1, F f) {
 #endif
 }
 
-template <typename T0, typename T1, typename T2, typename F>
-void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, F f) {
+template <typename T0, typename T1, typename T2>
+void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const std::function<void(size_t, size_t, size_t)>& f) {
 #if MKLDNN_THR == MKLDNN_THR_TBB
     int nthr = mkldnn_get_max_threads();
     size_t work_amount = D0 * D1 * D2;
@@ -263,8 +227,8 @@ void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, F f) {
 #endif
 }
 
-template <typename T0, typename T1, typename T2, typename T3, typename F>
-void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3, F f) {
+template <typename T0, typename T1, typename T2, typename T3>
+void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3, const std::function<void(size_t, size_t, size_t, size_t)>& f) {
 #if MKLDNN_THR == MKLDNN_THR_TBB
     int nthr = mkldnn_get_max_threads();
     size_t work_amount = D0 * D1 * D2 * D3;
@@ -285,10 +249,9 @@ void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3, F f) {
 #endif
 }
 
-template <typename T0, typename T1, typename T2, typename T3, typename T4,
-         typename F>
+template <typename T0, typename T1, typename T2, typename T3, typename T4>
 void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3,
-        const T4 &D4, F f) {
+        const T4 &D4, const std::function<void(size_t, size_t, size_t, size_t, size_t)>& f) {
 #if MKLDNN_THR == MKLDNN_THR_TBB
     int nthr = mkldnn_get_max_threads();
     size_t work_amount = D0 * D1 * D2 * D3 * D4;
@@ -310,9 +273,9 @@ void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3,
 }
 
 template <typename T0, typename T1, typename T2, typename T3, typename T4,
-         typename T5, typename F>
+         typename T5>
 void parallel_nd(const T0 &D0, const T1 &D1, const T2 &D2, const T3 &D3,
-        const T4 &D4, const T5 &D5, F f) {
+        const T4 &D4, const T5 &D5, const std::function<void(size_t, size_t, size_t, size_t, size_t, size_t)>& f) {
 #if MKLDNN_THR == MKLDNN_THR_TBB
     int nthr = mkldnn_get_max_threads();
     size_t work_amount = D0 * D1 * D2 * D3 * D4 * D5;
