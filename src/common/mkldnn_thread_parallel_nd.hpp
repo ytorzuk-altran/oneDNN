@@ -35,6 +35,7 @@
 namespace mkldnn {
 namespace impl {
 
+    
 /* general parallelization */
 void parallel(int nthr, size_t work_amount, const std::function<void(size_t, size_t)>& f);
 
