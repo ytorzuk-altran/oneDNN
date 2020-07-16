@@ -37,7 +37,8 @@ ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(alg_kind_t alg, float alpha,
     assert(utils::one_of(alg_, eltwise_relu, eltwise_tanh, eltwise_elu,
                 eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                 eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
-                eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_not, eltwise_swish));
+                eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_not, eltwise_swish,
+                eltwise_mish));
 }
 
 ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(
@@ -61,6 +62,7 @@ float ref_eltwise_scalar_fwd_t::compute_scalar(float s) {
         case eltwise_clamp: return clamp_fwd(s, alpha_, beta_);
         case eltwise_not: return not_fwd(s);
         case eltwise_swish: return swish_fwd(s, alpha_);
+        case eltwise_mish: return mish_fwd(s);
         default: assert(!"unknown eltwise alg_kind");
     }
 
@@ -96,6 +98,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_nCspBc_padded() const {
             case eltwise_clamp: d = clamp_fwd(s, alpha, beta); break;
             case eltwise_not: d = not_fwd(s); break;
             case eltwise_swish: d = swish_fwd(s, alpha); break;
+            case eltwise_mish: d = mish_fwd(s); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     };
@@ -205,6 +208,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic() const {
             case eltwise_clamp: d = clamp_fwd(s, alpha, beta); break;
             case eltwise_not: d = not_fwd(s); break;
             case eltwise_swish: d = swish_fwd(s, alpha); break;
+            case eltwise_mish: d = mish_fwd(s); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     });
@@ -299,6 +303,7 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense() const {
         case eltwise_clamp: d = clamp_fwd(s, alpha, beta); break;
         case eltwise_not: d = not_fwd(s); break;
         case eltwise_swish: d = swish_fwd(s, alpha); break;
+        case eltwise_mish: d = mish_fwd(s); break;
         default: assert(!"unknown eltwise alg_kind");
         }
     });

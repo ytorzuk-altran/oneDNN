@@ -278,6 +278,7 @@ enum algorithm {
     eltwise_clamp = mkldnn_eltwise_clamp,
     eltwise_not = mkldnn_eltwise_not,
     eltwise_swish = mkldnn_eltwise_swish,
+    eltwise_mish = mkldnn_eltwise_mish,
     depthwise_scale_shift = mkldnn_depthwise_scale_shift,
     depthwise_prelu = mkldnn_depthwise_prelu,
     lrn_across_channels = mkldnn_lrn_across_channels,

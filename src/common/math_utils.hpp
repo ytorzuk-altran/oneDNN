@@ -294,6 +294,13 @@ inline U swish_bwd(T dd, T s, A alpha) {
     return dd * (v + s * alpha * v * (1 - v));
 }
 
+template <typename T,
+        typename U = typename utils::remove_reference<T>::type>
+inline U mish_fwd(T s) {
+    float v = ::log1pf(::expf((float)s));
+    return (U)(s * ::tanhf(v));
+}
+
 template <typename T, typename A,
          typename U = typename utils::remove_reference<T>::type>
 inline U scale_shift_fwd(T s_val, A w_val, A b_val) {
