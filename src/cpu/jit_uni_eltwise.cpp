@@ -609,6 +609,25 @@ void jit_uni_eltwise_injector_f32<isa>::swish_compute_vector(
 }
 
 template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::hswish_compute_vector(
+        const Vmm &vmm_src) {
+    // Save src data on stack for later usage
+    h->sub(h->rsp, vlen);
+    h->uni_vmovups(h->ptr[h->rsp], vmm_src);
+    // x + 3
+    h->uni_vaddps(vmm_src, vmm_src, table_val(1));
+    // relu6(x + 3)
+    h->uni_vmaxps(vmm_src, vmm_src, table_val(0));
+    h->uni_vminps(vmm_src, vmm_src, table_val(2));
+    // relu6(x + 3) / 6
+    h->uni_vmulps(vmm_src, vmm_src, table_val(3));
+    // x * relu6(x + 3) / 6
+    h->uni_vmovups(vmm_aux0, h->ptr[h->rsp]);
+    h->add(h->rsp, vlen);
+    h->uni_vmulps(vmm_src, vmm_src, vmm_aux0);
+}
+
+template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::mish_compute_vector(
         const Vmm &vmm_src) {
     // Save src data on stack for later usage
@@ -837,6 +856,14 @@ void jit_uni_eltwise_injector_f32<isa>::clamp_prepare_table() {
 }
 
 template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::hswish_prepare_table() {
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0);
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0x40400000); // 3
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0x40C00000); // 6
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0x3e2aaaaa); // 1 / 6
+}
+
+template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::mish_prepare_table() {
     const unsigned int cvals[] = {
             0x3f800000, // [0] 1.0f
@@ -910,6 +937,7 @@ int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     case alg_kind::eltwise_gelu: return 5;
     case alg_kind::eltwise_clamp: return 0;
     case alg_kind::eltwise_swish: return 4;
+    case alg_kind::eltwise_hswish: return 1;
     case alg_kind::eltwise_mish: return 5;
     default: assert(!"unsupported eltwise algorithm");
     }
@@ -940,6 +968,7 @@ void jit_uni_eltwise_injector_f32<isa>::compute_body(size_t start_idx,
         case eltwise_gelu: gelu_compute_vector(Vmm(idx)); break;
         case eltwise_clamp: clamp_compute_vector(Vmm(idx)); break;
         case eltwise_swish: swish_compute_vector(Vmm(idx)); break;
+        case eltwise_hswish: hswish_compute_vector(Vmm(idx)); break;
         case eltwise_mish: mish_compute_vector(Vmm(idx)); break;
         default: assert(!"unsupported eltwise algorithm");
         }
@@ -982,6 +1011,7 @@ void jit_uni_eltwise_injector_f32<isa>::prepare_table(bool gen_table) {
         case eltwise_bounded_relu: bounded_relu_prepare_table(); break;
         case eltwise_square: break;
         case eltwise_clamp: clamp_prepare_table(); break;
+        case eltwise_hswish: hswish_prepare_table(); break;
         case eltwise_mish: mish_prepare_table(); break;
         default: assert(!"unsupported eltwise algorithm");
     }
@@ -1296,7 +1326,7 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
                     eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                     eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
                     eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_swish,
-                    eltwise_mish));
+                    eltwise_hswish, eltwise_mish));
 
         preamble();
 
@@ -1462,7 +1492,7 @@ status_t jit_uni_eltwise_fwd_t<isa, d_type>::pd_t::init() {
                 eltwise_elu, eltwise_square, eltwise_abs, eltwise_sqrt,
                 eltwise_linear, eltwise_bounded_relu, eltwise_soft_relu,
                 eltwise_logistic, eltwise_exp, eltwise_gelu, eltwise_clamp,
-                eltwise_swish, eltwise_mish)
+                eltwise_swish, eltwise_hswish, eltwise_mish)
         && memory_desc_wrapper(src_pd()).is_dense(true)
         && IMPLICATION(!memory_desc_wrapper(src_pd()).is_dense(false),
                 math::eltwise_fwd_preserves_zero(desc()->alg_kind, true))

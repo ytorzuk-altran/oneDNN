@@ -48,7 +48,7 @@ struct jit_uni_eltwise_injector_f32 {
                     eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                     eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
                     eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_swish,
-                    eltwise_mish));
+                    eltwise_hswish, eltwise_mish));
     }
 
     // note that eltwise.scale is ignored
@@ -121,7 +121,9 @@ private:
     void gelu_compute_vector(const Vmm &vmm_src);
     void clamp_compute_vector(const Vmm &vmm_src);
     void swish_compute_vector(const Vmm &vmm_src);
+    void hswish_compute_vector(const Vmm &vmm_src);
     void mish_compute_vector(const Vmm &vmm_src);
+
 
     void relu_prepare_table();
     void elu_prepare_table();
@@ -131,6 +133,7 @@ private:
     void linear_prepare_table();
     void bounded_relu_prepare_table();
     void clamp_prepare_table();
+    void hswish_prepare_table();
     void mish_prepare_table();
 };
 

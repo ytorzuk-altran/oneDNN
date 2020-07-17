@@ -432,6 +432,7 @@ const char *mkldnn_alg_kind2str(mkldnn_alg_kind_t v) {
     if (v == mkldnn_eltwise_clamp) return "eltwise_clamp";
     if (v == mkldnn_eltwise_not) return "eltwise_not";
     if (v == mkldnn_eltwise_swish) return "eltwise_swish";
+    if (v == mkldnn_eltwise_hswish) return "eltwise_hswish";
     if (v == mkldnn_eltwise_mish) return "eltwise_mish";
     if (v == mkldnn_pooling_max) return "pooling_max";
     if (v == mkldnn_pooling_avg_include_padding) return "pooling_avg_include_padding";

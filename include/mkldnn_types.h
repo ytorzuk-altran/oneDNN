@@ -617,6 +617,8 @@ typedef enum {
     mkldnn_eltwise_not = 0xef,
     /** Eltwise: swish */
     mkldnn_eltwise_swish = 0xff,
+    /** Eltwise: hswish */
+    mkldnn_eltwise_hswish = 0xf0,
     /** Eltwise: mish */
     mkldnn_eltwise_mish = 0x1f0,
     /** Max pooling */
