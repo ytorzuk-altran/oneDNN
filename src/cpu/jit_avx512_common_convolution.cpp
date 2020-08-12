@@ -566,7 +566,7 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
         start_copy = start;
 
         auto par_conv = jit_conv_call_s();
-        size_t diff_dst_c_stride = diff_dst_d.blk_off(0, 1);
+        size_t diff_dst_c_stride = diff_dst_d.blk_off(0, 1) - diff_dst_d.off_l(0);
         size_t wht_oc_stride = wht_blk_off(weights_d, 0, 1);
 
         for (int ocb_l2 = 0; ocb_l2 < jcp.nb_oc; ocb_l2 += jcp.nb_oc_L2) {
@@ -652,9 +652,9 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
         start_copy = start;
 
         auto par_conv = jit_conv_call_s();
-        size_t diff_src_h_stride = diff_src_d.blk_off(0, 0, 1);
-        size_t diff_dst_h_stride = diff_dst_d.blk_off(0, 0, 1);
-        size_t diff_dst_c_stride = diff_dst_d.blk_off(0, 1);
+        size_t diff_src_h_stride = diff_src_d.blk_off(0, 0, 1) - diff_src_d.off_l(0);
+        size_t diff_dst_h_stride = diff_dst_d.blk_off(0, 0, 1) - diff_dst_d.off_l(0);
+        size_t diff_dst_c_stride = diff_dst_d.blk_off(0, 1) - diff_dst_d.off_l(0);
         size_t wht_h_stride = wht_blk_off(weights_d, 0, 0, 0, 1);
         size_t wht_oc_stride = wht_blk_off(weights_d, 0, 1);
 
@@ -784,11 +784,11 @@ void jit_avx512_common_convolution_bwd_data_t<diff_dst_type, wei_type,
         start_copy = start;
 
         auto par_conv = jit_conv_call_s();
-        size_t diff_src_h_stride = diff_src_d.blk_off(0, 0, 0, 1);
-        size_t diff_src_d_stride = diff_src_d.blk_off(0, 0, 1);
-        size_t diff_dst_h_stride = diff_dst_d.blk_off(0, 0, 0, 1);
-        size_t diff_dst_d_stride = diff_dst_d.blk_off(0, 0, 1);
-        size_t diff_dst_c_stride = diff_dst_d.blk_off(0, 1);
+        size_t diff_src_h_stride = diff_src_d.blk_off(0, 0, 0, 1) - diff_src_d.off_l(0);
+        size_t diff_src_d_stride = diff_src_d.blk_off(0, 0, 1) - diff_src_d.off_l(0);
+        size_t diff_dst_h_stride = diff_dst_d.blk_off(0, 0, 0, 1) - diff_dst_d.off_l(0);
+        size_t diff_dst_d_stride = diff_dst_d.blk_off(0, 0, 1) - diff_dst_d.off_l(0);
+        size_t diff_dst_c_stride = diff_dst_d.blk_off(0, 1) - diff_dst_d.off_l(0);
         size_t wht_h_stride = wht_blk_off(weights_d, 0, 0, 0, 0, 1);
         size_t wht_d_stride = wht_blk_off(weights_d, 0, 0, 0, 1);
         size_t wht_oc_stride = wht_blk_off(weights_d, 0, 1);
