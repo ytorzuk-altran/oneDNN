@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -44,6 +44,386 @@ struct im_pos_t {
     }
 };
 } // namespace
+
+template <cpu_isa_t isa>
+jit_pp_kernel_t<isa>::jit_pp_kernel_t(
+        const cpu_convolution_fwd_pd_t *pd)
+        : ker_(nullptr)
+        , do_bias_(pd->with_bias())
+        , idx_compute_vreg_start_(0)
+        , idx_compute_vreg_max_(isa == avx512_common ? 31 : 15) {
+    using namespace types;
+    using namespace Xbyak;
+
+    if (utils::one_of(isa, avx2, sse42)) {
+        idx_compute_vreg_start_ += 1;   //  Vmm(0) - for masks
+    }
+    post_ops_ = pd->attr()->post_ops_;
+    bool only_eltwise = true;
+    for (int i = 0; i < post_ops_.len_; i++) {
+        auto &post_op = post_ops_.entry_[i];
+        if (post_op.is_eltwise()) {
+            eltwise_injectors_.push_back(new jit_uni_eltwise_injector_f32<isa>(
+                    this, post_op.eltwise, true, eltwise_reserved_1_, eltwise_reserved_2_));
+        } else if (post_op.is_depthwise()) {
+            only_eltwise = false;
+            depthwise_injectors_.push_back(new jit_uni_depthwise_injector_f32<isa>(
+                    this, post_op.depthwise.alg, depthwise_reserved_2_));
+        } else {
+            only_eltwise = false;
+        }
+    }
+    if (post_ops_.len_ > 0 && !only_eltwise) {
+        vreg_d_weights = Vmm(idx_compute_vreg_max_--);
+        vreg_d_bias = Vmm(idx_compute_vreg_max_--);
+    }
+    if (utils::one_of(isa, avx2, sse42))
+        vreg_zero = Vmm(idx_compute_vreg_start_++);
+
+    generate();
+}
+
+ref_pp_kernel_t::ref_pp_kernel_t(
+        const cpu_convolution_fwd_pd_t *pd)
+        : do_bias_(pd->with_bias()) {
+    post_ops_ = pd->attr()->post_ops_;
+    for (int i = 0; i < post_ops_.len_; i++) {
+        auto &post_op = post_ops_.entry_[i];
+        if (post_op.is_eltwise()) {
+            ref_eltwise_impls_.push_back(new ref_eltwise_scalar_fwd_t(
+                    post_op.eltwise.alg, post_op.eltwise.alpha, post_op.eltwise.beta));
+        } else if (post_op.is_depthwise()) {
+            ref_depthwise_impls_.push_back(new ref_depthwise_scalar_fwd_t(
+                    post_op.depthwise.alg));
+        }
+    }
+
+    use_fast_relu = false;
+    if (post_ops_.len_ == 1 && post_ops_.entry_[0].is_relu(true, false)) {
+        use_fast_relu = true;
+        fast_relu_ns = post_ops_.entry_[0].eltwise.alpha;
+    } else if (post_ops_.len_ == 2 && post_ops_.entry_[0].is_sum() && post_ops_.entry_[1].is_relu(true, false)) {
+        use_fast_relu = true;
+        fast_relu_ns = post_ops_.entry_[1].eltwise.alpha;
+    }
+}
+
+template<cpu_isa_t isa>
+void jit_pp_kernel_t<isa>::generate()
+{
+    using namespace Xbyak;
+    using namespace utils;
+    using namespace round_mode;
+
+    preamble();
+
+    using ker_args_ = ker_args;
+#define PARAM_OFF(x) offsetof(ker_args_, x)
+    mov(reg_dst, ptr[reg_param + PARAM_OFF(dst)]);
+    mov(reg_bias, ptr[reg_param + PARAM_OFF(bias)]);
+    mov(reg_len, ptr[reg_param + PARAM_OFF(len)]);
+    mov(reg_oc_offset, ptr[reg_param + PARAM_OFF(oc_offset)]);
+#undef PARAM_OFF
+
+    if (utils::one_of(isa, avx2, sse42)) {
+        uni_vpxor(vreg_zero, vreg_zero, vreg_zero);
+        mov(reg_table, l_table);
+    }
+
+    auto apply_post_ops = [&]() {
+        int eltwise_inj_idx = 0;
+        int depthwise_inj_idx = 0;
+        auto vreg_dst_ = vreg_dst(0);
+        for (int i = 0; i < post_ops_.len_; i++) {
+            auto& post_op = post_ops_.entry_[i];
+            if (post_op.is_eltwise()) {
+                eltwise_injectors_[eltwise_inj_idx]->compute_vector(vreg_dst_.getIdx());
+                eltwise_inj_idx++;
+            } else if (post_op.is_depthwise()) {
+                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+                lea(reg_d_weights, ptr[reg_d_weights + reg_oc_offset * sizeof(float)]);
+                lea(reg_d_bias, ptr[reg_d_bias + reg_oc_offset * sizeof(float)]);
+                depthwise_injectors_[depthwise_inj_idx]->compute_vector_range(vreg_dst_.getIdx(), vreg_dst_.getIdx() + 1,
+                        reg_d_weights, reg_d_bias, true);
+                depthwise_inj_idx++;
+            } else if (post_op.is_quantization()) {
+                bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
+                bool do_rounding = true;
+
+                if (post_op.quantization.crop_low_data->count_ != 1) {
+                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data->shifts_));
+                    uni_vpbroadcastd(vreg_d_weights, ptr[reg_d_weights + reg_oc_offset * sizeof(float)]);
+                } else {
+                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.crop_low_data->shifts_));
+                    uni_vpbroadcastd(vreg_d_weights, ptr[reg_d_weights]);
+                }
+
+                if (post_op.quantization.crop_high_data->count_ != 1) {
+                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data->shifts_));
+                    uni_vpbroadcastd(vreg_d_bias, ptr[reg_d_bias + reg_oc_offset * sizeof(float)]);
+                } else {
+                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.crop_high_data->shifts_));
+                    uni_vpbroadcastd(vreg_d_bias, ptr[reg_d_bias]);
+                }
+
+                uni_vmaxps(vreg_dst_, vreg_dst_, vreg_d_weights);
+                uni_vminps(vreg_dst_, vreg_dst_, vreg_d_bias);
+
+                if (post_op.quantization.input_scale_data->count_ != 1) {
+                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data->scales_));
+                    uni_vpbroadcastd(vreg_d_weights, ptr[reg_d_weights + reg_oc_offset * sizeof(float)]);
+                } else {
+                    mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.input_scale_data->scales_));
+                    uni_vpbroadcastd(vreg_d_weights, ptr[reg_d_weights]);
+                }
+
+                if (post_op.quantization.input_shift_data->count_ != 1) {
+                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data->shifts_));
+                    uni_vpbroadcastd(vreg_d_bias, ptr[reg_d_bias + reg_oc_offset * sizeof(float)]);
+                } else {
+                    mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.input_shift_data->shifts_));
+                    uni_vpbroadcastd(vreg_d_bias, ptr[reg_d_bias]);
+                }
+
+                uni_vfmadd213ps(vreg_dst_, vreg_d_weights, vreg_d_bias);
+
+                if (do_rounding)
+                    uni_vroundps(vreg_dst_, vreg_dst_, 0);
+
+                if (do_dequantization) {
+                    if (post_op.quantization.output_scale_data->count_ != 1) {
+                        mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data->scales_));
+                        uni_vpbroadcastd(vreg_d_weights, ptr[reg_d_weights + reg_oc_offset * sizeof(float)]);
+                    } else {
+                        mov(reg_d_weights, reinterpret_cast<size_t>(post_op.quantization.output_scale_data->scales_));
+                        uni_vpbroadcastd(vreg_d_weights, ptr[reg_d_weights]);
+                    }
+
+                    if (post_op.quantization.output_shift_data->count_ != 1) {
+                        mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data->shifts_));
+                        uni_vpbroadcastd(vreg_d_bias, ptr[reg_d_bias + reg_oc_offset * sizeof(float)]);
+                    } else {
+                        mov(reg_d_bias, reinterpret_cast<size_t>(post_op.quantization.output_shift_data->shifts_));
+                        uni_vpbroadcastd(vreg_d_bias, ptr[reg_d_bias]);
+                    }
+
+                    uni_vfmadd213ps(vreg_dst_, vreg_d_weights, vreg_d_bias);
+                }
+            }
+        }
+    };
+
+    // Load accumulated value, convert to float, apply bias (if any), scaling,
+    // and eltwise (if any); then convert to destination type and store
+    auto compute = [&](bool apply_mask) {
+        auto dst_addr = ptr[reg_dst];
+        auto vreg_dst_ = vreg_dst(0);
+        if (isa == avx512_common) {
+            if (apply_mask)
+                vreg_dst_ = vreg_dst_ | kreg_rem_mask;
+            uni_vmovups(vreg_dst_, dst_addr);
+        } else {
+            if (apply_mask) {
+                if (isa != sse42) {
+                    uni_vblendvps(vreg_dst_, vreg_zero, dst_addr, vreg_mask);
+                } else {
+                    uni_vmovups(vreg_dst_, dst_addr);
+                }
+            } else {
+                uni_vmovups(vreg_dst_, dst_addr);
+            }
+        }
+
+        if (do_bias_) {
+            auto vreg_bias_ = vreg_bias(0);
+            if (isa == avx512_common && apply_mask)
+                vreg_bias_ = vreg_bias_ | kreg_rem_mask;
+
+            uni_vpbroadcastd(vreg_bias_, ptr[reg_bias]);
+            uni_vaddps(vreg_dst_, vreg_dst_, vreg_bias_);
+        }
+
+        apply_post_ops();
+
+        if (isa == avx512_common) {
+            uni_vmovups(dst_addr, vreg_dst_);
+        } else {
+            if (apply_mask) {
+                if (isa != sse42) {
+                    vmaskmovps(dst_addr, vreg_mask, vreg_dst_);
+                } else {
+                    lea(reg_ptr_maskmovdqu_dst, dst_addr);
+                    maskmovdqu(vreg_dst_, vreg_mask);
+                }
+            } else {
+                uni_vmovups(dst_addr, vreg_dst_);
+            }
+        }
+    };
+
+    Label loop_end;
+    {
+        cmp(reg_len, 0);
+        je(loop_end, T_NEAR);
+
+        Label loop, loop_tail;
+        cmp(reg_len, vlen);
+        jl(loop_tail, T_NEAR);
+        L(loop); {
+            compute(false);
+            sub(reg_len, vlen);
+            add(reg_dst, vlen * sizeof(float));
+            cmp(reg_len, vlen);
+            jge(loop, T_NEAR);
+        }
+
+        L(loop_tail);
+        mov(reg_tmp, reg_len); // reg_tmp is rcx, and we need cl for the shift
+        if (isa == avx512_common) {
+            mov(reg_rem_mask, 1);
+            shl(reg_rem_mask, cl); // reg_tmp == rcx and reg_tail < vlen == 16
+            sub(reg_rem_mask, 1);
+            jz(loop_end, T_NEAR);
+            kmovq(kreg_rem_mask, reg_rem_mask);
+        } else {
+            mov(reg_shift_table, vlen);
+            sub(reg_shift_table, reg_tmp);
+            uni_vmovups(vreg_mask, ptr[reg_table + reg_shift_table * sizeof(float)]);
+        }
+        compute(true);
+    }
+    L(loop_end);
+
+    postamble();
+
+    for (auto& inj : eltwise_injectors_)
+        inj->prepare_table();
+
+    if (utils::one_of(isa, avx2, sse42)) {
+        align(64);
+        L(l_table);
+        for (size_t i = 0; i < vlen; i++) dd(0xFFFFFFFF);
+        for (size_t i = 0; i < vlen; i++) dd(0x00000000);
+    }
+
+    ker_ = getCode<decltype(ker_)>();
+}
+
+template <cpu_isa_t isa>
+void jit_pp_kernel_t<isa>::operator()(float *dst, const float *bias, const int len, const int oc_start, const int oc_work, const int oc_stride) {
+    parallel_nd(oc_work, [&](int oc) {
+        ker_args args;
+        args.dst = dst + oc * oc_stride;
+        args.bias = bias + oc_start + oc;
+        args.len = len;
+        args.oc_offset = oc_start + oc;
+        ker_(&args);
+    });
+}
+
+void ref_pp_kernel_t::operator()(float *dst, const float *bias, const int len,const int oc_start, const int oc_work, const int oc_stride) {
+    // TODO: for "outer threading" we have parallel section within
+    // outermost "parallel". It is not good. Consider to use
+    // "parallel" here with number of threads passed as parameter
+    const auto &p = post_ops_;
+    bool need_bias = do_bias_;
+    if (use_fast_relu) {
+        parallel_nd(oc_work, [&](const int oc) {
+            float b = need_bias ? bias[oc_start + oc] : 0;
+            float *d_ = dst + oc * oc_stride;
+            PRAGMA_OMP_SIMD()
+            for (int oS = 0; oS < len; ++oS) {
+                d_[oS] += b;
+                if (d_[oS] < 0) d_[oS] *= fast_relu_ns;
+            }
+        });
+
+        need_bias = false;
+    } else if (p.len_ > 0) {
+        int eltwise_inj_idx = 0;
+        int depthwise_inj_idx = 0;
+
+        for (int i = 0; i < p.len_; i++) {
+            auto &post_op = p.entry_[i];
+            if (post_op.is_eltwise()) {
+                parallel_nd(oc_work, [&](const int oc) {
+                    float b = need_bias ? bias[oc_start + oc] : 0;
+                    float *d_ = dst + oc * oc_stride;
+                    PRAGMA_OMP_SIMD()
+                    for (int oS = 0; oS < len; ++oS) {
+                        d_[oS] += b;
+                        d_[oS] = ref_eltwise_impls_[eltwise_inj_idx]->compute_scalar(d_[oS]);
+                    }
+                });
+
+                eltwise_inj_idx++;
+                need_bias = false;
+            } else if (post_op.is_depthwise()) {
+                auto depthwise_weights = post_op.depthwise.weights_data;
+                auto depthwise_bias = post_op.depthwise.biases_data;
+
+                parallel_nd(oc_work, [&](const int oc) {
+                    float b = need_bias ? bias[oc_start + oc] : 0;
+                    float *d_ = dst + oc * oc_stride;
+                    PRAGMA_OMP_SIMD()
+                    for (int oS = 0; oS < len; ++oS) {
+                        d_[oS] += b;
+                        d_[oS] = ref_depthwise_impls_[depthwise_inj_idx]->compute_scalar(d_[oS],
+                                                                                        depthwise_weights + oc_start + oc,
+                                                                                        depthwise_bias + oc_start + oc);
+                    }
+                });
+
+                depthwise_inj_idx++;
+                need_bias = false;
+            } else if (post_op.is_quantization()) {
+                auto quant = post_op.quantization;
+                auto pcl = quant.crop_low_data->shifts_;
+                auto pch = quant.crop_high_data->shifts_;
+                auto pisc = quant.input_scale_data->scales_;
+                auto pish = quant.input_shift_data->shifts_;
+                auto posc = quant.output_scale_data->scales_;
+                auto posh = quant.output_shift_data->shifts_;
+
+                parallel_nd(oc_work, [&](const int oc) {
+                    float b = need_bias ? bias[oc_start + oc] : 0;
+                    float *d_ = dst + oc * oc_stride;
+
+                    int cl_idx = quant.crop_low_data->count_ == 1 ? 0 : oc_start + oc;
+                    int ch_idx = quant.crop_high_data->count_ == 1 ? 0 : oc_start + oc;
+                    int isc_idx = quant.input_scale_data->count_ == 1 ? 0 : oc_start + oc;
+                    int ish_idx = quant.input_shift_data->count_ == 1 ? 0 : oc_start + oc;
+                    int osc_idx = quant.output_scale_data->count_ == 1 ? 0 : oc_start + oc;
+                    int osh_idx = quant.output_shift_data->count_ == 1 ? 0 : oc_start + oc;
+
+                    PRAGMA_OMP_SIMD()
+                    for (int oS = 0; oS < len; ++oS) {
+                        d_[oS] += b;
+
+                        d_[oS] = nstl::min(pch[ch_idx], nstl::max(pcl[cl_idx], d_[oS]));
+                        d_[oS] = d_[oS] * pisc[isc_idx] + pish[ish_idx];
+                        d_[oS] = roundf(d_[oS]);
+                        d_[oS] = d_[oS] * posc[osc_idx] + posh[osh_idx];
+                    }
+                });
+
+                need_bias = false;
+            }
+        }
+    }
+
+    if (need_bias) {
+        parallel_nd(oc_work, [&](const int oc) {
+            float b = bias[oc_start + oc];
+            float *d_ = dst + oc * oc_stride;
+            PRAGMA_OMP_SIMD()
+            for (int oS = 0; oS < len; ++oS) {
+                d_[oS] += b;
+            }
+        });
+    }
+};
 
 void gemm_convolution_fwd_t::execute_forward() const {
     auto src = reinterpret_cast<const data_t *>(this->input_memory(0));
@@ -122,108 +502,9 @@ void gemm_convolution_fwd_t::execute_forward() const {
 
             extended_sgemm("N", "N", &m, &N, &K, &one, _source, &LDA, _weights,
                     &LDB, &beta, _dst, &M);
-            if (curr.ic == jcp.ic - step.ic) {
-                // TODO: for "outer threading" we have parallel section within
-                // outermost "parallel". It is not good. Consider to use
-                // "parallel" here with number of threads passed as parameter
-                const int oc_start = curr.g * jcp.oc + curr.oc;
-                const auto &p = pd()->attr()->post_ops_;
-                bool need_bias = jcp.with_bias;
-                if (use_fast_relu) {
-                    parallel_nd(step.oc, [&](const int oc) {
-                        data_t b = need_bias ? bias[oc_start + oc] : 0;
-                        data_t *d_ = _dst + oc * M;
-                        PRAGMA_OMP_SIMD()
-                        for (int oS = 0; oS < m; ++oS) {
-                            d_[oS] += b;
-                            if (d_[oS] < 0) d_[oS] *= fast_relu_ns;
-                        }
-                    });
 
-                    need_bias = false;
-                } else if (p.len_ > 0) {
-                    int eltwise_inj_idx = 0;
-                    int depthwise_inj_idx = 0;
-
-                    for (int i = 0; i < p.len_; i++) {
-                        auto& post_op = p.entry_[i];
-                        if (post_op.is_eltwise()) {
-                            parallel_nd(step.oc, [&](const int oc) {
-                                data_t b = need_bias ? bias[oc_start + oc] : 0;
-                                data_t *d_ = _dst + oc * M;
-                                PRAGMA_OMP_SIMD()
-                                for (int oS = 0; oS < m; ++oS) {
-                                    d_[oS] += b;
-                                    d_[oS] = eltwise_injectors[eltwise_inj_idx]->compute_scalar(d_[oS]);
-                                }
-                            });
-
-                            eltwise_inj_idx++;
-                            need_bias = false;
-                        } else if (post_op.is_depthwise()) {
-                            auto depthwise_weights = post_op.depthwise.weights_data;
-                            auto depthwise_bias = post_op.depthwise.biases_data;
-
-                            parallel_nd(step.oc, [&](const int oc) {
-                                data_t b = need_bias ? bias[oc_start + oc] : 0;
-                                data_t *d_ = _dst + oc * M;
-                                PRAGMA_OMP_SIMD()
-                                for (int oS = 0; oS < m; ++oS) {
-                                    d_[oS] += b;
-                                    d_[oS] = depthwise_injectors[depthwise_inj_idx]->compute_scalar(d_[oS],
-                                                                                                    depthwise_weights + oc_start + oc,
-                                                                                                    depthwise_bias + oc_start + oc);
-                                }
-                            });
-
-                            depthwise_inj_idx++;
-                            need_bias = false;
-                        } else if (post_op.is_quantization()) {
-                            auto quant = post_op.quantization;
-                            auto pcl = quant.crop_low_data->shifts_;
-                            auto pch = quant.crop_high_data->shifts_;
-                            auto pisc = quant.input_scale_data->scales_;
-                            auto pish = quant.input_shift_data->shifts_;
-                            auto posc = quant.output_scale_data->scales_;
-                            auto posh = quant.output_shift_data->shifts_;
-
-                            parallel_nd(step.oc, [&](const int oc) {
-                                data_t b = need_bias ? bias[oc_start + oc] : 0;
-                                data_t *d_ = _dst + oc * M;
-
-                                int cl_idx = quant.crop_low_data->count_ == 1 ? 0 : oc_start + oc;
-                                int ch_idx = quant.crop_high_data->count_ == 1 ? 0 : oc_start + oc;
-                                int isc_idx = quant.input_scale_data->count_ == 1 ? 0 : oc_start + oc;
-                                int ish_idx = quant.input_shift_data->count_ == 1 ? 0 : oc_start + oc;
-                                int osc_idx = quant.output_scale_data->count_ == 1 ? 0 : oc_start + oc;
-                                int osh_idx = quant.output_shift_data->count_ == 1 ? 0 : oc_start + oc;
-
-                                PRAGMA_OMP_SIMD()
-                                for (int oS = 0; oS < m; ++oS) {
-                                    d_[oS] += b;
-
-                                    d_[oS] = nstl::min(pch[ch_idx], nstl::max(pcl[cl_idx], d_[oS]));
-                                    d_[oS] = d_[oS] * pisc[isc_idx] + pish[ish_idx];
-                                    d_[oS] = roundf(d_[oS]);
-                                    d_[oS] = d_[oS] * posc[osc_idx] + posh[osh_idx];
-                                }
-                            });
-
-                            need_bias = false;
-                        }
-                    }
-                }
-
-                if (need_bias) {
-                    parallel_nd(step.oc, [&](const int oc) {
-                        data_t b = bias[oc_start + oc];
-                        data_t *d_ = _dst + oc * M;
-                        PRAGMA_OMP_SIMD()
-                        for (int oS = 0; oS < m; ++oS) {
-                            d_[oS] += b;
-                        }
-                    });
-                }
+            if (pp_kernel_ && curr.ic == jcp.ic - step.ic) {
+                (*pp_kernel_)(_dst, bias, m, curr.g * jcp.oc + curr.oc, step.oc, M);
             }
         };
         im_pos_t start, end;
@@ -469,6 +750,10 @@ void gemm_convolution_bwd_weights_t::execute_backward_weights() const {
         });
     }
 }
+
+template class jit_pp_kernel_t<avx512_common>;
+template class jit_pp_kernel_t<avx2>;
+template class jit_pp_kernel_t<sse42>;
 
 }
 }

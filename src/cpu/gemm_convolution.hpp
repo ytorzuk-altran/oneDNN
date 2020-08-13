@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2018 Intel Corporation
+* Copyright 2016-2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -27,9 +27,128 @@
 #include "ref_eltwise.hpp"
 #include "ref_depthwise.hpp"
 
+#include "jit_generator.hpp"
+#include "jit_uni_eltwise.hpp"
+#include "jit_uni_depthwise.hpp"
+
 namespace mkldnn {
 namespace impl {
 namespace cpu {
+
+struct ker_args {
+    float *dst;
+    const float *bias;
+    size_t len;
+    size_t oc_offset;
+};
+
+class uni_pp_kernel_t {
+public:
+    virtual ~uni_pp_kernel_t() = default;
+
+    void (*ker_)(const ker_args *args);
+
+    virtual void operator()(float *dst, const float *bias, const int len, const int oc_start, const int oc_work, const int oc_stride) = 0;
+};
+
+template <cpu_isa_t isa>
+class jit_pp_kernel_t : public uni_pp_kernel_t, jit_generator
+{
+public:
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(gemm_convolution_fwd_t::jit_pp_kernel_);
+    jit_pp_kernel_t(const cpu_convolution_fwd_pd_t *pd);
+    ~jit_pp_kernel_t() {
+        for (auto inj : eltwise_injectors_)
+            delete inj;
+        eltwise_injectors_.clear();
+        for (auto inj : depthwise_injectors_)
+            delete inj;
+        depthwise_injectors_.clear();
+    }
+
+    void operator()(float *dst, const float *bias, const int len, const int oc_start, const int oc_work, const int oc_stride) override;
+
+private:
+    void generate();
+
+    void (*ker_)(const ker_args *args);
+
+    nstl::vector<jit_uni_eltwise_injector_f32<isa> *> eltwise_injectors_;
+    nstl::vector<jit_uni_depthwise_injector_f32<isa> *> depthwise_injectors_;
+
+    using Vmm = typename cpu_isa_traits<isa>::Vmm;
+    static const size_t vlen = cpu_isa_traits<isa>::vlen / sizeof(float);
+
+    Xbyak::Reg64 reg_param = abi_param1;
+    Xbyak::Reg64 reg_dst = rdx;
+    Xbyak::Reg64 reg_bias = rbx;
+
+    Xbyak::Reg64 reg_len = r8;
+    Xbyak::Reg64 reg_tmp = rcx; // intentional for shifting purposes
+    Xbyak::Reg64 reg_oc_offset = r9;
+    Xbyak::Reg64 reg_rem_mask = r10;
+    Xbyak::Opmask kreg_rem_mask = k1;
+
+    Xbyak::Reg64 eltwise_reserved_1_ = r11;
+    Xbyak::Opmask eltwise_reserved_2_ = k2;
+    Xbyak::Opmask depthwise_reserved_2_ = k2;
+
+    //  sse42/avx2
+    Xbyak::Reg64 reg_ptr_maskmovdqu_dst = rdi; // sse42: store destination - must be rdi
+    Xbyak::Label l_table;
+    Xbyak::Reg64 reg_table = r12;
+    Xbyak::Reg64 reg_shift_table = r13;
+    Vmm vreg_mask = Vmm(0); //  sse42: mask for blendvps must be in xmm0
+    Vmm vreg_zero;
+
+    //  post_ops
+    Xbyak::Reg64 reg_d_weights = r14;
+    Xbyak::Reg64 reg_d_bias = r15;
+    Vmm vreg_d_weights, vreg_d_bias;
+    post_ops_t post_ops_;
+
+    bool do_bias_ = false;
+    int idx_compute_vreg_start_;
+    int idx_compute_vreg_max_;
+
+    int idx_vreg_dst(int iter) {
+        int idx = idx_compute_vreg_start_ + 0;
+        assert(idx <= idx_compute_vreg_max_);
+        return idx;
+    }
+    int idx_vreg_bias(int iter) {
+        int idx = idx_compute_vreg_start_ + 1;
+        assert(idx <= idx_compute_vreg_max_);
+        return idx;
+    }
+
+    Vmm vreg_dst(int iter) { return Vmm(idx_vreg_dst(iter)); };
+    Vmm vreg_bias(int iter) { return Vmm(idx_vreg_bias(iter)); };
+};
+
+class ref_pp_kernel_t : public uni_pp_kernel_t {
+public:
+    ref_pp_kernel_t(const cpu_convolution_fwd_pd_t *pd);
+    ~ref_pp_kernel_t() {
+        for (auto impl : ref_eltwise_impls_)
+            delete impl;
+        ref_eltwise_impls_.clear();
+        for (auto impl : ref_depthwise_impls_)
+            delete impl;
+        ref_depthwise_impls_.clear();
+    }
+
+    void operator()(float *dst, const float *bias, const int len, const int oc_start, const int oc_work, const int oc_stride) override;
+
+private:
+    nstl::vector<ref_eltwise_scalar_fwd_t*> ref_eltwise_impls_;
+    nstl::vector<ref_depthwise_scalar_fwd_t*> ref_depthwise_impls_;
+
+    post_ops_t post_ops_;
+    bool do_bias_ = false;
+    bool use_fast_relu = false;
+    float fast_relu_ns;
+};
 
 struct gemm_convolution_fwd_t: public cpu_primitive_t {
     struct pd_t: public cpu_convolution_fwd_pd_t {
@@ -136,28 +255,20 @@ struct gemm_convolution_fwd_t: public cpu_primitive_t {
         const data_t one = 1.0, zero = 0.0;
         beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
 
-        for (int i = 0; i < post_ops.len_; i++) {
-            auto &post_op = post_ops.entry_[i];
-            if (post_op.is_eltwise()) {
-                eltwise_injectors.push_back(new ref_eltwise_scalar_fwd_t(
-                        post_op.eltwise.alg,
-                        post_op.eltwise.alpha,
-                        post_op.eltwise.beta
-                ));
-            } else if (post_op.is_depthwise()) {
-                depthwise_injectors.push_back(new ref_depthwise_scalar_fwd_t(
-                        post_op.depthwise.alg
-                ));
-            }
-        }
+        bool has_bias = pd()->with_bias(),
+                has_post_ops = pd()->attr()->post_ops_.len_ > 0;
 
-        use_fast_relu = false;
-        if (post_ops.len_ == 1 && post_ops.entry_[0].is_relu(true, false)) {
-            use_fast_relu = true;
-            fast_relu_ns = post_ops.entry_[0].eltwise.alpha;
-        } else if (post_ops.len_ == 2 && post_ops.entry_[0].is_sum() && post_ops.entry_[1].is_relu(true, false)) {
-            use_fast_relu = true;
-            fast_relu_ns = post_ops.entry_[1].eltwise.alpha;
+        postops_in_ip_ = has_bias || has_post_ops;
+        if (postops_in_ip_) {
+            if (mayiuse(avx512_common)) {
+                pp_kernel_ = new jit_pp_kernel_t<avx512_common>(apd);
+            } else if (mayiuse(avx2)) {
+                pp_kernel_ = new jit_pp_kernel_t<avx2>(apd);
+            } else if (mayiuse(sse42)) {
+                pp_kernel_ = new jit_pp_kernel_t<sse42>(apd);
+            } else {
+                pp_kernel_ = new ref_pp_kernel_t(apd);
+            }
         }
     }
 
@@ -187,8 +298,8 @@ private:
     nstl::vector<ref_eltwise_scalar_fwd_t*> eltwise_injectors;
     nstl::vector<ref_depthwise_scalar_fwd_t*> depthwise_injectors;
 
-    bool use_fast_relu;
-    float fast_relu_ns;
+    uni_pp_kernel_t *pp_kernel_ = nullptr;
+    bool postops_in_ip_ = false;
 };
 
 struct gemm_convolution_bwd_data_t: public cpu_primitive_t {
