@@ -77,7 +77,7 @@ dnnl_status_t dnnl_gemm_s8s8s32(char transa, char transb, char offsetc, dim_t M,
 #endif
 }
 
-extern "C" dnnl_status_t DNNL_API dnnl_gemm_bf16bf16f32(char transa,
+dnnl_status_t dnnl_gemm_bf16bf16f32(char transa,
         char transb, dim_t M, dim_t N, dim_t K, float alpha,
         const bfloat16_t *A, dim_t lda, const bfloat16_t *B, dim_t ldb,
         float beta, float *C, dim_t ldc) {
