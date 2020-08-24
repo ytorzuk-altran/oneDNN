@@ -2057,6 +2057,11 @@ mkldnn_status_t MKLDNN_API mkldnn_gemm_s8s8s32(char transa,
         int8_t ao, const int8_t *B, int ldb, int8_t bo,
         float beta, int32_t *c, int ldc, const int32_t *co);
 
+mkldnn_status_t MKLDNN_API mkldnn_gemm_bf16bf16f32(char transa, char transb,
+        int M, int N, int K, float alpha,
+        const mkldnn_bfloat16_t* A, int lda, const mkldnn_bfloat16_t* B,
+        int ldb, float beta, float* C, int ldc);
+
 /** @} */
 
 /** @} */
