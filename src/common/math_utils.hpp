@@ -310,6 +310,15 @@ inline U mish_fwd(T s) {
     return (U)(s * ::tanhf(v));
 }
 
+template <typename T,
+        typename U = typename utils::remove_reference<T>::type>
+inline U hsigmoid_fwd(T s) {
+    float v = s + 3.0f;
+    v = v > 0.0f ? v : 0.0f;
+    v = v < 6.0f ? v : 6.0f;
+    return (U)(v / 6.0f);
+}
+
 template <typename T, typename A,
          typename U = typename utils::remove_reference<T>::type>
 inline U scale_shift_fwd(T s_val, A w_val, A b_val) {
