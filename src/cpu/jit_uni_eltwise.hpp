@@ -43,7 +43,8 @@ struct jit_uni_eltwise_injector_f32 {
         , save_state_(save_state), p_table(p_table), k_mask(k_mask)
     {
         using namespace alg_kind;
-        assert(utils::one_of(isa, sse42, avx2, avx512_common));
+//        TODO: reevaluate assertion applicability
+//        assert(utils::one_of(isa, sse42, avx2, avx512_common));
         assert(utils::one_of(alg_, eltwise_relu, eltwise_tanh, eltwise_elu,
                     eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                     eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,

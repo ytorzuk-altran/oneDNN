@@ -37,7 +37,8 @@ template <cpu_isa_t isa>
 struct jit_uni_depthwise_injector_f32 {
     jit_uni_depthwise_injector_f32(jit_generator* host, alg_kind_t depthwise_alg_, Xbyak::Opmask k_mask_ = Xbyak::Opmask(1))
         : h(host), depthwise_alg(depthwise_alg_), k_mask(k_mask_) {
-        assert(utils::one_of(isa, sse42, avx2, avx512_common));
+//        TODO: reevaluate assertion applicability
+//        assert(utils::one_of(isa, sse42, avx2, avx512_common));
         assert(utils::one_of(depthwise_alg, alg_kind::depthwise_scale_shift, alg_kind::depthwise_prelu));
     }
 

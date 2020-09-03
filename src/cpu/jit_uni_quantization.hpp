@@ -41,7 +41,8 @@ struct jit_uni_quantization_injector_f32 {
     jit_uni_quantization_injector_f32(jit_generator* host, mkldnn_post_ops::entry_t post_op,
             Vmm vmm_d_weights, Vmm vmm_d_bias, Xbyak::Reg64 reg_d_weights, Xbyak::Reg64 reg_d_bias)
         : h(host), post_op_(post_op), vmm_d_weights_(vmm_d_weights), vmm_d_bias_(vmm_d_bias), reg_d_weights_(reg_d_weights), reg_d_bias_(reg_d_bias) {
-        assert(utils::one_of(isa, sse42, avx2, avx512_common));
+//        TODO: reevaluate assertion applicability
+//        assert(utils::one_of(isa, sse42, avx2, avx512_common));
         assert(post_op.is_quantization());
         assert(utils::one_of(post_op.quantization.alg, alg_kind::quantization_quantize, alg_kind::quantization_quantize_dequantize));
 
