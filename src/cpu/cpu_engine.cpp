@@ -530,9 +530,9 @@ static const pd_create_f cpu_impl_list[] = {
     INSTANCE(jit_uni_binary_convolution_fwd_t<sse42>),
     INSTANCE(ref_binary_convolution_fwd_t),
     /* quantization */
-    INSTANCE(jit_uni_quantization_fwd_t<avx512_common>),
-    INSTANCE(jit_uni_quantization_fwd_t<avx2>),
-    INSTANCE(jit_uni_quantization_fwd_t<sse42>),
+//    INSTANCE(jit_uni_quantization_fwd_t<avx512_common>),
+//    INSTANCE(jit_uni_quantization_fwd_t<avx2>),
+//    INSTANCE(jit_uni_quantization_fwd_t<sse42>),
     INSTANCE(ref_quantization_fwd_t<f32, bin>),
     INSTANCE(ref_quantization_fwd_t<f32, u8>),
     INSTANCE(ref_quantization_fwd_t<f32, s8>),
