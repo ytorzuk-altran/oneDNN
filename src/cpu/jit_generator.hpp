@@ -1036,7 +1036,7 @@ public:
 public:
     jit_generator(
         void *code_ptr = nullptr,
-        size_t code_size = 256 * 1024
+        size_t code_size = 256 * 1024 * 3
         ) : Xbyak::CodeGenerator(code_size, code_ptr)
     {
     }

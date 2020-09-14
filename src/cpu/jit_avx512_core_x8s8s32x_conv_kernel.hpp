@@ -32,6 +32,17 @@ namespace mkldnn {
 namespace impl {
 namespace cpu {
 
+    // calculates filter size taking into account dilation
+    inline int calculate_extended_filter_size(int filter_size, int dilation) {
+        return (filter_size - 1) * (dilation + 1) + 1;
+    }
+
+    inline int calculate_end_padding(int start_padding, int dst_size, int src_size,
+                                     int spatial_stride, int dilated_filter_size) {
+        return (dst_size - 1) * spatial_stride + dilated_filter_size
+               - (src_size + start_padding);
+    }
+
 template<typename Vmm>
 struct _jit_avx512_core_x8s8s32x_fwd_kernel : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(_jit_avx512_core_x8s8s32x_conv_fwd_ker_t)
@@ -68,6 +79,7 @@ private:
     nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
     nstl::vector<jit_uni_quantization_injector_f32<avx512_common>*> quantization_injectors;
 
+    const int ic_sub_step = 4;
     enum {
         typesize = sizeof(float),
         ker_reg_base_idx = 28,
@@ -102,6 +114,7 @@ private:
     const Xbyak::Reg64 reg_kj = reg_ptr_scales;
     const Xbyak::Reg64 reg_overflow = reg_ptr_scales;
     const Xbyak::Reg64 reg_icb = reg_bias;
+    const Xbyak::Reg64 reg_jmp_tbl_base = reg_kj;
 
     const Xbyak::Reg64 reg_d_weights = r15;
     const Xbyak::Reg64 reg_d_bias = r13;
