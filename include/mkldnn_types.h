@@ -624,7 +624,11 @@ typedef enum {
     /** Eltwise: mish */
     mkldnn_eltwise_mish = 0x1f0,
     /** Eltwise: hsigmoid */
-    mkldnn_eltwise_hsigmoid = 0x1fe,
+    mkldnn_eltwise_hsigmoid = 0x1f1,
+    /** Eltwise: round half to even */
+    mkldnn_eltwise_round_half_to_even = 0x1f2,
+    /** Eltwise: round half away from zero */
+    mkldnn_eltwise_round_half_away_from_zero = 0x1f3,
     /** Max pooling */
     mkldnn_pooling_max = 0x1ff,
     /** Average pooling include padding */

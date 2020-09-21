@@ -38,7 +38,8 @@ ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(alg_kind_t alg, float alpha,
                 eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                 eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
                 eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_not, eltwise_swish,
-                eltwise_hswish, eltwise_mish, eltwise_hsigmoid));
+                eltwise_hswish, eltwise_mish, eltwise_hsigmoid, eltwise_round_half_to_even,
+                eltwise_round_half_away_from_zero));
 }
 
 ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(
@@ -65,6 +66,8 @@ float ref_eltwise_scalar_fwd_t::compute_scalar(float s) {
         case eltwise_hswish: return hswish_fwd(s);
         case eltwise_mish: return mish_fwd(s);
         case eltwise_hsigmoid: return hsigmoid_fwd(s);
+        case eltwise_round_half_to_even: return round_half_to_even_fwd(s);
+        case eltwise_round_half_away_from_zero: return round_half_away_from_zero_fwd(s);
         default: assert(!"unknown eltwise alg_kind");
     }
 
@@ -103,6 +106,8 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_nCspBc_padded() const {
             case eltwise_hswish: d = hswish_fwd(s); break;
             case eltwise_mish: d = mish_fwd(s); break;
             case eltwise_hsigmoid: d = hsigmoid_fwd(s); break;
+            case eltwise_round_half_to_even: d = round_half_to_even_fwd(s); break;
+            case eltwise_round_half_away_from_zero: d =round_half_away_from_zero_fwd(s); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     };
@@ -215,6 +220,8 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_generic() const {
             case eltwise_hswish: d = hswish_fwd(s); break;
             case eltwise_mish: d = mish_fwd(s); break;
             case eltwise_hsigmoid: d = hsigmoid_fwd(s); break;
+            case eltwise_round_half_to_even: d = round_half_to_even_fwd(s); break;
+            case eltwise_round_half_away_from_zero: d =round_half_away_from_zero_fwd(s); break;
             default: assert(!"unknown eltwise alg_kind");
         }
     });
@@ -312,6 +319,8 @@ void ref_eltwise_fwd_t<data_type>::execute_forward_dense() const {
         case eltwise_hswish: d = hswish_fwd(s); break;
         case eltwise_mish: d = mish_fwd(s); break;
         case eltwise_hsigmoid: d = hsigmoid_fwd(s); break;
+        case eltwise_round_half_to_even: d = round_half_to_even_fwd(s); break;
+        case eltwise_round_half_away_from_zero: d = round_half_away_from_zero_fwd(s); break;
         default: assert(!"unknown eltwise alg_kind");
         }
     });

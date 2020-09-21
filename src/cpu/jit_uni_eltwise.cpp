@@ -938,6 +938,37 @@ void jit_uni_eltwise_injector_f32<isa>::hsigmoid_compute_vector(
 }
 
 template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::round_half_to_even_compute_vector(
+        const Vmm &vmm_src) {
+    h->uni_vroundps(vmm_src, vmm_src, _op_near);
+}
+
+template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::round_half_away_from_zero_compute_vector(
+        const Vmm &vmm_src) {
+    // create a mask of negative numbers for later returning sign
+    compute_cmp_mask(vmm_src, table_val(1), _cmp_lt_os);
+
+    // round half away from zero for positive numbers
+    h->uni_vandps(vmm_src, vmm_src, table_val(0));
+    h->uni_vaddps(vmm_src, vmm_src, table_val(2));
+    h->uni_vroundps(vmm_src, vmm_src, _op_floor);
+
+    // return a sign for negative numbers using the mask
+    if (isa == sse42) {
+        h->movups(vmm_aux1, vmm_src);
+        h->mulps(vmm_aux1, table_val(3));
+        h->blendvps(vmm_src, vmm_aux1);
+    } else if (isa == avx2) {
+        h->vmulps(vmm_aux1, vmm_src, table_val(3));
+        h->vblendvps(vmm_src, vmm_src, vmm_aux1, vmm_mask);
+    } else if (isa == avx512_common) {
+        h->vmulps(vmm_aux1, vmm_src, table_val(3));
+        h->vblendmps(vmm_src | k_mask, vmm_src, vmm_aux1);
+    }
+}
+
+template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::relu_prepare_table() {
     for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(float2int(alpha_));
     for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0);
@@ -1158,6 +1189,14 @@ void jit_uni_eltwise_injector_f32<isa>::mish_prepare_table() {
 }
 
 template <cpu_isa_t isa>
+void jit_uni_eltwise_injector_f32<isa>::round_half_away_from_zero_prepare_table() {
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0x7fffffff); // for abs()
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0);
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0x3f000000); // 0.5f
+    for (size_t d = 0; d < vlen / sizeof(float); ++d) h->dd(0xbf800000); // -1.0f
+}
+
+template <cpu_isa_t isa>
 int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     switch (alg_) {
     case alg_kind::eltwise_relu: return (alpha_ == 0.f) ? 0 : 2;
@@ -1178,6 +1217,8 @@ int jit_uni_eltwise_injector_f32<isa>::aux_vecs_count(alg_kind_t alg_) {
     case alg_kind::eltwise_mish: return 5;
     case alg_kind::eltwise_log: return 5;
     case alg_kind::eltwise_hsigmoid: return 0;
+    case alg_kind::eltwise_round_half_to_even: return 0;
+    case alg_kind::eltwise_round_half_away_from_zero: return 2;
     default: assert(!"unsupported eltwise algorithm");
     }
 
@@ -1211,6 +1252,8 @@ void jit_uni_eltwise_injector_f32<isa>::compute_body(size_t start_idx,
         case eltwise_mish: mish_compute_vector(Vmm(idx)); break;
         case eltwise_log: log_compute_vector(Vmm(idx)); break;
         case eltwise_hsigmoid: hsigmoid_compute_vector(Vmm(idx)); break;
+        case eltwise_round_half_to_even: round_half_to_even_compute_vector(Vmm(idx)); break;
+        case eltwise_round_half_away_from_zero: round_half_away_from_zero_compute_vector(Vmm(idx)); break;
         default: assert(!"unsupported eltwise algorithm");
         }
     }
@@ -1257,6 +1300,9 @@ void jit_uni_eltwise_injector_f32<isa>::prepare_table(bool gen_table) {
         case eltwise_hsigmoid:
         case eltwise_hswish: hswish_prepare_table(); break;
         case eltwise_mish: mish_prepare_table(); break;
+        case eltwise_round_half_to_even : break;
+        case eltwise_round_half_away_from_zero :
+            round_half_away_from_zero_prepare_table(); break;
         default: assert(!"unsupported eltwise algorithm");
     }
     }
@@ -1570,7 +1616,8 @@ struct jit_uni_kernel_fwd_f32: public jit_uni_eltwise_kernel_f32,
                     eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
                     eltwise_bounded_relu, eltwise_soft_relu, eltwise_logistic,
                     eltwise_exp, eltwise_gelu, eltwise_clamp, eltwise_swish,
-                    eltwise_hswish, eltwise_mish, eltwise_hsigmoid));
+                    eltwise_hswish, eltwise_mish, eltwise_hsigmoid, eltwise_round_half_to_even,
+		      eltwise_round_half_away_from_zero));
 
         preamble();
 
@@ -1736,7 +1783,8 @@ status_t jit_uni_eltwise_fwd_t<isa, d_type>::pd_t::init() {
                 eltwise_elu, eltwise_square, eltwise_abs, eltwise_sqrt,
                 eltwise_linear, eltwise_bounded_relu, eltwise_soft_relu,
                 eltwise_logistic, eltwise_exp, eltwise_gelu, eltwise_clamp,
-                eltwise_swish, eltwise_hswish, eltwise_mish, eltwise_hsigmoid)
+                eltwise_swish, eltwise_hswish, eltwise_mish, eltwise_hsigmoid,
+                eltwise_round_half_to_even, eltwise_round_half_away_from_zero)
         && memory_desc_wrapper(src_pd()).is_dense(true)
         && IMPLICATION(!memory_desc_wrapper(src_pd()).is_dense(false),
                 math::eltwise_fwd_preserves_zero(desc()->alg_kind, true))
