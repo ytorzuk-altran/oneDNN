@@ -44,8 +44,8 @@ template <cpu_isa_t isa, data_type_t kernel_dt>
 struct jit_uni_dw_conv_fwd_kernel {
 
     jit_uni_dw_conv_fwd_kernel(
-            const jit_conv_conf_t &ajcp, const memory_desc_t &dst_md) {
-        ker_ = new jit_kernel_t(ajcp, dst_md);
+            const jit_conv_conf_t &ajcp, const memory_desc_t &dst_md, const primitive_attr_t &attr) {
+        ker_ = new jit_kernel_t(ajcp, dst_md, attr);
     }
 
     status_t create_kernel() { return ker_->create_kernel(); }
@@ -233,13 +233,15 @@ status_t jit_uni_dw_conv_fwd_kernel<isa, kernel_dt>::init_conf(
     if (jcp.with_eltwise) jcp.eltwise = post_ops.entry_[eltwise_ind].eltwise;
     const int binary_ind = post_ops.find(primitive_kind::binary);
     jcp.with_binary = binary_ind != -1;
+    jcp.with_depthwise = post_ops.find(primitive_kind::depthwise) != -1;
+    jcp.with_quantization = post_ops.find(primitive_kind::quantization) != -1;
 
     jcp.post_ops = post_ops;
 
     using namespace injector;
     static constexpr bool sum_at_pos_0_only = true;
     static constexpr bool sum_requires_scale_one = true;
-    const bool post_ops_ok_ = post_ops_ok({isa, {eltwise, binary, sum},
+    const bool post_ops_ok_ = post_ops_ok({isa, {eltwise, binary, sum, depthwise, quantization},
             jcp.post_ops, &dst_d, sum_at_pos_0_only, sum_requires_scale_one});
     if (!post_ops_ok_) return status::unimplemented;
 
