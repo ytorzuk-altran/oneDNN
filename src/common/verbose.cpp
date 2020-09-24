@@ -279,6 +279,16 @@ void attr2str(char *str, int len, int written, const primitive_attr_t *attr) {
                             dnnl_alg_kind2str(eb.alg),
                             dnnl_dt2str(eb.src1_desc.data_type), mask);
                 } break;
+                case primitive_kind::depthwise: {
+                    const post_ops_t::entry_t::depthwise_t &dw = e.depthwise;
+                    const char *alg_str = dnnl_alg_kind2str(dw.alg);
+                    DPRINT(str, len, written, "%s;", alg_str);
+                } break;
+                case primitive_kind::quantization: {
+                    const post_ops_t::entry_t::quantization_t &qt = e.quantization;
+                    const char *alg_str = dnnl_alg_kind2str(qt.alg);
+                    DPRINT(str, len, written, "%s;", alg_str);
+                } break;
                 default: assert(!"unsupported post op primitive kind!"); break;
             }
         }

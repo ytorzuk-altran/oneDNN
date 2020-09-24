@@ -604,6 +604,10 @@ const char *dnnl_alg_kind2str(dnnl_alg_kind_t v) {
     if (v == dnnl_reduction_norm_lp_sum) return "reduction_norm_lp_sum";
     if (v == dnnl_reduction_norm_lp_power_p_max) return "reduction_norm_lp_power_p_max";
     if (v == dnnl_reduction_norm_lp_power_p_sum) return "reduction_norm_lp_power_p_sum";
+    if (v == dnnl_depthwise_scale_shift) return "depthwise_scale_shift";
+    if (v == dnnl_depthwise_prelu) return "depthwise_prelu";
+    if (v == dnnl_quantization_quantize_dequantize) return "quantization_quantize_dequantize";
+    if (v == dnnl_quantization_quantize) return "quantization_quantize";
     assert(!"unknown alg_kind");
     return "unknown alg_kind";
 }

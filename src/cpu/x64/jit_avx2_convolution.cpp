@@ -138,7 +138,7 @@ void jit_avx2_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
                         par_conv.flags |= FLAG_IC_FIRST;
                     }
 
-                    if (jcp.with_eltwise && icb + 1 == jcp.nb_ic)
+                    if (icb + 1 == jcp.nb_ic)
                         par_conv.flags |= FLAG_IC_LAST;
 
                     par_conv.reduce_work = this_block_size(
@@ -159,6 +159,8 @@ void jit_avx2_convolution_fwd_t::execute_forward(const exec_ctx_t &ctx) const {
                             - div_up(d_t_overflow, (jcp.dilate_d + 1))
                             - div_up(d_b_overflow, (jcp.dilate_d + 1));
                     par_conv.kd_padding = nstl::max(0, kd_padding);
+
+                    par_conv.oc_off = _oc * oc_bias_scale * sizeof(float);
 
                     (*kernel_)(&par_conv);
                 }
