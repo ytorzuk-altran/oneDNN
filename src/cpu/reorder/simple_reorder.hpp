@@ -256,14 +256,14 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                                         format_tag::gOIw2i8o4i,
                                         format_tag::gOIw4o4i))
                         || (utils::one_of(tag_i, format_tag::ihwo,
-                                    format_tag::hwio, format_tag::oihw)
+                                    format_tag::hwio, format_tag::oihw, format_tag::iohw)
                                 && utils::one_of(tag_o, format_tag::OIhw4i16o4i,
                                         format_tag::OIhw4i32o4i,
                                         format_tag::OIhw4i64o4i,
                                         format_tag::OIhw2i8o4i,
                                         format_tag::OIhw4o4i))
                         || (utils::one_of(tag_i, format_tag::idhwo,
-                                    format_tag::dhwio, format_tag::oidhw)
+                                    format_tag::dhwio, format_tag::oidhw, format_tag::iodhw)
                                 && utils::one_of(tag_o,
                                         format_tag::OIdhw4i16o4i,
                                         format_tag::OIdhw4i32o4i,
@@ -271,11 +271,11 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                                         format_tag::OIdhw2i8o4i,
                                         format_tag::OIdhw4o4i))
                         || (utils::one_of(
-                                    tag_i, format_tag::goihw, format_tag::hwigo)
+                                    tag_i, format_tag::goihw, format_tag::hwigo, format_tag::giohw)
                                 && utils::one_of(tag_o, format_tag::gOIhw4o4i,
                                         format_tag::gOIhw2i8o4i,
                                         format_tag::gOIhw4i16o4i))
-                        || (utils::one_of(tag_i, format_tag::goidhw)
+                        || (utils::one_of(tag_i, format_tag::goidhw, format_tag::giodhw)
                                 && (utils::one_of(tag_o,
                                         format_tag::gOIdhw4i16o4i,
                                         format_tag::gOIdhw2i8o4i,

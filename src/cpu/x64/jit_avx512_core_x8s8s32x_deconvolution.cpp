@@ -45,7 +45,7 @@ jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::
                 const primitive_attr_t &attr, const memory_desc_t &dst_md)
     : jcp(ajcp), attr_(attr), postops_injector_(nullptr) {
 
-    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum) {
+    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum || jcp.with_depthwise || jcp.with_quantization) {
         const std::size_t tail_size = jcp.is_depthwise
                 ? jcp.ngroups % jcp.ch_block
                 : jcp.oc_without_padding % jcp.oc_block;
@@ -62,9 +62,19 @@ jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::
                 use_exact_tail_scalar_bcast};
         const binary_injector::static_params_t bsp {this->param1, rhs_sp};
 
+        if (jcp.ver == ver_vnni) {
+            vmm_d_weights = Vmm(28);
+            vmm_d_bias = Vmm(29);
+        } else {
+            vmm_d_weights = Vmm(26);
+            vmm_d_bias = Vmm(27);
+        }
+
+        const quantization_injector::static_params_t qsp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias};
+
         postops_injector_ = utils::make_unique<
-                injector::jit_uni_postops_injector_t<avx512_core, Vmm>>(
-                this, jcp.post_ops, bsp);
+                injector::jit_uni_postops_injector_t<avx512_core>>(
+                this, jcp.post_ops, bsp, qsp);
     }
 }
 
@@ -267,6 +277,10 @@ status_t _jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     if (jcp.with_eltwise) jcp.eltwise = p.entry_[eltwise_ind].eltwise;
     const int binary_ind = p.find(primitive_kind::binary);
     jcp.with_binary = binary_ind != -1;
+    const int depthwise_ind = p.find(primitive_kind::depthwise);
+    jcp.with_depthwise = depthwise_ind != -1;
+    const int quantization_ind = p.find(primitive_kind::quantization);
+    jcp.with_quantization = quantization_ind != -1;
 
     const int sum_ind = p.find(primitive_kind::sum);
     jcp.with_sum = sum_ind != -1;
@@ -276,6 +290,12 @@ status_t _jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
 
     jcp.ver = ver_avx512_core;
     if (mayiuse(avx512_core_vnni)) jcp.ver = ver_vnni;
+    int max_regs = jcp.ver == ver_vnni ? 30 : 28;
+
+    if (jcp.with_depthwise || jcp.with_quantization) {
+        max_regs -= 2;
+    }
+
     const auto &oscales = attr.output_scales_;
     jcp.is_oc_scale = oscales.mask_ == 1 << 1;
 
@@ -292,10 +312,11 @@ status_t _jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
 
     jcp.nb_ch = div_up(jcp.ngroups, jcp.ch_block);
     jcp.nb_oc = jcp.oc / jcp.oc_block;
+    if (jcp.nb_oc == 0) return status::unimplemented;
     jcp.nb_ic = jcp.ic / jcp.ic_block;
 
     /* kernel blocking params */
-    const int regs = jcp.ver == ver_vnni ? 30 : 28;
+    const int regs = max_regs;
     jcp.nb_ch_blocking = 1;
     jcp.nb_oc_blocking = nstl::min(4, jcp.nb_oc);
     for (; jcp.nb_oc_blocking > 1; jcp.nb_oc_blocking--)
@@ -364,7 +385,7 @@ bool _jit_avx512_core_x8s8s32x_deconv_fwd_kernel::post_ops_ok(
     static constexpr bool sum_at_pos_0_only = true;
     static constexpr bool sum_requires_scale_one = true;
 
-    return injector::post_ops_ok({avx512_core, {eltwise, binary, sum}, post_ops,
+    return injector::post_ops_ok({avx512_core, {eltwise, binary, sum, depthwise, quantization}, post_ops,
             &dst_d, sum_at_pos_0_only, sum_requires_scale_one});
 }
 
@@ -982,7 +1003,7 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::store_output(
         }
     }
     /* Do post-ops */
-    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum) {
+    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum || jcp.with_depthwise || jcp.with_quantization) {
         const auto sum_injector = [&]() {
             if (p_sum_scale) { // post_op: sum
                 for (int k = 0; k < jcp.nb_oc_blocking; k++) {
@@ -1027,10 +1048,21 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::store_output(
                 }
             }
         }
+
+        std::map<size_t, int> vmm_idx_off;
+        for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
+            for (int ur = 0; ur < ur_w; ur++) {
+                vmm_idx_off.insert({vmm_out(ur, ocb).getIdx(), ocb * jcp.oc_block * sizeof(float)});
+            }
+        }
+        depthwise_injector::dynamic_params_t ddp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias,
+                                                  ptr[this->param1 + GET_OFF(oc_off)], vmm_idx_off};
+        quantization_injector::dynamic_params_t qdp {ptr[this->param1 + GET_OFF(oc_off)], vmm_idx_off};
+
         const int nb_oc_block
                 = jcp.is_depthwise ? jcp.nb_ch_blocking : jcp.nb_oc_blocking;
         postops_injector_->compute_vector_range(
-                0, nb_oc_block * ur_w, rhs_arg_params);
+                0, nb_oc_block * ur_w, rhs_arg_params, ddp, qdp);
     }
 
     if (jcp.dst_zero_point) {
@@ -1448,6 +1480,7 @@ status_t jit_avx512_core_x8s8s32x_deconvolution_fwd_t::execute_forward_1d(
             p.oc_blocks = jcp.is_depthwise ? g : ocb;
             p.post_ops_binary_rhs_arg_vec = post_ops_binary_rhs_arg_vec.data();
             p.oc_l_off = g_oc;
+            p.oc_off = g_oc * sizeof(float);
             p.zp_compensation
                     = jcp.src_zero_point ? zp_compensation + g_oc : nullptr;
             p.zp_src_pad_str_compensation
@@ -1619,6 +1652,7 @@ status_t jit_avx512_core_x8s8s32x_deconvolution_fwd_t::execute_forward_2d(
                 p.post_ops_binary_rhs_arg_vec
                         = post_ops_binary_rhs_arg_vec.data();
                 p.oc_l_off = g_oc;
+                p.oc_off = g_oc * sizeof(float);
                 p.zp_compensation
                         = jcp.src_zero_point ? zp_compensation + g_oc : nullptr;
                 p.zp_src_pad_str_compensation = jcp.src_zero_point
@@ -1848,6 +1882,7 @@ status_t jit_avx512_core_x8s8s32x_deconvolution_fwd_t::execute_forward_3d(
                 p.post_ops_binary_rhs_arg_vec
                         = post_ops_binary_rhs_arg_vec.data();
                 p.oc_l_off = g_oc;
+                p.oc_off = g_oc * sizeof(float);
                 p.zp_compensation
                         = jcp.src_zero_point ? zp_compensation + g_oc : nullptr;
                 p.zp_src_pad_str_compensation = jcp.src_zero_point
