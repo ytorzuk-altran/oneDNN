@@ -70,12 +70,14 @@ struct jit_uni_x8s8s32x_1x1_convolution_fwd_t : public primitive_t {
                                     data_type::s8, data_type::u8))
                     && attr()->has_default_values(smask_t::oscale
                                     | smask_t::zero_points_runtime
-                                    | smask_t::post_ops,
+                                    | smask_t::post_ops
+                                    | smask_t::sum_dt,
                             dst_type)
                     && !has_zero_dim_memory() && zero_points_ok()
                     && set_default_formats_common(
                             dat_tag(), format_tag::any, dat_tag())
-                    && set_or_check_wei_format();
+                    && set_or_check_wei_format()
+                    && !this->attr()->has_asymmetric_quantization();
             if (!ok) return status::unimplemented;
 
             const convolution_desc_t *conv_d = desc();
