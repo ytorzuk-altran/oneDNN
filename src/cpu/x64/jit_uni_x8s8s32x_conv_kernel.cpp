@@ -56,7 +56,7 @@ _jit_uni_x8s8s32x_fwd_kernel<isa, Vmm>::_jit_uni_x8s8s32x_fwd_kernel(
         const jit_conv_conf_t &ajcp, const primitive_attr_t &attr,
         const memory_desc_t &dst_md)
     : jit_generator(nullptr, MAX_CODE_SIZE, true, isa), jcp(ajcp), attr_(attr) {
-    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum) {
+    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum || jcp.with_depthwise || jcp.with_quantization) {
         using namespace binary_injector;
         static constexpr bool preserve_gpr = true;
         static constexpr bool preserve_vmm = false;
@@ -72,10 +72,12 @@ _jit_uni_x8s8s32x_fwd_kernel<isa, Vmm>::_jit_uni_x8s8s32x_fwd_kernel(
                 memory_desc_wrapper(dst_md), tail_size, true};
         const static_params_t static_params {
                 this->param1, rhs_arg_static_params};
+        quantization_injector::static_params_t quantization_static_params =
+                {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias};
 
         postops_injector_
                 = utils::make_unique<injector::jit_uni_postops_injector_t<isa>>(
-                        this, jcp.post_ops, static_params);
+                        this, jcp.post_ops, static_params, quantization_static_params);
     }
 }
 
@@ -139,7 +141,7 @@ void _jit_uni_x8s8s32x_fwd_kernel<isa, Vmm>::apply_sum(const int nb_oc_block,
                                               const int j) {
             const int aux_output_offset = jcp.typesize_out
                     * (k * oc_block + j * jcp.oc_without_padding * jcp.ngroups);
-            cvt2ps(jcp.dst_dt, vmm_prev_dst, reg_out, aux_output_offset,
+            cvt2ps(jcp.sum_dt, vmm_prev_dst, reg_out, aux_output_offset,
                     mask_flag ? get_tail_size() : get_blocking_size());
             const Vmm vmm = vmm_out(j, k);
             if (sum_scale == 1.f)
@@ -162,7 +164,16 @@ template <cpu_isa_t isa, typename Vmm>
 void _jit_uni_x8s8s32x_fwd_kernel<isa, Vmm>::apply_postops(
         const int nb_oc_block, const int ur_w, const bool last_oc_block_flag,
         const int oc_block, const float *p_sum_scale) {
-    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum) {
+    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum || jcp.with_depthwise || jcp.with_quantization) {
+        std::map<size_t, int> vmm_idx_off;
+        iterate(nb_oc_block, ur_w,
+                [&](const bool, const int k, const int j) {
+                    vmm_idx_off.insert({vmm_out_idx(j, k), k * oc_block * sizeof(float)});
+                });
+        depthwise_injector::dynamic_params_t ddp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias,
+                                                  ptr[this->param1 + GET_OFF(oc_off)], vmm_idx_off};
+        quantization_injector::dynamic_params_t qdp {ptr[this->param1 + GET_OFF(oc_off)], vmm_idx_off};
+
         apply_sum(nb_oc_block, ur_w, last_oc_block_flag, oc_block, p_sum_scale);
 
         vmm_index_set_t vmm_idxs;
@@ -194,7 +205,7 @@ void _jit_uni_x8s8s32x_fwd_kernel<isa, Vmm>::apply_postops(
                         vmm_idxs.emplace(vmm_out_idx(j, k));
                     });
 
-        postops_injector_->compute_vector_range(vmm_idxs, rhs_arg_params);
+        postops_injector_->compute_vector_range(vmm_idxs, rhs_arg_params, ddp, qdp);
     }
 }
 
@@ -1325,12 +1336,17 @@ status_t jit_uni_x8s8s32x_fwd_kernel<isa>::init_conf(jit_conv_conf_t &jcp,
     jcp.with_binary = binary_ind != -1;
     const int sum_ind = post_ops.find(primitive_kind::sum);
     jcp.with_sum = sum_ind != -1;
+    if (jcp.with_sum)
+        jcp.sum_dt = post_ops.entry_[sum_ind].sum.dt;
+
+    jcp.with_depthwise = post_ops.find(primitive_kind::depthwise) != -1;
+    jcp.with_quantization = post_ops.find(primitive_kind::quantization) != -1;
 
     jcp.post_ops = post_ops;
 
     using namespace injector;
     const bool post_ops_ok_
-            = post_ops_ok({isa, {eltwise, binary, sum}, jcp.post_ops, &dst_d});
+            = post_ops_ok({isa, {eltwise, binary, sum, depthwise, quantization}, jcp.post_ops, &dst_d});
     if (!post_ops_ok_) return status::unimplemented;
 
     jcp.is_resrc_depthwise = true && jcp.is_depthwise && jcp.stride_w < jcp.kw
