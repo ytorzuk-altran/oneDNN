@@ -143,6 +143,10 @@ const alg_kind_t reduction_norm_lp_power_p_sum
         = dnnl_reduction_norm_lp_power_p_sum;
 const alg_kind_t softmax_accurate = dnnl_softmax_accurate;
 const alg_kind_t softmax_log = dnnl_softmax_log;
+const alg_kind_t depthwise_scale_shift = dnnl_depthwise_scale_shift;
+const alg_kind_t depthwise_prelu = dnnl_depthwise_prelu;
+const alg_kind_t quantization_quantize_dequantize = dnnl_quantization_quantize_dequantize;
+const alg_kind_t quantization_quantize = dnnl_quantization_quantize;
 } // namespace alg_kind
 
 using data_type_t = dnnl_data_type_t;
@@ -1249,6 +1253,8 @@ const primitive_kind_t matmul = dnnl_matmul;
 const primitive_kind_t resampling = dnnl_resampling;
 const primitive_kind_t reduction = dnnl_reduction;
 const primitive_kind_t softmax_v2 = dnnl_softmax_v2;
+const primitive_kind_t depthwise = dnnl_depthwise;
+const primitive_kind_t quantization = dnnl_quantization;
 
 // Internal only primitive kinds.
 const primitive_kind_t internal_only_start = (primitive_kind_t)(1 << 12);
