@@ -57,9 +57,11 @@ struct jit_uni_x8s8s32x_convolution_fwd_t : public primitive_t {
                                     data_type::u8))
                     && attr()->has_default_values(smask_t::oscale
                                     | smask_t::zero_points_runtime
-                                    | smask_t::post_ops,
+                                    | smask_t::post_ops
+                                    | smask_t::sum_dt,
                             dst_type)
-                    && !has_zero_dim_memory() && zero_points_ok();
+                    && !has_zero_dim_memory() && zero_points_ok()
+                    && !this->attr()->has_asymmetric_quantization();
             if (!args_ok) return status::unimplemented;
 
             const auto status = jit_uni_x8s8s32x_fwd_kernel<isa>::init_conf(
