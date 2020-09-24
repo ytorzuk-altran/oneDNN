@@ -63,8 +63,8 @@ const impl_list_item_t impl_list[] = {
         REG_POOLING_P_BWD(CPU_INSTANCE(nhwc_pooling_bwd_t<bf16>))
         REG_POOLING_P_FWD(CPU_INSTANCE(nhwc_pooling_fwd_t<f32>))
         REG_POOLING_P_BWD(CPU_INSTANCE(nhwc_pooling_bwd_t<f32>))
-        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<f32>))
-        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<bf16, f32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<f32, f32, f32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<bf16, bf16, f32>))
         REG_POOLING_P_BWD(CPU_INSTANCE(ref_pooling_bwd_t<f32>))
         REG_POOLING_P_BWD(CPU_INSTANCE(ref_pooling_bwd_t<bf16>))
         /* int */
@@ -72,9 +72,11 @@ const impl_list_item_t impl_list[] = {
         REG_POOLING_P_FWD(CPU_INSTANCE_X64(jit_uni_i8i8_pooling_fwd_t<avx2>))
         REG_POOLING_P_FWD(CPU_INSTANCE_X64(jit_uni_i8i8_pooling_fwd_t<sse41>))
         REG_POOLING_P_FWD(CPU_INSTANCE_AARCH64(jit_uni_i8i8_pooling_fwd_t<sve_512>))
-        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<s32>))
-        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<s8, s32>))
-        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<u8, s32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<s32, s32, s32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<s8, s8, s32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<s8, f32, f32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<u8, u8, s32>))
+        REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t<u8, f32, f32>))
         /* eol */
         nullptr,
 };
