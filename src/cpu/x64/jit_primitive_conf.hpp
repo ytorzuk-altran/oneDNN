@@ -107,8 +107,11 @@ struct jit_conv_conf_t {
     format_tag_t src_tag, wei_tag, dst_tag; // temporary workaround
     bool with_bias;
     bool with_sum;
+    data_type_t sum_dt;
     bool with_eltwise;
     bool with_binary;
+    bool with_depthwise;
+    bool with_quantization;
 
     bool with_binary_per_oc_bcast;
     bool with_binary_no_bcast;
@@ -486,6 +489,9 @@ struct jit_conv_call_s {
     int oc_flag;
     size_t last_ic_block;
     size_t last_oc_block;
+
+    size_t oc_off;
+    size_t oc_off_prf;
 };
 
 struct jit_deconv_call_s {
@@ -562,8 +568,11 @@ struct jit_1x1_conv_conf_t {
     format_tag_t src_tag, wei_tag, dst_tag; // temporary workaround
     bool with_bias;
     bool with_sum;
+    data_type_t sum_dt;
     bool with_eltwise;
     bool with_binary;
+    bool with_depthwise;
+    bool with_quantization;
     bool with_dw_conv;
 
     post_ops_t post_ops;
@@ -644,6 +653,8 @@ struct jit_1x1_conv_call_s {
     size_t output_stride; // used in backward_weights only
 
     size_t first_last_flag;
+
+    size_t oc_off;
 };
 
 struct jit_pool_conf_t {
@@ -683,6 +694,8 @@ struct jit_pool_conf_t {
     bool with_postops;
     bool with_eltwise;
     bool with_binary;
+    bool with_depthwise;
+    bool with_quantization;
 };
 
 struct jit_pool_call_s {
