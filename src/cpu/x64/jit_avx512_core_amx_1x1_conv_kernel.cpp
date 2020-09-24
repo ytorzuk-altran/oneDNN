@@ -42,7 +42,7 @@ jit_avx512_core_amx_1x1_fwd_kernel_t::jit_avx512_core_amx_1x1_fwd_kernel_t(
     : jit_generator(nullptr, MAX_CODE_SIZE, true, avx512_core_amx)
     , jcp(ajcp)
     , attr_(attr) {
-    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum) {
+    if (jcp.with_eltwise || jcp.with_binary || jcp.with_sum || jcp.with_depthwise || jcp.with_quantization) {
         using namespace binary_injector;
         const auto &rhs_addr_reg = bin_injector_helper_reg_1;
         const auto &rhs_helper_reg = bin_injector_helper_reg_2;
@@ -220,7 +220,7 @@ void jit_avx512_core_amx_1x1_fwd_kernel_t::apply_postops(const Zmm &zmm_out,
         const float *p_sum_scale, const Xbyak::Address &addr,
         const bool mask_flag, const size_t off, const int ocb) {
     if (jcp.with_eltwise || jcp.with_binary
-            || (jcp.with_sum && p_sum_scale != nullptr)) {
+            || (jcp.with_sum && p_sum_scale != nullptr) || jcp.with_depthwise || jcp.with_quantization) {
         binary_injector::rhs_arg_dynamic_params_t rhs_arg_params;
 
         apply_sum(zmm_out, p_sum_scale, addr, mask_flag);
