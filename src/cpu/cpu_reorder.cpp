@@ -366,6 +366,7 @@ static const rpd_create_f cpu_reorder_impl_list[] = {
     REG_SR(bf16, any, bf16, any, fmt_order::any, spec::reference),
     REG_SR(bf16, any, f32, any, fmt_order::any, spec::reference),
     REG_SR(f32, any, bf16, any, fmt_order::any, spec::reference),
+    REG_SR(s32, any, bf16, any, fmt_order::any, spec::reference),
 
     /* s16 <-> s16 */
     REG_SR_DIRECT_COPY(s16, s16),
