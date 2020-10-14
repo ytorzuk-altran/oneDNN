@@ -2439,6 +2439,9 @@ typedef enum {
     dnnl_cpu_isa_avx512_core_amx = 0x3e7,
 
     dnnl_cpu_isa_avx512_vpopcnt =  0x6e7,
+
+    /// Intel AVX2 and Intel Deep Learning Boost (Intel DL Boost) support
+    dnnl_cpu_isa_avx2_vnni = 0x407,
 } dnnl_cpu_isa_t;
 
 /// @} dnnl_api_service
