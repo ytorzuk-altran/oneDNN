@@ -388,121 +388,6 @@ template <typename pd_t> static void init_info_rnn(pd_t *s, char *buffer) {
             aux_str, prb_str);
 }
 
-template <typename pd_t> static void init_info_roi_pooling(pd_t *s, char *buffer) {
-    DECL_DAT_AUX_PRB_STRS();
-
-    auto fmt_data = s->src_pd()->desc()->format;
-    auto fmt_diff = s->desc()->prop_kind == prop_kind::backward_data
-                    ? s->diff_src_pd()->desc()->format : memory_format::undef;
-    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN, "fdata:%s fdiff:%s",
-             mkldnn_fmt2str(fmt_data), mkldnn_fmt2str(fmt_diff));
-
-    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
-             "alg:%s", mkldnn_alg_kind2str(s->desc()->alg_kind));
-
-    snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-             "ph%dpw%dcs%f", s->pooledH(), s->pooledW(), s->spatialScale());
-    verbose_templ(buffer, s->kind(), s->name(), s->desc()->prop_kind, dat_str,
-                  aux_str, prb_str);
-}
-
-template <typename pd_t> static void init_info_bin_conv(pd_t *s, char *buffer) {
-    DECL_DAT_AUX_PRB_STRS();
-
-    auto fmt_src = s->src_pd()->desc()->format;
-    auto fmt_wei = s->weights_pd(0)->desc()->format;
-    auto fmt_dst = s->dst_pd()->desc()->format;
-
-    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN,
-            "fsrc:%s fwei:%s fdst:%s",
-            mkldnn_fmt2str(fmt_src), mkldnn_fmt2str(fmt_wei), mkldnn_fmt2str(fmt_dst));
-
-    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
-            "alg:%s", mkldnn_alg_kind2str(s->cdesc()->alg_kind));
-
-    if (s->ndims() == 5) {
-        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-            "mb%d_g%dic%doc%d"
-            "_id%dod%dkd%dsd%ddd%dpd%d"
-            "_ih%doh%dkh%dsh%ddh%dph%d"
-            "_iw%dow%dkw%dsw%ddw%dpw%d",
-            s->MB(), s->G(), s->IC(), s->OC(),
-            s->ID(), s->OD(), s->KD(), s->KSD(), s->KDD(), s->padFront(),
-            s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
-            s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
-    } else {
-        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-            "mb%d_g%dic%doc%d"
-            "_ih%doh%dkh%dsh%ddh%dph%d"
-            "_iw%dow%dkw%dsw%ddw%dpw%d",
-            s->MB(), s->G(), s->IC(), s->OC(),
-            s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
-            s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
-    }
-
-    verbose_templ(buffer, s->kind(), s->name(), s->cdesc()->prop_kind, dat_str,
-            aux_str, prb_str);
-}
-
-template <typename pd_t> static void init_info_quantization(pd_t *s, char *buffer) {
-    DECL_DAT_AUX_PRB_STRS();
-
-    auto fmt_data = s->src_pd()->desc()->format;
-    auto fmt_diff = s->desc()->prop_kind == prop_kind::backward_data
-        ? s->diff_src_pd()->desc()->format : memory_format::undef;
-    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN, "fdata:%s fdiff:%s",
-            mkldnn_fmt2str(fmt_data), mkldnn_fmt2str(fmt_diff));
-
-    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
-            "alg:%s", mkldnn_alg_kind2str(s->desc()->alg_kind));
-
-    snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-            "mb%dic%dih%diw%d", s->MB(), s->C(), s->H(), s->W());
-
-    verbose_templ(buffer, s->kind(), s->name(), s->desc()->prop_kind, dat_str,
-            aux_str, prb_str);
-}
-
-template <typename pd_t> static void init_info_def_conv(pd_t *s, char *buffer) {
-    DECL_DAT_AUX_PRB_STRS();
-
-    auto fmt_src = s->src_pd(0)->desc()->format;
-    auto fmt_off = s->src_pd(1)->desc()->format;
-    auto fmt_wei = s->weights_pd(0)->desc()->format;
-    auto fmt_bia = s->with_bias()
-                   ? s->weights_pd(1)->desc()->format
-                   : memory_format::undef;
-    auto fmt_dst = s->dst_pd()->desc()->format;
-    snprintf(dat_str, MKLDNN_VERBOSE_DAT_LEN,
-             "fsrc:%s foff:%s fwei:%s fbia:%s fdst:%s",
-             mkldnn_fmt2str(fmt_src), mkldnn_fmt2str(fmt_off),
-             mkldnn_fmt2str(fmt_wei), mkldnn_fmt2str(fmt_bia),
-             mkldnn_fmt2str(fmt_dst));
-
-    snprintf(aux_str, MKLDNN_VERBOSE_AUX_LEN,
-             "alg:%s", mkldnn_alg_kind2str(s->desc()->alg_kind));
-
-    if (s->with_groups())
-        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-                 "mb%d_g%ddg%dic%doc%d"
-                 "_ih%doh%dkh%dsh%ddh%dph%d"
-                 "_iw%dow%dkw%dsw%ddw%dpw%d",
-                 s->MB(), s->G(), s->defGroup(), s->IC(), s->OC(),
-                 s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
-                 s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
-    else
-        snprintf(prb_str, MKLDNN_VERBOSE_PRB_LEN,
-                 "mb%d_dg%dic%doc%d"
-                 "_ih%doh%dkh%dsh%ddh%dph%d"
-                 "_iw%dow%dkw%dsw%ddw%dpw%d",
-                 s->MB(), s->defGroup(), s->IC(), s->OC(),
-                 s->IH(), s->OH(), s->KH(), s->KSH(), s->KDH(), s->padT(),
-                 s->IW(), s->OW(), s->KW(), s->KSW(), s->KDW(), s->padL());
-
-    verbose_templ(buffer, s->kind(), s->name(), s->desc()->prop_kind, dat_str,
-                  aux_str, prb_str);
-}
-
 #else /* !defined(DISABLE_VERBOSE) */
 #define MKLDNN_VERBOSE_BUF_LEN 1
 
@@ -522,10 +407,8 @@ DEFINE_STUB(pool);
 DEFINE_STUB(softmax);
 DEFINE_STUB(rnn);
 DEFINE_STUB(shuffle);
-DEFINE_STUB(roi_pooling);
 DEFINE_STUB(bin_conv);
 DEFINE_STUB(binarization);
-DEFINE_STUB(def_conv);
 #undef DEFINE_STUB
 #endif /* !defined(DISABLE_VERBOSE) */
 

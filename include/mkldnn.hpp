@@ -128,9 +128,6 @@ public:
         batch_normalization = mkldnn_batch_normalization,
         inner_product = mkldnn_inner_product,
         rnn = mkldnn_rnn,
-        binary_convolution = mkldnn_binary_convolution,
-        quantization = mkldnn_quantization,
-        deformable_convolution = mkldnn_deformable_convolution,
     };
 
     /// A wrapper structure to specify a particular output of a primitive.
@@ -294,13 +291,9 @@ enum algorithm {
     vanilla_lstm = mkldnn_vanilla_lstm,
     vanilla_gru = mkldnn_vanilla_gru,
     gru_linear_before_reset = mkldnn_gru_linear_before_reset,
-    roi_pooling_max = mkldnn_roi_pooling_max,
-    roi_pooling_bilinear = mkldnn_roi_pooling_bilinear,
-    binary_convolution_direct = mkldnn_binary_convolution_direct,
     binarization_depthwise = mkldnn_binarization_depthwise,
     quantization_quantize_dequantize = mkldnn_quantization_quantize_dequantize,
     quantization_quantize = mkldnn_quantization_quantize,
-    deformable_convolution_direct = mkldnn_deformable_convolution_direct,
 };
 
 inline mkldnn_alg_kind_t convert_to_c(algorithm aalgorithm) {
@@ -356,9 +349,6 @@ enum query {
     batch_normalization_d = mkldnn_query_batch_normalization_d,
     inner_product_d = mkldnn_query_inner_product_d,
     rnn_d = mkldnn_query_rnn_d,
-    binary_convolution_d = mkldnn_query_binary_convolution_d,
-    quantization_d = mkldnn_query_quantization_d,
-    deformable_convolution_d = mkldnn_query_deformable_convolution_d,
 
     input_pd = mkldnn_query_input_pd,
     output_pd = mkldnn_query_output_pd,
@@ -2205,58 +2195,6 @@ struct deconvolution_backward_weights : public primitive {
 
 /// @}
 
-/// @addtogroup cpp_api_roi_pooling ROIPooling
-/// @{
-
-struct roi_pooling_forward : public primitive {
-    struct desc {
-        mkldnn_roi_pooling_desc_t data;
-        std::vector<mkldnn_memory_desc_t> c_api_inputs;
-
-        desc(prop_kind aprop_kind, algorithm aalgorithm, std::vector<memory::desc> inputs,
-             const memory::desc &dst_desc, int pooled_h, int pooled_w, double spatial_scale) {
-
-            for(size_t i = 0; i < inputs.size(); i++) {
-                c_api_inputs.push_back(inputs[i].data);
-            }
-
-            error::wrap_c_api(mkldnn_roi_pooling_forward_desc_init(&data,
-                        mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm), &c_api_inputs[0],
-                        c_api_inputs.size(),
-                        &dst_desc.data, pooled_h, pooled_w, spatial_scale),
-                    "could not create a roi pooling forward descriptor");
-        }
-    };
-
-    struct primitive_desc : public handle<mkldnn_primitive_desc_t>{
-        primitive_desc(const desc &adesc, const engine &aengine) {
-            mkldnn_primitive_desc_t result = nullptr;
-            error::wrap_c_api(mkldnn_primitive_desc_create(
-                        &result, &adesc.data, aengine.get(), nullptr),
-                    "could not create a roi pooling forward primitive descriptor");
-            reset(result);
-        }
-    };
-
-    roi_pooling_forward(const primitive_desc &aprimitive_desc,
-            std::vector<primitive::at> &inputs, const memory &dst) {
-        mkldnn_primitive_t result = nullptr;
-
-        std::vector<mkldnn_primitive_at_t> p_inputs;
-        for (size_t i = 0; i < inputs.size(); i++) {
-            p_inputs.push_back(inputs[i].data);
-        }
-
-        const_mkldnn_primitive_t outputs[] = { dst.get() };
-        error::wrap_c_api(mkldnn_primitive_create(&result,
-                    aprimitive_desc.get(), &p_inputs[0], outputs),
-                "could not create a roi pooling forward primitive");
-        reset(result);
-    }
-};
-
-/// @}
-
 /// @addtogroup cpp_api_lrn LRN
 /// A primitive to perform local response normalization (LRN) across or within
 /// channels.
@@ -3504,251 +3442,6 @@ struct shuffle_backward : public primitive {
         error::wrap_c_api(mkldnn_primitive_create(&result,
             aprimitive_desc.get(), inputs, outputs),
             "could not create a shuffle backward primitive");
-        reset(result);
-    }
-};
-
-/// @}
-
-/// @addtogroup cpp_api_binary_convolution Binary convolution
-/// A primitive to compute binary convolution using different algorithms.
-///
-/// @sa @ref c_api_binary_convolution in @ref c_api
-/// @{
-
-struct binary_convolution_forward: public primitive {
-    struct desc {
-        mkldnn_binary_convolution_desc_t data;
-        desc(prop_kind aprop_kind, algorithm aalgorithm,
-                const memory::desc &src_desc,
-                const memory::desc &weights_desc,
-                const memory::desc &dst_desc,
-                const memory::dims strides,
-                const memory::dims dilates,
-                const memory::dims padding_l,
-                const memory::dims padding_r,
-                const float pad_value) {
-            memory::validate_dims(strides);
-            memory::validate_dims(dilates);
-            memory::validate_dims(padding_l);
-            memory::validate_dims(padding_r);
-            error::wrap_c_api(
-                mkldnn_dilated_binary_convolution_forward_desc_init(&data,
-                    mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm),
-                        &src_desc.data, &weights_desc.data, &dst_desc.data,
-                        &strides[0], &dilates[0], &padding_l[0], &padding_r[0],
-                        pad_value),
-                    "could not create a dilated binary convolution forward descriptor");
-        }
-    };
-
-    struct primitive_desc : public mkldnn::primitive_desc {
-        primitive_desc(const desc &desc, const engine &e)
-            : mkldnn::primitive_desc(&desc.data, nullptr, e, nullptr) {}
-
-        primitive_desc(const desc &desc, const primitive_attr &attr, const engine &e)
-            : mkldnn::primitive_desc(&desc.data, &attr, e, nullptr) {}
-
-        REG_QUERY_MPD(src, src, 0);
-        REG_QUERY_MPD(weights, weights, 0);
-        REG_QUERY_MPD(dst, dst, 0);
-    };
-
-    binary_convolution_forward(const primitive_desc &aprimitive_desc,
-            const primitive::at &src, const primitive::at &weights, const memory &dst) {
-        mkldnn_primitive_t result = nullptr;
-        mkldnn_primitive_at_t inputs[] = { src.data, weights.data };
-        const_mkldnn_primitive_t outputs[] = { dst.get() };
-        check_num_parameters(aprimitive_desc.get(), 2, 1,
-            "binary convolution forward");
-        error::wrap_c_api(mkldnn_primitive_create(&result,
-                    aprimitive_desc.get(), inputs, outputs),
-                "could not create a binary convolution forward primitive");
-        reset(result);
-    }
-};
-
-/// @}
-
-/// @addtogroup cpp_api_quantization Quantization
-/// @{
-
-struct quantization_forward : public primitive {
-    struct desc {
-        mkldnn_quantization_desc_t data;
-
-        desc(prop_kind aprop_kind, algorithm alg_kind, int axis,
-             const memory::desc &src_desc,
-             const memory::desc &thresholds_desc, const memory::desc &output_mask_desc,
-             const memory::desc &dst_desc) {
-            error::wrap_c_api(mkldnn_binarization_forward_desc_init(&data,
-                                                                 mkldnn::convert_to_c(aprop_kind),
-                                                                 mkldnn::convert_to_c(alg_kind),
-                                                                 axis,
-                                                                 &src_desc.data, &thresholds_desc.data, &output_mask_desc.data, &dst_desc.data),
-                              "could not create a quantization forward descriptor");
-        }
-
-        desc(prop_kind aprop_kind, algorithm alg_kind, int axis,
-             const memory::desc &src_desc,
-             const memory::desc &crop_low_desc, const memory::desc &crop_high_desc,
-             const memory::desc &input_scale_desc, const memory::desc &input_shift_desc,
-             const memory::desc &output_scale_desc, const memory::desc &output_shift_desc,
-             const memory::desc &dst_desc) {
-            error::wrap_c_api(mkldnn_quantization_forward_desc_init(&data,
-                                                                    mkldnn::convert_to_c(aprop_kind),
-                                                                    mkldnn::convert_to_c(alg_kind),
-                                                                    axis,
-                                                                    &src_desc.data,
-                                                                    &crop_low_desc.data, &crop_high_desc.data,
-                                                                    &input_scale_desc.data, &input_shift_desc.data,
-                                                                    &output_scale_desc.data, &output_shift_desc.data,
-                                                                    &dst_desc.data),
-                              "could not create a quantization forward descriptor");
-        }
-    };
-
-    struct primitive_desc : public handle<mkldnn_primitive_desc_t> {
-        primitive_desc(const desc &adesc, const engine &aengine) {
-            mkldnn_primitive_desc_t result = nullptr;
-            error::wrap_c_api(mkldnn_primitive_desc_create(
-                    &result, &adesc.data, aengine.get(), nullptr),
-                              "could not create a quantization forward primitive descriptor");
-            reset(result);
-        }
-
-        engine get_engine() { return engine::query(*this); }
-    };
-
-    quantization_forward(const primitive_desc &aprimitive_desc,
-                      const primitive::at &src, const primitive::at &thresholds, const primitive::at &output_mask,
-                      const memory &dst) {
-        mkldnn_primitive_t result = nullptr;
-        mkldnn_primitive_at_t inputs[] = { src.data, thresholds.data, output_mask.data};
-        const_mkldnn_primitive_t outputs[] = { dst.get() };
-        error::wrap_c_api(mkldnn_primitive_create(&result, aprimitive_desc.get(), inputs, outputs),
-                          "could not create a quantization forward primitive");
-        reset(result);
-    }
-
-    quantization_forward(const primitive_desc &aprimitive_desc,
-                         const primitive::at &src, const primitive::at &crop_low, const primitive::at &crop_high,
-                         const primitive::at &input_scale, const primitive::at &input_shift,
-                         const primitive::at &output_scale, const primitive::at &output_shift,
-                         const memory &dst) {
-        mkldnn_primitive_t result = nullptr;
-        mkldnn_primitive_at_t inputs[] = { src.data, crop_low.data, crop_high.data,
-                                           input_scale.data, input_shift.data, output_scale.data, output_shift.data};
-        const_mkldnn_primitive_t outputs[] = { dst.get() };
-        error::wrap_c_api(mkldnn_primitive_create(&result, aprimitive_desc.get(), inputs, outputs),
-                          "could not create a quantization forward primitive");
-        reset(result);
-    }
-};
-
-/// @}
-
-/// @addtogroup cpp_api_deformable_convolution Deformable convolution
-/// A primitive to compute deformable convolution.
-///
-/// @sa @ref c_api_deformable_convolution in @ref c_api
-/// @{
-
-struct deformable_convolution_forward: public primitive {
-    struct desc {
-        mkldnn_deformable_convolution_desc_t data;
-        std::vector<mkldnn_memory_desc_t> c_api_inputs;
-
-        desc(prop_kind aprop_kind, algorithm aalgorithm, std::vector<memory::desc> inputs,
-             const memory::desc &weights_desc,
-             const memory::desc &bias_desc,
-             const memory::desc &dst_desc,
-             const memory::dims strides,
-             const memory::dims dilates,
-             const memory::dims padding_l,
-             const memory::dims padding_r,
-             const padding_kind apadding_kind,
-             const int deformable_group) {
-
-            for (size_t i = 0; i < inputs.size(); i++) {
-                c_api_inputs.push_back(inputs[i].data);
-            }
-
-            memory::validate_dims(strides);
-            memory::validate_dims(dilates);
-            memory::validate_dims(padding_l);
-            memory::validate_dims(padding_r);
-            error::wrap_c_api(mkldnn_deformable_convolution_forward_desc_init(&data,
-                                                                   mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm),
-                                                                   &c_api_inputs[0], c_api_inputs.size(), &weights_desc.data, &bias_desc.data,
-                                                                   &dst_desc.data, &strides[0], &dilates[0], &padding_l[0], &padding_r[0],
-                                                                   mkldnn::convert_to_c(apadding_kind), deformable_group),
-                              "could not create a deformable convolution forward descriptor");
-        }
-        desc(prop_kind aprop_kind, algorithm aalgorithm, std::vector<memory::desc> inputs,
-             const memory::desc &weights_desc,
-             const memory::desc &dst_desc,
-             const memory::dims strides,
-             const memory::dims dilates,
-             const memory::dims padding_l,
-             const memory::dims padding_r,
-             const padding_kind apadding_kind,
-             const int deformable_group) {
-
-            for (size_t i = 0; i < inputs.size(); i++) {
-                c_api_inputs.push_back(inputs[i].data);
-            }
-
-            memory::validate_dims(strides);
-            memory::validate_dims(dilates);
-            memory::validate_dims(padding_l);
-            memory::validate_dims(padding_r);
-            error::wrap_c_api(mkldnn_deformable_convolution_forward_desc_init(&data,
-                                                                   mkldnn::convert_to_c(aprop_kind), convert_to_c(aalgorithm),
-                                                                   &c_api_inputs[0], c_api_inputs.size(), &weights_desc.data, nullptr,
-                                                                   &dst_desc.data, &strides[0], &dilates[0], &padding_l[0], &padding_r[0],
-                                                                   mkldnn::convert_to_c(apadding_kind), deformable_group),
-                              "could not create a deformable convolution forward descriptor");
-        }
-    };
-
-    struct primitive_desc : public mkldnn::primitive_desc {
-        primitive_desc(const desc &desc, const engine &e)
-                : mkldnn::primitive_desc(&desc.data, nullptr, e, nullptr) {}
-
-        primitive_desc(const desc &desc, const primitive_attr &attr, const engine &e)
-                : mkldnn::primitive_desc(&desc.data, &attr, e, nullptr) {}
-
-        REG_QUERY_MPD(src, src, 0);
-        REG_QUERY_MPD(weights, weights, 0);
-        REG_QUERY_MPD(bias, weights, 1);
-        REG_QUERY_MPD(dst, dst, 0);
-    };
-
-    deformable_convolution_forward(const primitive_desc &aprimitive_desc,
-                        const std::vector<primitive::at> &inputs, const primitive::at &weights,
-                        const primitive::at &bias, const memory &dst) {
-        mkldnn_primitive_t result = nullptr;
-
-        mkldnn_primitive_at_t p_inputs[] = { inputs[0].data, inputs[1].data, weights.data,
-                                           bias.data };
-        const_mkldnn_primitive_t outputs[] = { dst.get() };
-        error::wrap_c_api(mkldnn_primitive_create(&result,
-                                                  aprimitive_desc.get(), &p_inputs[0], outputs),
-                          "could not create a deformable convolution forward bias primitive");
-        reset(result);
-    }
-
-    deformable_convolution_forward(const primitive_desc &aprimitive_desc,
-                        const std::vector<primitive::at> &inputs, const primitive::at &weights, const memory &dst) {
-        mkldnn_primitive_t result = nullptr;
-        mkldnn_primitive_at_t p_inputs[] = { inputs[0].data, inputs[1].data, weights.data, };
-        const_mkldnn_primitive_t outputs[] = { dst.get() };
-        check_num_parameters(aprimitive_desc.get(), 3, 1,
-                             "deformable convolution forward");
-        error::wrap_c_api(mkldnn_primitive_create(&result,
-                                                  aprimitive_desc.get(), &p_inputs[0], outputs),
-                          "could not create a deformable convolution forward primitive");
         reset(result);
     }
 };

@@ -71,18 +71,10 @@
 #include "cpu/jit_uni_batch_normalization_s8.hpp"
 #include "cpu/jit_uni_fork_softmax.hpp"
 #include "cpu/jit_uni_softmax.hpp"
-#include "cpu/jit_uni_roi_pooling.hpp"
-#include "cpu/ref_roi_pooling.hpp"
 #include "cpu/jit_uni_x8s8s32x_convolution.hpp"
 #include "cpu/jit_uni_x8s8s32x_dw_convolution.hpp"
 #include "cpu/jit_sse42_i8i8_pooling.hpp"
 #include "cpu/jit_uni_planar_convolution.hpp"
-#include "cpu/jit_uni_binary_convolution.hpp"
-#include "cpu/ref_binary_convolution.hpp"
-#include "cpu/jit_uni_quantization.hpp"
-#include "cpu/ref_quantization.hpp"
-#include "cpu/jit_uni_deformable_convolution.hpp"
-#include "cpu/ref_deformable_convolution.hpp"
 
 namespace mkldnn {
 namespace impl {
@@ -512,31 +504,6 @@ static const pd_create_f cpu_impl_list[] = {
 #ifdef ENABLE_UNUSED_PRIM
     INSTANCE(ref_inner_product_bwd_data_t<s32, s16, s16, s32>),
 #endif
-    /* roi pooling */
-    INSTANCE(jit_uni_roi_pooling_fwd_t<avx512_common>),
-    INSTANCE(jit_uni_roi_pooling_fwd_t<avx2>),
-    INSTANCE(jit_uni_roi_pooling_fwd_t<sse42>),
-    INSTANCE(ref_roi_pooling_fwd_t<data_type::f32>),
-    /* binary convolution */
-    INSTANCE(jit_uni_binary_convolution_fwd_t<avx512_common>),
-    INSTANCE(jit_uni_binary_convolution_fwd_t<avx2>),
-    INSTANCE(jit_uni_binary_convolution_fwd_t<sse42>),
-    INSTANCE(ref_binary_convolution_fwd_t),
-    /* quantization */
-    INSTANCE(jit_uni_quantization_fwd_t<avx512_common>),
-    INSTANCE(jit_uni_quantization_fwd_t<avx2>),
-    INSTANCE(jit_uni_quantization_fwd_t<sse42>),
-    INSTANCE(ref_quantization_fwd_t<f32, bin>),
-    INSTANCE(ref_quantization_fwd_t<f32, u8>),
-    INSTANCE(ref_quantization_fwd_t<f32, s8>),
-    INSTANCE(ref_quantization_fwd_t<f32, f32>),
-    INSTANCE(ref_quantization_fwd_t<u8, u8>),
-    INSTANCE(ref_quantization_fwd_t<u8, f32>),
-    /* deformable convolution */
-    INSTANCE(jit_uni_deformable_convolution_fwd_t<avx512_common>),
-    INSTANCE(jit_uni_deformable_convolution_fwd_t<avx2>),
-    INSTANCE(jit_uni_deformable_convolution_fwd_t<sse42>),
-    INSTANCE(ref_deformable_convolution_fwd_t),
     /* eol */
     nullptr,
 };
