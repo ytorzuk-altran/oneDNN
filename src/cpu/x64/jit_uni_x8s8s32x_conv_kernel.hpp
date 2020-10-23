@@ -126,9 +126,9 @@ private:
     /* used in compute_ker (but set during prepare_output) */
     const Vmm vmm_shift = vmm_comp; // only for signed input
     /* used in compute_ker */
-    const Vmm vmm_tmp = Vmm(3); // not used for depthwise
+    const Vmm vmm_tmp = Vmm(2); // not used for depthwise
     const Vmm vmm_one
-            = Vmm(2); // set at start of kernel, not used for depthwise.
+            = Vmm(3); // set at start of kernel, not used for depthwise.
     /* used during scale section of store output */
     const Vmm vmm_scale = vmm_tmp;
     /* registers use only for depthwise
