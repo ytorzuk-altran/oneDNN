@@ -96,6 +96,17 @@ set_property(TARGET ${LIB_NAME} PROPERTY VERSION "${MKLDNN_VERSION_MAJOR}.${MKLD
 set_property(TARGET ${LIB_NAME} PROPERTY SOVERSION "${MKLDNN_VERSION_MAJOR}")
 set_property(TARGET ${LIB_NAME} PROPERTY PUBLIC_HEADER ${HEADERS})
 
+if(${ENABLE_SUBSET} STREQUAL "ANALYZE")
+    if(NOT TARGET ittnotify)
+        find_package(Threads REQUIRED)
+        find_package(ITT REQUIRED)
+    endif()
+    target_link_libraries(${LIB_NAME} PRIVATE ittnotify)
+    add_definitions(-DMKLDNN_SUBSET_FIND)
+elseif(${ENABLE_SUBSET} STREQUAL "ON")
+    add_definitions(-DMKLDNN_SUBSET)
+endif()
+
 target_include_directories(${LIB_NAME} PUBLIC
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../include>

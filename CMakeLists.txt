@@ -71,6 +71,8 @@ set(CMAKE_TEST_CCXX_FLAGS)      # TESTS specifics
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 include("cmake/utils.cmake")
 include("cmake/options.cmake")
 include("cmake/OpenMP.cmake")
