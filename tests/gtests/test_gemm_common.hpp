@@ -63,7 +63,6 @@
     CPU_INST_TEST_CASE_( \
             CONCAT_WITH_UNDERSCORE(str, TEST_CASE_NAME_PREFIX), __VA_ARGS__)
 
-
 // Declare packed GEMM interfaces for testing
 #include "src/cpu/gemm/gemm_pack.hpp"
 
