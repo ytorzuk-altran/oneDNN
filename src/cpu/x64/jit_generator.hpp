@@ -1269,6 +1269,58 @@ public:
         vpmaxsd(x1, x2, op);
     }
 
+    void uni_vcmpgtps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+                      const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        cmpps(x1, op, _cmp_nle_us);
+    }
+
+    void uni_vcmpgtps(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
+                      const Xbyak::Operand &op) {
+        vcmpgtps(x1, x2, op);
+    }
+
+    void uni_vpmovzxwd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+        pmovzxwd(x, op);
+    }
+    void uni_vpmovzxwd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
+        vpmovzxwd(x, op);
+    }
+
+    void uni_vpmovsxwd(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
+        pmovsxwd(x, op);
+    }
+    void uni_vpmovsxwd(const Xbyak::Ymm &x, const Xbyak::Operand &op) {
+        vpmovsxwd(x, op);
+    }
+
+    void uni_vpackusdw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        packusdw(x1, op);
+    }
+    void uni_vpackusdw(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpackusdw(x1, x2, op);
+    }
+
+    void uni_vpcmpeqd(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
+                      const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pcmpeqd(x1, op);
+    }
+
+    void uni_vpcmpeqd(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
+                      const Xbyak::Operand &op) {
+        vpcmpeqd(x1, x2, op);
+    }
+
+    void uni_vpminsd(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2, const Xbyak::Operand &op) {
+        assert(x1.getIdx() == x2.getIdx());
+        pminsd(x1, op);
+    }
+    void uni_vpminsd(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2, const Xbyak::Operand &op) {
+        vpminsd(x1, x2, op);
+    }
+
     void mul_by_const(
             const Xbyak::Reg &out, const Xbyak::Reg64 &tmp, int value) {
         // Generates a shift + add sequence for multiplicating contents of the
