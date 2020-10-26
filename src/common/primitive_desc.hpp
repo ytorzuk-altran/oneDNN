@@ -25,6 +25,7 @@
 #include "type_helpers.hpp"
 #include "primitive_attr.hpp"
 #include "verbose.hpp"
+#include "mkldnn_subset.hpp"
 
 struct mkldnn_primitive_desc: public mkldnn::impl::c_compatible {
     using memory_pd_t = mkldnn::impl::memory_pd_t;
@@ -111,11 +112,18 @@ protected:
     mkldnn::impl::memory_tracking::registry_t scratchpad_registry_;
 };
 
+#ifdef MKLDNN_SUBSET_FIND
+#define MKLDNN_PRIMITIVE_MARKER MKLDNN_ITT_SCOPED_TASK(mkldnn::impl::domains::CC0MKLDNN_CPUEngine, std::string("CREATE$") + typeid(pd_t).name());
+#else
+#define MKLDNN_PRIMITIVE_MARKER
+#endif
+
 #define DECLARE_COMMON_PD_t(impl_name, ...) \
     virtual pd_t *clone() const override { return new pd_t(*this); } \
     virtual status_t create_primitive(primitive_t **primitive, \
             const primitive_at_t *inputs, \
             const primitive_t **outputs) const override { \
+        MKLDNN_PRIMITIVE_MARKER \
         double ms = get_msec(); \
         primitive_t::input_vector ins(inputs, inputs + this->n_inputs()); \
         primitive_t::output_vector outs(outputs, outputs + this->n_outputs()); \
