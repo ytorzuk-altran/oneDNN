@@ -113,7 +113,7 @@ protected:
 };
 
 #ifdef MKLDNN_SUBSET_FIND
-#define MKLDNN_PRIMITIVE_MARKER MKLDNN_ITT_SCOPED_TASK(mkldnn::impl::domains::CC0MKLDNN_CPUEngine, std::string("CREATE$") + typeid(pd_t).name());
+#define MKLDNN_PRIMITIVE_MARKER MKLDNN_ITT_SCOPED_TASK(mkldnn::impl::domains::CC2_MKLDNN, std::string("CREATE$CPUEngine$") + typeid(pd_t).name());
 #else
 #define MKLDNN_PRIMITIVE_MARKER
 #endif

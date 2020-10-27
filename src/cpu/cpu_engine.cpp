@@ -23,6 +23,7 @@
 
 #include "cpu_concat.hpp"
 #include "cpu_sum.hpp"
+#include "mkldnn_subset.hpp"
 #include "mkldnn_macros.hpp"
 
 #include "cpu/rnn/ref_rnn.hpp"
@@ -119,8 +120,8 @@ using namespace mkldnn::impl::data_type;
 template<typename pd_t>
 pd_create_f primitive_desc_builder(const char *name) {
     MKLDNN_ITT_SCOPED_TASK(
-        mkldnn::impl::domains::CC0MKLDNN_CPUEngine,
-        mkldnn::impl::handle<pd_t>(std::string("REG$") + typeid(pd_t).name() + "$" + name));
+        mkldnn::impl::domains::CC2_MKLDNN,
+        mkldnn::impl::handle<pd_t>(std::string("REG$CPUEngine$") + typeid(pd_t).name() + "$" + name));
     return &primitive_desc_t::create<pd_t>;
 }
 
@@ -132,7 +133,29 @@ pd_create_f primitive_desc_builder(const char *name) {
 #define INSTANCE_5(name, arg1, arg2, arg3, arg4) primitive_desc_builder<name<arg1, arg2, arg3, arg4>::pd_t>(MKLDNN_MACRO_TOSTRING(name ## _ ## arg1 ## _ ## arg2 ## _ ## arg3 ## _ ## arg4))
 
 #elif defined(MKLDNN_SUBSET)
-#define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
+
+template<typename pd_t>
+mkldnn::impl::status_t primitive_builder_stub(mkldnn::impl::primitive_desc_t **pd,
+        const mkldnn::impl::op_desc_t *adesc,
+        const mkldnn::impl::primitive_attr_t *attr,
+        mkldnn::impl::engine_t *engine,
+        const mkldnn::impl::primitive_desc_t *hint_fwd) {
+    using namespace mkldnn::impl;
+    using namespace mkldnn::impl::status;
+    return unimplemented;
+}
+
+#define INSTANCE_BUILDER_0 &primitive_builder_stub
+#define INSTANCE_BUILDER_1 &primitive_desc_t::create
+#define INSTANCE_BUILDER(name) MKLDNN_MACRO_CAT(INSTANCE_BUILDER_, MKLDNN_MACRO_IS_ENABLED(MKLDNN_MACRO_CAT(MKLDNN_, name)))
+
+#define INSTANCE(...) MKLDNN_MACRO_OVERLOAD(INSTANCE, __VA_ARGS__)
+#define INSTANCE_1(name) INSTANCE_BUILDER(name)<name::pd_t>
+#define INSTANCE_2(name, arg1) INSTANCE_BUILDER(name ## _ ## arg1)<name<arg1>::pd_t>
+#define INSTANCE_3(name, arg1, arg2) INSTANCE_BUILDER(name ## _ ## arg1 ## _ ## arg2)<name<arg1, arg2>::pd_t>
+#define INSTANCE_4(name, arg1, arg2, arg3) INSTANCE_BUILDER(name ## _ ## arg1 ## _ ## arg2 ## _ ## arg3)<name<arg1, arg2, arg3>::pd_t>
+#define INSTANCE_5(name, arg1, arg2, arg3, arg4) INSTANCE_BUILDER(name ## _ ## arg1 ## _ ## arg2 ## _ ## arg3 ## _ ## arg4)<name<arg1, arg2, arg3, arg4>::pd_t>
+
 #else
 #define INSTANCE(...) &primitive_desc_t::create<__VA_ARGS__::pd_t>
 #endif

@@ -23,7 +23,7 @@ namespace mkldnn {
 namespace impl {
 namespace domains {
 
-MKLDNN_ITT_DOMAIN(CC0MKLDNN_CPUEngine);
+MKLDNN_ITT_DOMAIN(CC2_MKLDNN);
 
 } // namespace domains
 } // namespace impl

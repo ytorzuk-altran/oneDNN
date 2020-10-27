@@ -23,6 +23,9 @@
 
 #define MKLDNN_MACRO_EXPAND(X) X
 
+#define MKLDNN_MACRO_CAT_(x, y) x ## y
+#define MKLDNN_MACRO_CAT(x, y) MKLDNN_MACRO_CAT_(x, y)
+
 #define MKLDNN_MACRO_TOSTRING(...) MKLDNN_MACRO_TOSTRING_(__VA_ARGS__)
 #define MKLDNN_MACRO_TOSTRING_(...) #__VA_ARGS__
 
@@ -35,3 +38,18 @@
 #define MKLDNN_MACRO_EVAL(NAME, N) MKLDNN_MACRO_EVAL_(NAME, N)
 
 #define MKLDNN_MACRO_OVERLOAD(NAME, ...) MKLDNN_MACRO_EXPAND( MKLDNN_MACRO_EVAL(NAME, MKLDNN_MACRO_EXPAND( MKLDNN_MACRO_NARG(__VA_ARGS__) ))(__VA_ARGS__) )
+
+// Placeholder for first macro argument
+#define MKLDNN_MACRO_ARG_PLACEHOLDER_1 0,
+
+// This macro returns second argument, first argument is ignored
+#define MKLDNN_MACRO_SECOND_ARG(ignored, val, ...) val
+
+// Return macro argument value
+#define MKLDNN_MACRO_IS_ENABLED(x) MKLDNN_MACRO_IS_ENABLED1(x)
+
+// Generate junk macro or {0, } sequence if val is 1
+#define MKLDNN_MACRO_IS_ENABLED1(val) MKLDNN_MACRO_IS_ENABLED2(MKLDNN_MACRO_ARG_PLACEHOLDER_##val)
+
+// Return second argument from possible sequences {1, 0}, {0, 1, 0}
+#define MKLDNN_MACRO_IS_ENABLED2(arg1_or_junk) MKLDNN_MACRO_SECOND_ARG(arg1_or_junk 1, 0)
