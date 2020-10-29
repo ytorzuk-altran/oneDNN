@@ -15,18 +15,41 @@
 *******************************************************************************/
 
 #pragma once
+#include "mkldnn_macros.hpp"
 
-#ifdef MKLDNN_SUBSET_FIND
+#ifdef MKLDNN_SUBSET_FIND           // MKLDNN analysis
 #include "mkldnn_itt.hpp"
 
 namespace mkldnn {
 namespace impl {
 namespace domains {
 
+MKLDNN_ITT_DOMAIN(CC0_MKLDNN);
+MKLDNN_ITT_DOMAIN(CC1_MKLDNN);
 MKLDNN_ITT_DOMAIN(CC2_MKLDNN);
 
 } // namespace domains
+
+#define MKLDNN_CSCOPE(region, ...)                                                           \
+    MKLDNN_ITT_SCOPED_TASK(mkldnn::impl::domains::CC0_MKLDNN, MKLDNN_MACRO_TOSTRING(region));   \
+    __VA_ARGS__
+
 } // namespace impl
 } // namespace mkldnn
+
+#elif defined(MKLDNN_SUBSET)        // MKLDNN subset is used
+
+// Scope is disabled
+#define MKLDNN_CSCOPE_0(...)
+
+// Scope is enabled
+#define MKLDNN_CSCOPE_1(...) __VA_ARGS__
+
+#define MKLDNN_CSCOPE(region, ...)      \
+    MKLDNN_MACRO_EXPAND(MKLDNN_MACRO_CAT(MKLDNN_CSCOPE_, MKLDNN_MACRO_IS_ENABLED(MKLDNN_MACRO_CAT(MKLDNN_, region)))(__VA_ARGS__))
+
+#else
+
+#define MKLDNN_CSCOPE(region, ...) __VA_ARGS__
 
 #endif

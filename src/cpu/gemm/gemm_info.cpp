@@ -24,6 +24,7 @@
 #include "cpu_isa_traits.hpp"
 #include "mkldnn_traits.hpp"
 #include "mkldnn_types.h"
+#include "mkldnn_subset.hpp"
 #include "f32/common_f32.hpp"
 #include "f32/jit_avx2_kernel_sgemm_kern.hpp"
 #include "f32/jit_avx_gemv_t_f32_kern.hpp"
@@ -316,119 +317,137 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
         switch (data_traits<a_t>::data_type) {
             case data_type::s8:
                 if (mayiuse(avx512_core)) {
-                    copy_a[no_trans][no_sum]
-                            = new jit_avx512_core_u8_copy_an_kern();
-                    copy_a[do_trans][no_sum]
-                            = new jit_avx512_core_u8_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_s8_avx512_core,
+                        copy_a[no_trans][no_sum]
+                                = new jit_avx512_core_u8_copy_an_kern();
+                        copy_a[do_trans][no_sum]
+                                = new jit_avx512_core_u8_copy_at_kern();
 
-                    copy_b[no_trans][no_sum]
-                            = new jit_avx512_core_u8_copy_bn_kern(b_is_s8);
-                    copy_b[do_trans][no_sum]
-                            = new jit_avx512_core_u8_copy_bt_kern(b_is_s8);
+                        copy_b[no_trans][no_sum]
+                                = new jit_avx512_core_u8_copy_bn_kern(b_is_s8);
+                        copy_b[do_trans][no_sum]
+                                = new jit_avx512_core_u8_copy_bt_kern(b_is_s8);
 
-                    copy_a[no_trans][do_sum]
-                            = new jit_avx512_core_u8_copy_sum_an_kern();
-                    copy_a[do_trans][do_sum]
-                            = new jit_avx512_core_u8_copy_sum_at_kern();
+                        copy_a[no_trans][do_sum]
+                                = new jit_avx512_core_u8_copy_sum_an_kern();
+                        copy_a[do_trans][do_sum]
+                                = new jit_avx512_core_u8_copy_sum_at_kern();
 
-                    copy_b[no_trans][do_sum]
-                            = new jit_avx512_core_u8_copy_sum_bn_kern(b_is_s8);
-                    copy_b[do_trans][do_sum]
-                            = new jit_avx512_core_u8_copy_sum_bt_kern(b_is_s8);
+                        copy_b[no_trans][do_sum]
+                                = new jit_avx512_core_u8_copy_sum_bn_kern(b_is_s8);
+                        copy_b[do_trans][do_sum]
+                                = new jit_avx512_core_u8_copy_sum_bt_kern(b_is_s8);
+                    );
                 } else if (mayiuse(avx2)) {
-                    copy_a[no_trans][no_sum] = new jit_avx2_u8_copy_an_kern();
-                    copy_a[do_trans][no_sum] = new jit_avx2_u8_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_s8_avx2,
+                        copy_a[no_trans][no_sum] = new jit_avx2_u8_copy_an_kern();
+                        copy_a[do_trans][no_sum] = new jit_avx2_u8_copy_at_kern();
 
-                    copy_b[no_trans][no_sum] = new jit_avx2_u8_copy_bn_kern();
-                    copy_b[do_trans][no_sum] = new jit_avx2_u8_copy_bt_kern();
+                        copy_b[no_trans][no_sum] = new jit_avx2_u8_copy_bn_kern();
+                        copy_b[do_trans][no_sum] = new jit_avx2_u8_copy_bt_kern();
 
-                    copy_a[no_trans][do_sum]
-                            = new jit_avx2_u8_copy_sum_an_kern();
-                    copy_a[do_trans][do_sum]
-                            = new jit_avx2_u8_copy_sum_at_kern();
+                        copy_a[no_trans][do_sum]
+                                = new jit_avx2_u8_copy_sum_an_kern();
+                        copy_a[do_trans][do_sum]
+                                = new jit_avx2_u8_copy_sum_at_kern();
 
-                    copy_b[no_trans][do_sum]
-                            = new jit_avx2_u8_copy_sum_bn_kern();
-                    copy_b[do_trans][do_sum]
-                            = new jit_avx2_u8_copy_sum_bt_kern();
+                        copy_b[no_trans][do_sum]
+                                = new jit_avx2_u8_copy_sum_bn_kern();
+                        copy_b[do_trans][do_sum]
+                                = new jit_avx2_u8_copy_sum_bt_kern();
+                    );
                 } else if (mayiuse(avx)) {
-                    copy_a[no_trans][no_sum] = new jit_avx_u8_copy_an_kern();
-                    copy_a[do_trans][no_sum] = new jit_avx_u8_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_s8_avx,
+                        copy_a[no_trans][no_sum] = new jit_avx_u8_copy_an_kern();
+                        copy_a[do_trans][no_sum] = new jit_avx_u8_copy_at_kern();
 
-                    copy_b[no_trans][no_sum] = new jit_avx_u8_copy_bn_kern();
-                    copy_b[do_trans][no_sum] = new jit_avx_u8_copy_bt_kern();
+                        copy_b[no_trans][no_sum] = new jit_avx_u8_copy_bn_kern();
+                        copy_b[do_trans][no_sum] = new jit_avx_u8_copy_bt_kern();
 
-                    copy_a[no_trans][do_sum]
-                            = new jit_avx_u8_copy_sum_an_kern();
-                    copy_a[do_trans][do_sum]
-                            = new jit_avx_u8_copy_sum_at_kern();
+                        copy_a[no_trans][do_sum]
+                                = new jit_avx_u8_copy_sum_an_kern();
+                        copy_a[do_trans][do_sum]
+                                = new jit_avx_u8_copy_sum_at_kern();
 
-                    copy_b[no_trans][do_sum]
-                            = new jit_avx_u8_copy_sum_bn_kern();
-                    copy_b[do_trans][do_sum]
-                            = new jit_avx_u8_copy_sum_bt_kern();
+                        copy_b[no_trans][do_sum]
+                                = new jit_avx_u8_copy_sum_bn_kern();
+                        copy_b[do_trans][do_sum]
+                                = new jit_avx_u8_copy_sum_bt_kern();
+                    );
                 } else if (mayiuse(sse42)) {
-                    copy_a[no_trans][no_sum] = new jit_sse41_u8_copy_an_kern();
-                    copy_a[do_trans][no_sum] = new jit_sse41_u8_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_s8_sse42,
+                        copy_a[no_trans][no_sum] = new jit_sse41_u8_copy_an_kern();
+                        copy_a[do_trans][no_sum] = new jit_sse41_u8_copy_at_kern();
 
-                    copy_b[no_trans][no_sum] = new jit_sse41_u8_copy_bn_kern();
-                    copy_b[do_trans][no_sum] = new jit_sse41_u8_copy_bt_kern();
+                        copy_b[no_trans][no_sum] = new jit_sse41_u8_copy_bn_kern();
+                        copy_b[do_trans][no_sum] = new jit_sse41_u8_copy_bt_kern();
 
-                    copy_a[no_trans][do_sum]
-                            = new jit_sse41_u8_copy_sum_an_kern();
-                    copy_a[do_trans][do_sum]
-                            = new jit_sse41_u8_copy_sum_at_kern();
+                        copy_a[no_trans][do_sum]
+                                = new jit_sse41_u8_copy_sum_an_kern();
+                        copy_a[do_trans][do_sum]
+                                = new jit_sse41_u8_copy_sum_at_kern();
 
-                    copy_b[no_trans][do_sum]
-                            = new jit_sse41_u8_copy_sum_bn_kern();
-                    copy_b[do_trans][do_sum]
-                            = new jit_sse41_u8_copy_sum_bt_kern();
+                        copy_b[no_trans][do_sum]
+                                = new jit_sse41_u8_copy_sum_bn_kern();
+                        copy_b[do_trans][do_sum]
+                                = new jit_sse41_u8_copy_sum_bt_kern();
+                    );
                 }
                 break;
 
             case data_type::bf16:
                 if (mayiuse(avx512_core)) {
-                    copy_a[no_trans][no_sum]
-                            = new jit_avx512_core_s16_copy_an_kern();
-                    copy_a[do_trans][no_sum]
-                            = new jit_avx512_core_s16_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_bf16_avx512_core,
+                        copy_a[no_trans][no_sum]
+                                = new jit_avx512_core_s16_copy_an_kern();
+                        copy_a[do_trans][no_sum]
+                                = new jit_avx512_core_s16_copy_at_kern();
 
-                    copy_b[no_trans][no_sum]
-                            = new jit_avx512_core_s16_copy_bn_kern();
-                    copy_b[do_trans][no_sum]
-                            = new jit_avx512_core_s16_copy_bt_kern();
+                        copy_b[no_trans][no_sum]
+                                = new jit_avx512_core_s16_copy_bn_kern();
+                        copy_b[do_trans][no_sum]
+                                = new jit_avx512_core_s16_copy_bt_kern();
+                    );
                 }
                 break;
 
             case data_type::f32:
                 if (mayiuse(avx512_core)) {
-                    copy_a[no_trans][no_sum]
-                            = new jit_avx512_core_f32_copy_an_kern();
-                    copy_a[do_trans][no_sum]
-                            = new jit_avx512_core_f32_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_f32_avx512_core,
+                        copy_a[no_trans][no_sum]
+                                = new jit_avx512_core_f32_copy_an_kern();
+                        copy_a[do_trans][no_sum]
+                                = new jit_avx512_core_f32_copy_at_kern();
 
-                    copy_b[no_trans][no_sum]
-                            = new jit_avx512_core_f32_copy_bn_kern();
-                    copy_b[do_trans][no_sum]
-                            = new jit_avx512_core_f32_copy_bt_kern();
+                        copy_b[no_trans][no_sum]
+                                = new jit_avx512_core_f32_copy_bn_kern();
+                        copy_b[do_trans][no_sum]
+                                = new jit_avx512_core_f32_copy_bt_kern();
+                    );
                 } else if (mayiuse(avx2)) {
-                    copy_a[no_trans][no_sum] = new jit_avx2_f32_copy_an_kern();
-                    copy_a[do_trans][no_sum] = new jit_avx2_f32_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_f32_avx2,
+                        copy_a[no_trans][no_sum] = new jit_avx2_f32_copy_an_kern();
+                        copy_a[do_trans][no_sum] = new jit_avx2_f32_copy_at_kern();
 
-                    copy_b[no_trans][no_sum] = new jit_avx2_f32_copy_bn_kern();
-                    copy_b[do_trans][no_sum] = new jit_avx2_f32_copy_bt_kern();
+                        copy_b[no_trans][no_sum] = new jit_avx2_f32_copy_bn_kern();
+                        copy_b[do_trans][no_sum] = new jit_avx2_f32_copy_bt_kern();
+                    );
                 } else if (mayiuse(avx)) {
-                    copy_a[no_trans][no_sum] = new jit_avx_f32_copy_an_kern();
-                    copy_a[do_trans][no_sum] = new jit_avx_f32_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_f32_avx,
+                        copy_a[no_trans][no_sum] = new jit_avx_f32_copy_an_kern();
+                        copy_a[do_trans][no_sum] = new jit_avx_f32_copy_at_kern();
 
-                    copy_b[no_trans][no_sum] = new jit_avx_f32_copy_bn_kern();
-                    copy_b[do_trans][no_sum] = new jit_avx_f32_copy_bt_kern();
+                        copy_b[no_trans][no_sum] = new jit_avx_f32_copy_bn_kern();
+                        copy_b[do_trans][no_sum] = new jit_avx_f32_copy_bt_kern();
+                    );
                 } else if (mayiuse(sse42)) {
-                    copy_a[no_trans][no_sum] = new jit_sse42_f32_copy_an_kern();
-                    copy_a[do_trans][no_sum] = new jit_sse42_f32_copy_at_kern();
+                    MKLDNN_CSCOPE(jit_init_copy_kern_f32_sse42,
+                        copy_a[no_trans][no_sum] = new jit_sse42_f32_copy_an_kern();
+                        copy_a[do_trans][no_sum] = new jit_sse42_f32_copy_at_kern();
 
-                    copy_b[no_trans][no_sum] = new jit_sse42_f32_copy_bn_kern();
-                    copy_b[do_trans][no_sum] = new jit_sse42_f32_copy_bt_kern();
+                        copy_b[no_trans][no_sum] = new jit_sse42_f32_copy_bn_kern();
+                        copy_b[do_trans][no_sum] = new jit_sse42_f32_copy_bt_kern();
+                    );
                 }
                 break;
         }
@@ -437,87 +456,103 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
         switch (data_traits<a_t>::data_type) {
             case data_type::s8:
                 if (mayiuse(avx512_core)) {
-                    for (int isBeta0 : {no_beta0, do_beta0})
-                        for (int doColSum : {no_sum, do_sum})
-                            for (int doRowSum : {no_sum, do_sum}) {
-                                kernel[isBeta0][no_alpha1][doColSum][doRowSum]
-                                        = new jit_avx512_core_gemm_s8u8s32_kern(
-                                                isBeta0, doColSum, doRowSum);
-                            }
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_s8_avx512_core,
+                        for (int isBeta0 : {no_beta0, do_beta0})
+                            for (int doColSum : {no_sum, do_sum})
+                                for (int doRowSum : {no_sum, do_sum}) {
+                                    kernel[isBeta0][no_alpha1][doColSum][doRowSum]
+                                            = new jit_avx512_core_gemm_s8u8s32_kern(
+                                                    isBeta0, doColSum, doRowSum);
+                                }
+                    );
                 } else if (mayiuse(avx2)) {
-                    for (int isBeta0 : {no_beta0, do_beta0})
-                        for (int doColSum : {no_sum, do_sum})
-                            for (int doRowSum : {no_sum, do_sum}) {
-                                kernel[isBeta0][no_alpha1][doColSum][doRowSum]
-                                        = new jit_avx2_gemm_s8u8s32_kern(
-                                                isBeta0, doColSum, doRowSum);
-                            }
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_s8_avx2,
+                        for (int isBeta0 : {no_beta0, do_beta0})
+                            for (int doColSum : {no_sum, do_sum})
+                                for (int doRowSum : {no_sum, do_sum}) {
+                                    kernel[isBeta0][no_alpha1][doColSum][doRowSum]
+                                            = new jit_avx2_gemm_s8u8s32_kern(
+                                                    isBeta0, doColSum, doRowSum);
+                                }
+                    );
                 } else if (mayiuse(avx)) {
-                    kernel[no_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_avx_kernel_gemm_s8u8s32_kern();
-                    kernel[no_beta0][no_alpha1][do_sum][no_sum]
-                            = new jit_avx_kernel_c_gemm_s8u8s32_kern();
-                    kernel[no_beta0][no_alpha1][no_sum][do_sum]
-                            = new jit_avx_kernel_r_gemm_s8u8s32_kern();
-                    kernel[no_beta0][no_alpha1][do_sum][do_sum]
-                            = new jit_avx_kernel_b_gemm_s8u8s32_kern();
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_s8_avx,
+                        kernel[no_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_avx_kernel_gemm_s8u8s32_kern();
+                        kernel[no_beta0][no_alpha1][do_sum][no_sum]
+                                = new jit_avx_kernel_c_gemm_s8u8s32_kern();
+                        kernel[no_beta0][no_alpha1][no_sum][do_sum]
+                                = new jit_avx_kernel_r_gemm_s8u8s32_kern();
+                        kernel[no_beta0][no_alpha1][do_sum][do_sum]
+                                = new jit_avx_kernel_b_gemm_s8u8s32_kern();
 
-                    kernel[do_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_avx_kernel_b0_gemm_s8u8s32_kern();
-                    kernel[do_beta0][no_alpha1][do_sum][no_sum]
-                            = new jit_avx_kernel_b0_c_gemm_s8u8s32_kern();
-                    kernel[do_beta0][no_alpha1][no_sum][do_sum]
-                            = new jit_avx_kernel_b0_r_gemm_s8u8s32_kern();
-                    kernel[do_beta0][no_alpha1][do_sum][do_sum]
-                            = new jit_avx_kernel_b0_b_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_avx_kernel_b0_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][do_sum][no_sum]
+                                = new jit_avx_kernel_b0_c_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][no_sum][do_sum]
+                                = new jit_avx_kernel_b0_r_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][do_sum][do_sum]
+                                = new jit_avx_kernel_b0_b_gemm_s8u8s32_kern();
+                    );
                 } else if (mayiuse(sse42)) {
-                    kernel[no_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_sse41_kernel_gemm_s8u8s32_kern();
-                    kernel[no_beta0][no_alpha1][do_sum][no_sum]
-                            = new jit_sse41_kernel_c_gemm_s8u8s32_kern();
-                    kernel[no_beta0][no_alpha1][no_sum][do_sum]
-                            = new jit_sse41_kernel_r_gemm_s8u8s32_kern();
-                    kernel[no_beta0][no_alpha1][do_sum][do_sum]
-                            = new jit_sse41_kernel_b_gemm_s8u8s32_kern();
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_s8_sse42,
+                        kernel[no_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_sse41_kernel_gemm_s8u8s32_kern();
+                        kernel[no_beta0][no_alpha1][do_sum][no_sum]
+                                = new jit_sse41_kernel_c_gemm_s8u8s32_kern();
+                        kernel[no_beta0][no_alpha1][no_sum][do_sum]
+                                = new jit_sse41_kernel_r_gemm_s8u8s32_kern();
+                        kernel[no_beta0][no_alpha1][do_sum][do_sum]
+                                = new jit_sse41_kernel_b_gemm_s8u8s32_kern();
 
-                    kernel[do_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_sse41_kernel_b0_gemm_s8u8s32_kern();
-                    kernel[do_beta0][no_alpha1][do_sum][no_sum]
-                            = new jit_sse41_kernel_b0_c_gemm_s8u8s32_kern();
-                    kernel[do_beta0][no_alpha1][no_sum][do_sum]
-                            = new jit_sse41_kernel_b0_r_gemm_s8u8s32_kern();
-                    kernel[do_beta0][no_alpha1][do_sum][do_sum]
-                            = new jit_sse41_kernel_b0_b_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_sse41_kernel_b0_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][do_sum][no_sum]
+                                = new jit_sse41_kernel_b0_c_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][no_sum][do_sum]
+                                = new jit_sse41_kernel_b0_r_gemm_s8u8s32_kern();
+                        kernel[do_beta0][no_alpha1][do_sum][do_sum]
+                                = new jit_sse41_kernel_b0_b_gemm_s8u8s32_kern();
+                    );
                 }
                 break;
 
             case data_type::bf16:
                 if (mayiuse(avx512_core)) {
-                    for (int isBeta0 : {no_beta0, do_beta0})
-                        for (int isAlpha1 : {no_alpha1, do_alpha1}) {
-                            kernel[isBeta0][isAlpha1][no_sum][no_sum]
-                                    = new jit_avx512_core_gemm_bf16bf16f32_kern(
-                                            isBeta0, isAlpha1);
-                        }
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_bf16_avx512_core,
+                        for (int isBeta0 : {no_beta0, do_beta0})
+                            for (int isAlpha1 : {no_alpha1, do_alpha1}) {
+                                kernel[isBeta0][isAlpha1][no_sum][no_sum]
+                                        = new jit_avx512_core_gemm_bf16bf16f32_kern(
+                                                isBeta0, isAlpha1);
+                            }
+                    );
                 }
                 break;
 
             case data_type::f32:
                 if (mayiuse(avx2)) {
-                    for (int isBeta0 : {no_beta0, do_beta0}) {
-                        kernel[isBeta0][no_alpha1][no_sum][no_sum]
-                                = new jit_avx2_kernel_sgemm_kern(isBeta0);
-                    }
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_f32_avx2,
+                        for (int isBeta0 : {no_beta0, do_beta0}) {
+                            kernel[isBeta0][no_alpha1][no_sum][no_sum]
+                                    = new jit_avx2_kernel_sgemm_kern(isBeta0);
+                        }
+                    );
                 } else if (mayiuse(avx)) {
-                    kernel[no_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_avx_kernel_sgemm_kern;
-                    kernel[do_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_avx_kernel_b0_sgemm_kern();
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_f32_avx,
+                        kernel[no_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_avx_kernel_sgemm_kern;
+                        kernel[do_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_avx_kernel_b0_sgemm_kern();
+                    );
                 } else if (mayiuse(sse42)) {
-                    kernel[no_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_sse42_kernel_sgemm_kern;
-                    kernel[do_beta0][no_alpha1][no_sum][no_sum]
-                            = new jit_sse42_kernel_b0_sgemm_kern();
+                    MKLDNN_CSCOPE(jit_init_gemm_kern_f32_sse42,
+                        kernel[no_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_sse42_kernel_sgemm_kern;
+                        kernel[do_beta0][no_alpha1][no_sum][no_sum]
+                                = new jit_sse42_kernel_b0_sgemm_kern();
+                    );
                 }
                 break;
         }
@@ -525,9 +560,13 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
         static jit_generator *gemv_kernel[2] = {NULL};
         if (data_traits<a_t>::data_type == data_type::f32) {
             if (mayiuse(avx)) {
-                gemv_kernel[do_trans] = new jit_avx_gemv_t_f32_kern();
+                MKLDNN_CSCOPE(jit_init_gemv_kern_f32_avx,
+                    gemv_kernel[do_trans] = new jit_avx_gemv_t_f32_kern();
+                );
             } else if (mayiuse(sse42)) {
-                gemv_kernel[do_trans] = new jit_sse42_gemv_t_f32_kern();
+                MKLDNN_CSCOPE(jit_init_gemv_kern_f32_sse42,
+                    gemv_kernel[do_trans] = new jit_sse42_gemv_t_f32_kern();
+                );
             }
         }
 
@@ -536,9 +575,11 @@ void gemm_info_t<a_t, b_t, c_t>::jit_init(void) {
         static jit_avx512_core_gemv_s8x8s32_kern *gemv_u8s8s32_kernel = NULL;
         if (data_traits<a_t>::data_type == data_type::s8) {
             if (mayiuse(avx512_core)) {
-                gemv_s8s8s32_kernel = new jit_avx512_core_gemv_s8x8s32_kern();
-                gemv_s8u8s32_kernel = new jit_avx512_core_gemv_s8x8s32_kern();
-                gemv_u8s8s32_kernel = new jit_avx512_core_gemv_s8x8s32_kern();
+                MKLDNN_CSCOPE(jit_init_gemv_kern_s8_avx512_core,
+                    gemv_s8s8s32_kernel = new jit_avx512_core_gemv_s8x8s32_kern();
+                    gemv_s8u8s32_kernel = new jit_avx512_core_gemv_s8x8s32_kern();
+                    gemv_u8s8s32_kernel = new jit_avx512_core_gemv_s8x8s32_kern();
+                );
             }
         }
 
