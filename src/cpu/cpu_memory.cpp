@@ -21,6 +21,7 @@
 #include "mkldnn_thread.hpp"
 #include "type_helpers.hpp"
 #include "utils.hpp"
+#include "mkldnn_subset.hpp"
 
 #include "format_traits.hpp"
 
@@ -266,8 +267,14 @@ status_t cpu_memory_t::typed_zero_pad() const {
     const auto fmt = mpd.format();
 
     /* data */
-#   define MAYBE_DATA(f) if (fmt == f) \
-    { typed_zero_pad_data<dt, f>(mpd, data); return success; }
+#   define MAYBE_DATA(f) if (fmt == f)                      \
+    {                                                       \
+        MKLDNN_CSCOPE(                                      \
+            MKLDNN_MACRO_CAT(typed_zero_pad_data_, f),      \
+            typed_zero_pad_data<dt, f>(mpd, data);          \
+            return success;                                 \
+        );                                                  \
+    }
     MAYBE_DATA(nCw4c);
     MAYBE_DATA(nCw8c);
     MAYBE_DATA(nCw16c);
@@ -279,8 +286,14 @@ status_t cpu_memory_t::typed_zero_pad() const {
     MAYBE_DATA(nCdhw16c);
 
     /* weights */
-#   define MAYBE_WEIGHTS(f) if (fmt == f) \
-    { typed_zero_pad_weights<dt, f>(mpd, data); return success; }
+#   define MAYBE_WEIGHTS(f) if (fmt == f)                   \
+    {                                                       \
+        MKLDNN_CSCOPE(                                      \
+            MKLDNN_MACRO_CAT(typed_zero_pad_weights_, f),   \
+            typed_zero_pad_weights<dt, f>(mpd, data);       \
+            return success;                                 \
+        );                                                  \
+    }
     MAYBE_WEIGHTS(OIdhw4i4o);
     MAYBE_WEIGHTS(OIdhw8i8o);
     MAYBE_WEIGHTS(OIdhw8o8i);
