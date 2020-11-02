@@ -91,7 +91,7 @@ rpd_create_f rpd_builder(char const *name) {
     MKLDNN_ITT_SCOPED_TASK(
         mkldnn::impl::domains::CC2_MKLDNN,
         mkldnn::impl::handle(std::string("REG$CPUReorder$") + typeid(pd_t).name() + "$" + name));
-    return pd_t::create;
+    return rpd_create<pd_t>;
 }
 
 #define REG_REORDER_FN(...) MKLDNN_MACRO_OVERLOAD(REG_REORDER_FN, __VA_ARGS__)
