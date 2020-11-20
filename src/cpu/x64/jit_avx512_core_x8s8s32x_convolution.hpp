@@ -58,10 +58,11 @@ struct jit_avx512_core_x8s8s32x_convolution_fwd_t : public primitive_t {
                     && attr()->has_default_values(smask_t::oscale
                                     | smask_t::zero_points_runtime
                                     | smask_t::post_ops
-                                    | smask_t::sum_dt,
+                                    | smask_t::sum_dt
+                                    | smask_t::input_zero_points
+                                    | smask_t::output_compensations,
                             dst_type)
-                    && !has_zero_dim_memory() && zero_points_ok()
-                    && !this->attr()->has_asymmetric_quantization();
+                    && !has_zero_dim_memory() && zero_points_ok();
 
             if (!ok) return status::unimplemented;
 
