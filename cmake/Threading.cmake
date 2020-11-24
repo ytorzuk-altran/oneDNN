@@ -34,7 +34,7 @@ list(APPEND EXTRA_SHARED_LIBS "${CMAKE_THREAD_LIBS_INIT}")
 # A macro to avoid code duplication
 macro(find_package_tbb)
     if(WIN32)
-        find_package(TBB ${ARGN} COMPONENTS tbb HINTS cmake/win)
+        find_package(TBB ${ARGN} COMPONENTS tbb)
     elseif(APPLE)
         find_package(TBB ${ARGN} COMPONENTS tbb HINTS cmake/mac)
     elseif(UNIX)
@@ -47,7 +47,7 @@ macro(find_package_tbb)
             get_target_property(_tbb_include_dirs TBB::tbb
                 INTERFACE_INCLUDE_DIRECTORIES)
             set(_tbb_ver_header_full_path
-                "${_tbb_include_dirs}/tbb/${_tbb_ver_header}")
+                "${_tbb_include_dirs}/oneapi/tbb/${_tbb_ver_header}")
             if(EXISTS ${_tbb_ver_header_full_path})
                 file(READ "${_tbb_ver_header_full_path}" _tbb_ver)
                 string(REGEX REPLACE
