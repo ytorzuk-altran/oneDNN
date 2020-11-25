@@ -46,8 +46,13 @@ macro(find_package_tbb)
         foreach (_tbb_ver_header tbb_stddef.h version.h)
             get_target_property(_tbb_include_dirs TBB::tbb
                 INTERFACE_INCLUDE_DIRECTORIES)
+            #pre-oneTBB path is default 		
             set(_tbb_ver_header_full_path
-                "${_tbb_include_dirs}/oneapi/tbb/${_tbb_ver_header}")
+                "${_tbb_include_dirs}/tbb/${_tbb_ver_header}")
+            if(EXISTS "${_tbb_include_dirs}/oneapi/tbb")
+	        set(_tbb_ver_header_full_path
+        	    "${_tbb_include_dirs}/oneapi/tbb/${_tbb_ver_header}")
+            endif()
             if(EXISTS ${_tbb_ver_header_full_path})
                 file(READ "${_tbb_ver_header_full_path}" _tbb_ver)
                 string(REGEX REPLACE
