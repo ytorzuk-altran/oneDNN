@@ -25,7 +25,16 @@ if(NOT DNNL_AARCH64_USE_ACL)
         ${CMAKE_CURRENT_SOURCE_DIR}/acl_*.[ch]
         ${CMAKE_CURRENT_SOURCE_DIR}/acl_*.[ch]pp
         )
+<<<<<<< HEAD
     list(REMOVE_ITEM SOURCES ${ACL_FILES})
+=======
+
+    set(OBJ_LIB ${LIB_NAME}_cpu_aarch64)
+    add_library(${OBJ_LIB} OBJECT ${SOURCES})
+    set_property(GLOBAL APPEND PROPERTY DNNL_LIB_DEPS
+        $<TARGET_OBJECTS:${OBJ_LIB}>)
+    enable_conditional_compilation4(${OBJ_LIB})
+>>>>>>> a3ddcb3... Introduced conditional compilation
 endif()
 
 set(OBJ_LIB ${LIB_NAME}_cpu_aarch64)
