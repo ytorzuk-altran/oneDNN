@@ -109,14 +109,14 @@ private:
     Xbyak::Zmm bf16_emu_reserv_5 = Xbyak::Zmm(31);
 
     //  sse42/avx2
-    Xbyak::Reg64 reg_ptr_maskmovdqu_dst = rdi; // sse42: store destination - must be rdi
+    Xbyak::Reg64 reg_ptr_maskmovdqu_dst = rdi; // sse41: store destination - must be rdi
     Xbyak::Reg8 reg_tmp_8 = r11b;
     Xbyak::Reg32 reg_tmp_32 = r11d;
     Xbyak::Reg64 reg_tmp_64 = r11;
     Xbyak::Label l_table;
     Xbyak::Reg64 reg_table = r12;
     Xbyak::Reg64 reg_shift_table = r13;
-    Vmm vreg_mask = Vmm(0); //  sse42: mask for blendvps must be in xmm0
+    Vmm vreg_mask = Vmm(0); //  sse41: mask for blendvps must be in xmm0
     Vmm vreg_store_mask = Vmm(1);
 
     //  post_ops
@@ -509,8 +509,6 @@ void jit_pp_kernel_t<isa, acc_type, dst_type>::compute_oc_channel_blk() {
         {
             compute(0, 0, false);
             advance_ptrs_imm(vlen);
-            if (do_post_ops)
-                add(reg_oc_offset, vlen);
             sub(reg_tmp, vlen);
             cmp(reg_tmp, vlen);
             jge(l_loop, T_NEAR);
