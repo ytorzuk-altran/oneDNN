@@ -53,6 +53,7 @@
 #include "cpu/x64/jit_sse41_1x1_convolution.hpp"
 #include "cpu/x64/jit_sse41_convolution.hpp"
 #include "cpu/x64/jit_uni_dw_convolution.hpp"
+#include "cpu/x64/jit_uni_fork_dw_convolution.hpp"
 #include "cpu/x64/jit_uni_x8s8s32x_1x1_convolution.hpp"
 #include "cpu/x64/jit_uni_x8s8s32x_convolution.hpp"
 using namespace dnnl::impl::cpu::x64;
@@ -104,14 +105,17 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t<avx512_core>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t<avx512_core>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_fwd_t))
+        REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_1x1_convolution_fwd_f32_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_f32_wino_conv_2x3_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_f32_wino_conv_4x3_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_convolution_winograd_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_convolution_fwd_t<f32>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx2_dw_convolution_fwd_t))
+        REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx2_fork_dw_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx2_1x1_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_sse41_dw_convolution_fwd_t))
+        REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_sse41_fork_dw_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_sse41_1x1_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx2_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_sse41_convolution_fwd_t))
@@ -135,6 +139,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t<avx512_core_bf16>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t<avx512_core_bf16>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_dw_convolution_fwd_t<avx512_core, bf16, f32>))
+        REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_fwd_t<avx512_core, bf16, f32>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_fwd_t<f32>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_bf16_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(gemm_bf16_convolution_fwd_t<f32>))
@@ -150,6 +155,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t<avx512_core_bf16>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t<avx512_core_bf16>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_dw_convolution_fwd_t<avx512_core, bf16, bf16>))
+        REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_fwd_t<avx512_core, bf16, bf16>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_fwd_t<bf16>))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_bf16_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(gemm_bf16_convolution_fwd_t<bf16>))
@@ -161,13 +167,16 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     {{backward_data, f32, f32, f32}, {
         REG_CONV_P_BWD_D(REG_IP_P_BWD(CPU_INSTANCE_X64(ip_convolution_bwd_data_t)))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_bwd_data_t))
+        REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_1x1_convolution_bwd_data_f32_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_f32_wino_conv_4x3_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_convolution_winograd_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_convolution_bwd_data_t<f32>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx2_dw_convolution_bwd_data_t))
+        REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx2_fork_dw_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx2_1x1_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_sse41_dw_convolution_bwd_data_t))
+        REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_sse41_fork_dw_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx2_convolution_bwd_data_t))
         CPU_INSTANCE_AARCH64(jit_sve_512_dw_convolution_bwd_data_t)
         CPU_INSTANCE_AARCH64(jit_sve_512_1x1_convolution_bwd_data_f32_t)
@@ -180,6 +189,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_BWD_D(REG_IP_P_BWD(CPU_INSTANCE_X64(ip_convolution_bwd_data_t)))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_bwd_data_t<f32, bf16, bf16>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_dw_convolution_bwd_data_t<avx512_core, bf16, f32>))
+        REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_bwd_data_t<avx512_core, bf16, f32>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_bwd_data_t<f32>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_bf16_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(gemm_bf16_convolution_bwd_data_t<f32>))
@@ -190,6 +200,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_BWD_D(REG_IP_P_BWD(CPU_INSTANCE_X64(ip_convolution_bwd_data_t)))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_bwd_data_t<bf16, bf16, bf16>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_dw_convolution_bwd_data_t<avx512_core, bf16, bf16>))
+        REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_bwd_data_t<avx512_core, bf16, bf16>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_bwd_data_t<bf16>))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_bf16_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(gemm_bf16_convolution_bwd_data_t<bf16>))
