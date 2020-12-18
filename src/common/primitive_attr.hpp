@@ -138,23 +138,24 @@ private:
 }
 
 struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
+    typedef float data_t;
     struct entry_t {
         struct eltwise_t {
             mkldnn::impl::alg_kind_t alg;
-            float scale, alpha, beta;
+            data_t scale, alpha, beta;
         };
 
         mkldnn::impl::primitive_kind_t kind;
         union {
             struct {
-                float scale;
+                data_t scale;
                 mkldnn::impl::data_type_t data_type;
             } sum;
             eltwise_t eltwise;
             struct {
                 mkldnn::impl::alg_kind_t alg;
-                const float* weights_data;
-                const float* biases_data;
+                const data_t* weights_data;
+                const data_t* biases_data;
             } depthwise;
             struct {
                 int in_h;
@@ -164,22 +165,22 @@ struct mkldnn_post_ops: public mkldnn::impl::c_compatible {
                 int str_h;
                 int str_w;
                 mkldnn::impl::data_type_t in_dt;
-                const float* weights_data;
-                const float* biases_data;
+                const data_t* weights_data;
+                const data_t* biases_data;
             } dw_conv;
             struct {
                 mkldnn::impl::alg_kind_t alg;
-                const float* thresholds_data;
-                const float* output_mask_data;
+                const data_t* thresholds_data;
+                const data_t* output_mask_data;
             } binarization;
             struct {
                 mkldnn::impl::alg_kind_t alg;
-                const mkldnn::impl::shifts_t<float>* crop_low_data;
-                const mkldnn::impl::shifts_t<float>* crop_high_data;
+                const mkldnn::impl::shifts_t<data_t>* crop_low_data;
+                const mkldnn::impl::shifts_t<data_t>* crop_high_data;
                 const mkldnn::impl::scales_t* input_scale_data;
-                const mkldnn::impl::shifts_t<float>* input_shift_data;
+                const mkldnn::impl::shifts_t<data_t>* input_shift_data;
                 const mkldnn::impl::scales_t* output_scale_data;
-                const mkldnn::impl::shifts_t<float>* output_shift_data;
+                const mkldnn::impl::shifts_t<data_t>* output_shift_data;
             } quantization;
         };
 

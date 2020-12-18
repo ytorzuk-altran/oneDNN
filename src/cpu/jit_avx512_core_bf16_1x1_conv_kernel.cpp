@@ -236,8 +236,8 @@ void jit_avx512_core_bf16_1x1_conv_kernel::reduce_loop(int load_loop_blk,
                         depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
                             start_idx, end_idx, reg_d_weights, reg_d_bias);
 
-                        add(reg_d_weights, jcp.oc_block * sizeof(float));
-                        add(reg_d_bias, jcp.oc_block * sizeof(float));
+                        add(reg_d_weights, jcp.oc_block * sizeof(mkldnn_post_ops::data_t));
+                        add(reg_d_bias, jcp.oc_block * sizeof(mkldnn_post_ops::data_t));
                     }
 
                     depthwise_inj_idx++;
@@ -526,7 +526,7 @@ void jit_avx512_core_bf16_1x1_conv_kernel::generate()
             assert(!"invalid prop_kind");
         }
         sub(reg_load_loop_work, load_loop_blk * jcp.load_loop_iter_step);
-        add(reg_oc_off, load_loop_blk * jcp.oc_block * jcp.typesize_out);
+        add(reg_oc_off, load_loop_blk * jcp.oc_block * sizeof(mkldnn_post_ops::data_t));
     };
 
     const int simd_w = 16;

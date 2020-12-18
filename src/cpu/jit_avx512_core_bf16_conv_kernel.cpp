@@ -147,8 +147,8 @@ void jit_avx512_core_bf16_fwd_kernel::store_output(int ur_w)
                 depthwise_injectors[depthwise_inj_idx]->compute_vector_range(
                         k*jcp.ur_w, k*jcp.ur_w + ur_w, reg_d_weights, reg_d_bias);
 
-                add(reg_d_weights, jcp.oc_block * sizeof(float));
-                add(reg_d_bias, jcp.oc_block * sizeof(float));
+                add(reg_d_weights, jcp.oc_block * sizeof(mkldnn_post_ops::data_t));
+                add(reg_d_bias, jcp.oc_block * sizeof(mkldnn_post_ops::data_t));
             }
 
             depthwise_inj_idx++;
