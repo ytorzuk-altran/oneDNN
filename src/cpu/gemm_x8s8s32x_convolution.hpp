@@ -117,7 +117,7 @@ private:
             const zero_point_call_params_t &zp,
             const memory_tracking::grantor_t &scratchpad,
             const void *post_ops_binary_rhs_arg_vec,
-            const exec_ctx_t &ctx) const;
+            const exec_ctx_t &ctx, int MB) const;
 
     int nthr_ = 0;
 
@@ -184,7 +184,7 @@ private:
     status_t execute_backward_data_thr(const int ithr, const int nthr,
             const diff_dst_data_t *diff_dst_base, const wei_data_t *wei_base,
             const char *bia_base, diff_src_data_t *diff_src_base,
-            const memory_tracking::grantor_t &scratchpad) const;
+            const memory_tracking::grantor_t &scratchpad, int MB) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
 };
 
