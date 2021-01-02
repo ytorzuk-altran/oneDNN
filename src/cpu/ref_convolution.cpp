@@ -70,6 +70,8 @@ ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>::execute_forward(
     auto dst = CTX_OUT_CLEAN_MEM(dst_data_t *, DNNL_ARG_DST, status);
     CHECK(status);
 
+    auto MB = CTX_IN_BATCH(DNNL_ARG_SRC);
+
     DEFINE_ZERO_POINTS_BUFFER(src_zero_point, DNNL_ARG_SRC);
     DEFINE_ZERO_POINTS_BUFFER(dst_zero_point, DNNL_ARG_DST);
 
@@ -81,7 +83,6 @@ ref_convolution_fwd_t<src_type, wei_type, dst_type, acc_type>::execute_forward(
     const bool with_groups = pd()->with_groups();
 
     const auto G = pd()->G();
-    const auto MB = pd()->MB();
     const auto OD = pd()->OD();
     const auto OH = pd()->OH();
     const auto OW = pd()->OW();
@@ -286,6 +287,8 @@ status_t ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
             = CTX_OUT_CLEAN_MEM(diff_src_data_t *, DNNL_ARG_DIFF_SRC, status);
     CHECK(status);
 
+    auto MB = CTX_IN_BATCH(DNNL_ARG_DIFF_DST);
+
     const memory_desc_wrapper diff_dst_d(pd()->diff_dst_md());
     const memory_desc_wrapper diff_src_d(pd()->diff_src_md());
     const memory_desc_wrapper weights_d(pd()->weights_md(0));
@@ -294,7 +297,6 @@ status_t ref_convolution_bwd_data_t<diff_src_type, wei_type, diff_dst_type,
     const bool with_groups = pd()->with_groups();
 
     const auto G = pd()->G();
-    const auto MB = pd()->MB();
     const auto OD = pd()->OD();
     const auto OH = pd()->OH();
     const auto OW = pd()->OW();
