@@ -108,7 +108,7 @@ private:
     status_t execute_forward_thr_nspc(const exec_ctx_t &ctx, const int ithr,
             const int nthr, const data_t *src_base, const data_t *wei_base,
             const data_t *bia_base, data_t *dst_base,
-            const memory_tracking::grantor_t &scratchpad) const;
+            const memory_tracking::grantor_t &scratchpad, int MB) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
 
     data_t beta_;
@@ -192,7 +192,7 @@ private:
     status_t execute_backward_data_thr_nspc(const int ithr, const int nthr,
             const data_t *diff_dst_base, const data_t *wei_base,
             const data_t *bia_base, data_t *diff_src_base,
-            const memory_tracking::grantor_t &scratchpad) const;
+            const memory_tracking::grantor_t &scratchpad, int MB) const;
 
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
 
