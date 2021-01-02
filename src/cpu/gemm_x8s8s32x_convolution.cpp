@@ -121,6 +121,8 @@ status_t _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward(
             = binary_injector_utils::prepare_binary_args(
                     this->pd()->attr()->post_ops_, ctx);
 
+    auto MB = CTX_IN_BATCH(DNNL_ARG_SRC);
+
     auto scratchpad = ctx.get_scratchpad_grantor();
 
     assert(IMPLICATION(jcp.ow_block != jcp.ow, jcp.oh_block == 1));
@@ -134,7 +136,7 @@ status_t _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward(
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
         status_t st_thr = execute_forward_thr(ithr, nthr, src_base, wei_base,
                 bia_base, dst_base, zp, scratchpad,
-                post_ops_binary_rhs_arg_vec.data(), ctx);
+                post_ops_binary_rhs_arg_vec.data(), ctx, MB);
 
         if (st_thr != status::success) st = st_thr;
     });
@@ -156,7 +158,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
         const wei_data_t *wei_base, const char *bia_base, dst_data_t *dst_base,
         const zero_point_call_params_t &zp,
         const memory_tracking::grantor_t &scratchpad,
-        const void *post_ops_binary_rhs_arg_vec, const exec_ctx_t &ctx) const {
+        const void *post_ops_binary_rhs_arg_vec, const exec_ctx_t &ctx, int MB) const {
 
     const conv_gemm_conf_t &jcp = this->pd()->jcp_;
 
@@ -218,9 +220,9 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
 
     const int nb_oh = div_up(jcp.oh, jcp.oh_block);
     const int nb_ow = div_up(jcp.ow, jcp.ow_block);
-    const size_t work_amount = (size_t)jcp.ngroups * jcp.mb * nb_oh * nb_ow;
+    const size_t work_amount = (size_t)jcp.ngroups * MB * nb_oh * nb_ow;
     balance211(work_amount, nthr, ithr, start, end);
-    nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);
+    nd_iterator_init(start, n, MB, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);
     const uint8_t shift = jcp.signed_input ? 128 : 0;
     parallel_nd(jcp.im2col_sz, [&](ptrdiff_t i) { col[i] = shift; });
 
@@ -301,7 +303,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
                         *pd()->dst_md(), chunk_desc);
             });
         }
-        nd_iterator_step(n, jcp.mb, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);
+        nd_iterator_step(n, MB, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);
     }
 
     return st;
@@ -315,6 +317,8 @@ status_t _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data(
     auto bia_base = CTX_IN_MEM(const char *, DNNL_ARG_BIAS);
     auto diff_src_base = CTX_OUT_MEM(diff_src_data_t *, DNNL_ARG_DIFF_SRC);
 
+    auto MB = CTX_IN_BATCH(DNNL_ARG_DIFF_DST);
+
     auto scratchpad = ctx.get_scratchpad_grantor();
 
     const conv_gemm_conf_t &jcp = this->pd()->jcp_;
@@ -323,7 +327,7 @@ status_t _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data(
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
         status_t st_thr = execute_backward_data_thr(ithr, nthr, diff_dst_base,
-                wei_base, bia_base, diff_src_base, scratchpad);
+                wei_base, bia_base, diff_src_base, scratchpad, MB);
 
         if (st_thr != status::success) st = st_thr;
     });
@@ -337,7 +341,7 @@ _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data_thr(
         const int ithr, const int nthr, const diff_dst_data_t *diff_dst_base,
         const wei_data_t *wei_base, const char *bia_base,
         diff_src_data_t *diff_src_base,
-        const memory_tracking::grantor_t &scratchpad) const {
+        const memory_tracking::grantor_t &scratchpad, int MB) const {
     const conv_gemm_conf_t &jcp = this->pd()->jcp_;
 
     const auto diff_dst_md = memory_desc_wrapper(pd()->diff_dst_md());
@@ -356,7 +360,7 @@ _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data_thr(
     /* scale_idx_mult = 1 for per_oc scales and 0, otherwise */
     const int scale_idx_mult = pd()->attr()->output_scales_.mask_ == (1 << 1);
     const float *__restrict scales = pd()->attr()->output_scales_.scales_;
-    const size_t work_amount = jcp.ngroups * jcp.mb;
+    const size_t work_amount = jcp.ngroups * MB;
 
     acc_data_t *__restrict col = scratchpad.get<acc_data_t>(key_conv_gemm_col)
             + (ptrdiff_t)ithr * jcp.im2col_sz;
@@ -368,7 +372,7 @@ _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data_thr(
     size_t start = 0, end = 0;
 
     balance211(work_amount, nthr, ithr, start, end);
-    nd_iterator_init(start, n, jcp.mb, g, jcp.ngroups);
+    nd_iterator_init(start, n, MB, g, jcp.ngroups);
 
     for (size_t iwork = start; iwork < end; ++iwork) {
         const diff_dst_data_t *__restrict diff_dst = diff_dst_base
@@ -411,7 +415,7 @@ _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data_thr(
                 diff_src_loc[ic] = qz_a1b0<acc_data_t, diff_src_data_t>()(d);
             }
         });
-        nd_iterator_step(n, jcp.mb, g, jcp.ngroups);
+        nd_iterator_step(n, MB, g, jcp.ngroups);
     }
 
     return status::success;
