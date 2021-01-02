@@ -55,6 +55,7 @@ using namespace dnnl::impl::cpu::aarch64;
 #include "cpu/x64/jit_uni_fork_dw_convolution.hpp"
 #include "cpu/x64/jit_uni_x8s8s32x_1x1_convolution.hpp"
 #include "cpu/x64/jit_uni_x8s8s32x_convolution.hpp"
+#include "cpu/x64/jit_uni_planar_convolution.hpp"
 using namespace dnnl::impl::cpu::x64;
 #endif
 
@@ -90,6 +91,7 @@ private:
 const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
     // FWD fp
     {{forward, f32, f32, f32}, {
+        CPU_INSTANCE_X64(jit_avx512_common_planar_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_1x1_convolution_fwd_f32_t)
@@ -97,6 +99,7 @@ const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         CPU_INSTANCE_X64(jit_avx512_core_f32_wino_conv_4x3_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_convolution_winograd_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_convolution_fwd_t, f32)
+        CPU_INSTANCE_X64(jit_avx2_planar_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_fork_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_1x1_convolution_fwd_t)
