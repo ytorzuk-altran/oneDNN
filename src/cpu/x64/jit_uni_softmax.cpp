@@ -855,7 +855,8 @@ status_t jit_uni_softmax_fwd_t<isa>::execute(const exec_ctx_t &ctx) const {
             memory_tracking::names::key_softmax_interim_store);
     const float *oscales = pd()->attr()->output_scales_.scales_;
 
-    const memory_desc_wrapper src_d(pd()->src_md());
+    auto real_src_md = ctx.input(DNNL_ARG_SRC)->md();
+    const memory_desc_wrapper src_d(real_src_md);
     const memory_desc_wrapper dst_d(pd()->dst_md());
     const auto src_data_type_size = src_d.data_type_size();
     const auto dst_data_type_size = dst_d.data_type_size();
