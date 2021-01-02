@@ -61,6 +61,8 @@ status_t jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
     DEFINE_ZERO_POINTS_BUFFER(src_zero_point, DNNL_ARG_SRC);
     DEFINE_ZERO_POINTS_BUFFER(dst_zero_point, DNNL_ARG_DST);
 
+    auto MB = CTX_IN_BATCH(DNNL_ARG_SRC);
+
     auto scratchpad = ctx.get_scratchpad_grantor();
 
     if (pd()->jcp_.signed_input && pd()->jcp_.ver != ver_vnni) {
@@ -102,7 +104,7 @@ status_t jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
         execute_forward_thr(ithr, nthr, src, weights, bias, weights_dw, bias_dw,
                 dst, src_zero_point, dst_zero_point, scratchpad,
                 post_ops_binary_rhs_arg_vec.data(),
-                post_ops_binary_rhs_arg_vec_dw.data());
+                post_ops_binary_rhs_arg_vec_dw.data(), MB);
     });
     return status::success;
 }
@@ -115,7 +117,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
         const int32_t *src_zero_point, const int32_t *dst_zero_point,
         const memory_tracking::grantor_t &scratchpad,
         const void *post_ops_binary_rhs_arg_vec,
-        const void *post_ops_binary_rhs_arg_vec_dw) const {
+        const void *post_ops_binary_rhs_arg_vec_dw, int MB) const {
     const memory_desc_wrapper src_d(pd()->src_md());
     const memory_desc_wrapper dst_d(pd()->dst_md());
     const memory_desc_wrapper weights_d(pd()->weights_md(0));
@@ -134,7 +136,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
 
     auto local_scales = scratchpad.get<float>(key_conv_adjusted_scales);
 
-    const int work_amount = jcp.mb * jcp.ngroups * jcp.nb_bcast;
+    const int work_amount = MB * jcp.ngroups * jcp.nb_bcast;
 
     const int ndims = dst_d.ndims();
     const int stride_d = (ndims == 5) ? pd()->desc()->strides[0] : 1;
@@ -210,7 +212,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
                               int &bcast_step, int &od, int &oh, int &ow,
                               int &id, int &ih, int &iw) {
         int osb {0};
-        nd_iterator_init(iwork, n, jcp.mb, g, jcp.ngroups, osb, nb_bcast);
+        nd_iterator_init(iwork, n, MB, g, jcp.ngroups, osb, nb_bcast);
         bcast_step = step(
                 nb_bcast_blocking, nb_bcast - osb, nb_bcast_blocking_max);
         bcast_step = nstl::min(bcast_step, bcast_end - iwork);
@@ -436,7 +438,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
         addrs.resize(jcp_dw->kh);
 
         int bcast_start {0}, bcast_end {0}, ocb_start, ocb_end;
-        balance2D(nthr, ithr, jcp.mb * jcp.ngroups * jcp_dw->oh, bcast_start,
+        balance2D(nthr, ithr, MB * jcp.ngroups * jcp_dw->oh, bcast_start,
                 bcast_end, nb_oc, ocb_start, ocb_end, jcp.load_grp_count);
 
         while (ocb_start < ocb_end) {
@@ -447,7 +449,7 @@ void jit_uni_x8s8s32x_1x1_convolution_fwd_t<isa, src_type,
             auto bcast_iter = bcast_start;
             while (bcast_iter < bcast_end) {
                 int n {0}, g {0}, oh_dw {0};
-                nd_iterator_init(bcast_iter, n, jcp.mb, g, jcp.ngroups, oh_dw,
+                nd_iterator_init(bcast_iter, n, MB, g, jcp.ngroups, oh_dw,
                         jcp_dw->oh);
                 if (oh_dw == 0) oh_1x1 = 0; // Reset over mb boundary
                 const int oh_1x1_range
