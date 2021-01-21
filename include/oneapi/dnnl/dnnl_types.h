@@ -74,6 +74,10 @@ typedef enum {
     dnnl_s8 = 5,
     /// 8-bit unsigned integer.
     dnnl_u8 = 6,
+    /// 64-bit/double-precision floating point.
+    dnnl_f64 = 7,
+    /// 1-bit integer.
+    dnnl_bin = 8,
 } dnnl_data_type_t;
 
 /// Memory format kind
@@ -277,6 +281,8 @@ typedef enum {
     dnnl_ABcd8a16b2a,
     dnnl_ABcd2b8a4b,
     dnnl_ABcd8a8b,
+    dnnl_ABcd8a32b,
+    dnnl_ABcd16a32b,
     dnnl_ABcd8a4b,
     /// 4D tensor blocked by 2nd dimension with block size 8
     dnnl_aBcd8b,
@@ -975,6 +981,8 @@ typedef enum {
     dnnl_OIhw2i8o4i = dnnl_ABcd2b8a4b,
     dnnl_IOhw8o16i2o = dnnl_BAcd8a16b2a,
     dnnl_OIhw8o8i = dnnl_ABcd8a8b,
+    dnnl_OIhw8o32i = dnnl_ABcd8a32b,
+    dnnl_OIhw16o32i = dnnl_ABcd16a32b,
     dnnl_OIhw8o4i = dnnl_ABcd8a4b,
     dnnl_Owhi16o = dnnl_Adcb16a,
 
@@ -1377,6 +1385,8 @@ typedef enum {
     dnnl_depthwise,
     /// A quantization primitive.
     dnnl_quantization,
+    /** A binatization primitive. */
+    dnnl_binarization,
     /// A softmax primitive.
     dnnl_softmax,
     /// A pooling primitive.
@@ -1584,6 +1594,7 @@ typedef enum {
 
     dnnl_quantization_quantize_dequantize = 0x4fff0,
     dnnl_quantization_quantize = 0x4fff1,
+    dnnl_binarization_depthwise = 0x4fff2,
 } dnnl_alg_kind_t;
 
 /// Flags for normalization primitives.
@@ -3139,6 +3150,8 @@ typedef enum {
     /// Intel AVX-512, Intel DL Boost and bfloat16 support and
     /// Intel AMX with 8-bit integer and bfloat16 support
     dnnl_cpu_isa_avx512_core_amx = 0x3e7,
+
+    dnnl_cpu_isa_avx512_vpopcnt = 0x6e7,
 
     /// Intel AVX2 and Intel Deep Learning Boost (Intel DL Boost) support
     dnnl_cpu_isa_avx2_vnni = 0x407,
