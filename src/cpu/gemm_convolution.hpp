@@ -93,9 +93,9 @@ struct gemm_convolution_fwd_t : public primitive_t {
         const data_t one = 1.0, zero = 0.0;
         beta_ = post_ops.find(primitive_kind::sum) >= 0 ? one : zero;
 
-        bool has_bias = pd()->with_bias(),
-                has_post_ops = post_ops.len() > 0,
-                has_scale = !pd()->attr()->output_scales_.has_default_values();
+        bool has_bias = pd()->with_bias();
+        bool has_post_ops = post_ops.len() > 0;
+        bool has_scale = !pd()->attr()->output_scales_.has_default_values();
         postops_in_ip_ = has_bias || has_post_ops || has_scale;
 
         CHECK(safe_ptr_assign(pp_kernel_, pp_kernel_t::create(pd(), pd()->jcp_)));

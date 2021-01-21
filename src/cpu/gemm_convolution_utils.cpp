@@ -91,7 +91,6 @@ void ref_pp_kernel_t::operator()(float *dst, const float *bias, const int len,co
                 parallel_nd(oc_work, [&](const int oc) {
                     float b = need_bias ? bias[oc_start + oc] : 0;
                     float *d_ = dst + oc * oc_stride;
-                    PRAGMA_OMP_SIMD()
                     for (int oS = 0; oS < len; ++oS) {
                         d_[oS] += b;
                         d_[oS] = ref_eltwise_injectors_[eltwise_inj_idx]->compute_scalar(d_[oS]);
@@ -107,7 +106,6 @@ void ref_pp_kernel_t::operator()(float *dst, const float *bias, const int len,co
                 parallel_nd(oc_work, [&](const int oc) {
                     float b = need_bias ? bias[oc_start + oc] : 0;
                     float *d_ = dst + oc * oc_stride;
-                    PRAGMA_OMP_SIMD()
                     for (int oS = 0; oS < len; ++oS) {
                         d_[oS] += b;
                         d_[oS] = ref_depthwise_injectors_[depthwise_inj_idx]->compute_scalar(d_[oS],
