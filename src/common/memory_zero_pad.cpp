@@ -285,6 +285,7 @@ static status_t zero_pad(const memory_t *memory, stream_t *stream) {
         case s32: return typed_zero_pad<s32>(memory, stream);
         case s8: return typed_zero_pad<s8>(memory, stream);
         case u8: return typed_zero_pad<u8>(memory, stream);
+        case bin: return typed_zero_pad<u8>(memory, stream);
         default: assert(!"memory is undefined"); return unimplemented;
     }
     return unimplemented;

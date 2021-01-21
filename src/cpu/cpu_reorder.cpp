@@ -371,6 +371,22 @@ const impl_list_map_t regular_impl_list_map {
         nullptr,
     }},
 
+    // f32 -> bin
+    {{f32, bin, 4}, {
+        REG_SR_BIDIR(f32, nchw, bin, nhwc)
+
+        REG_SR_BIDIR(f32, nhwc, bin, nhwc)
+    }},
+
+    // bin -> bin
+    {{bin, bin, 4}, {
+        REG_SR_DIRECT_COPY(bin, bin)
+
+        REG_SR(bin, any, bin, OIhw8o32i, fmt_order::keep)
+
+        REG_SR(bin, any, bin, OIhw16o32i, fmt_order::keep)
+    }},
+
     // bf16 ->
     {{bf16, data_type::undef, 0}, {
         REG_REORDER_FN(rnn_weights_reorder_t, bf16, bf16)
