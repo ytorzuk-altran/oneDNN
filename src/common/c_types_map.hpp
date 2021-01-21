@@ -133,6 +133,7 @@ const alg_kind_t depthwise_scale_shift = dnnl_depthwise_scale_shift;
 const alg_kind_t depthwise_prelu = dnnl_depthwise_prelu;
 const alg_kind_t quantization_quantize_dequantize = dnnl_quantization_quantize_dequantize;
 const alg_kind_t quantization_quantize = dnnl_quantization_quantize;
+const alg_kind_t binarization_depthwise = dnnl_binarization_depthwise;
 } // namespace alg_kind
 
 using data_type_t = dnnl_data_type_t;
@@ -144,6 +145,7 @@ const data_type_t f32 = dnnl_f32;
 const data_type_t s32 = dnnl_s32;
 const data_type_t s8 = dnnl_s8;
 const data_type_t u8 = dnnl_u8;
+const data_type_t bin = dnnl_bin;
 } // namespace data_type
 
 using scratchpad_mode_t = dnnl_scratchpad_mode_t;
@@ -244,6 +246,8 @@ const format_tag_t aBCd4b4c = dnnl_aBCd4b4c;
 const format_tag_t ABcd8a16b2a = dnnl_ABcd8a16b2a;
 const format_tag_t BAcd8a16b2a = dnnl_BAcd8a16b2a;
 const format_tag_t ABcd8a8b = dnnl_ABcd8a8b;
+const format_tag_t ABcd8a32b = dnnl_ABcd8a32b;
+const format_tag_t ABcd16a32b = dnnl_ABcd16a32b;
 const format_tag_t ABcd8a4b = dnnl_ABcd8a4b;
 const format_tag_t aBcd8b = dnnl_aBcd8b;
 const format_tag_t ABcd8b16a2b = dnnl_ABcd8b16a2b;
@@ -496,6 +500,8 @@ const format_tag_t OIhw8i8o = dnnl_OIhw8i8o;
 const format_tag_t OIhw8o16i2o = dnnl_OIhw8o16i2o;
 const format_tag_t IOhw8o16i2o = dnnl_IOhw8o16i2o;
 const format_tag_t OIhw8o8i = dnnl_OIhw8o8i;
+const format_tag_t OIhw8o32i = dnnl_OIhw8o32i;
+const format_tag_t OIhw16o32i = dnnl_OIhw16o32i;
 const format_tag_t OIhw8o4i = dnnl_OIhw8o4i;
 const format_tag_t Owhi16o = dnnl_Owhi16o;
 const format_tag_t Odhwi16o = dnnl_Odhwi16o;
@@ -681,6 +687,7 @@ const primitive_kind_t resampling = dnnl_resampling;
 const primitive_kind_t reduction = dnnl_reduction;
 const primitive_kind_t depthwise = dnnl_depthwise;
 const primitive_kind_t quantization = dnnl_quantization;
+const primitive_kind_t binarization = dnnl_binarization;
 
 // Internal only primitive kinds.
 const primitive_kind_t internal_only_start = (primitive_kind_t)(1 << 12);

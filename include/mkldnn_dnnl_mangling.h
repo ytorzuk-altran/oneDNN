@@ -123,6 +123,8 @@
 #define mkldnn_ABcd4a4b dnnl_ABcd4a4b
 #define mkldnn_ABcd8a16b2a dnnl_ABcd8a16b2a
 #define mkldnn_ABcd8a8b dnnl_ABcd8a8b
+#define mkldnn_ABcd8a32b dnnl_ABcd8a32b
+#define mkldnn_ABcd16a32b dnnl_ABcd16a32b
 #define mkldnn_ABcd8b16a2b dnnl_ABcd8b16a2b
 #define mkldnn_ABcd8b8a dnnl_ABcd8b8a
 #define mkldnn_ABcde16a16b dnnl_ABcde16a16b
@@ -202,6 +204,8 @@
 #define mkldnn_OIhw8i8o dnnl_OIhw8i8o
 #define mkldnn_OIhw8o16i2o dnnl_OIhw8o16i2o
 #define mkldnn_OIhw8o8i dnnl_OIhw8o8i
+#define mkldnn_OIhw8o32i dnnl_OIhw8o32i
+#define mkldnn_OIhw16o32i dnnl_OIhw16o32i
 #define mkldnn_OIw16i16o dnnl_OIw16i16o
 #define mkldnn_OIw16o16i dnnl_OIw16o16i
 #define mkldnn_OIw4i16o4i dnnl_OIw4i16o4i
