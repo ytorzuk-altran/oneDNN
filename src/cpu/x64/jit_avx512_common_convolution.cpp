@@ -270,7 +270,7 @@ void jit_avx512_common_convolution_fwd_t<src_type, wei_type,
                         ic_work = utils::this_block_size(icb * jcp.ic_block,
                                 jcp.ic, icb_step * jcp.ic_block);
                     }
-                    int oc_off = oc_off_idx * (is_dst_layout_nxc ? 1 : jcp.oc_block) * sizeof(dst_data_t);
+                    int oc_off = oc_off_idx * (is_dst_layout_nxc ? 1 : jcp.oc_block) * sizeof(float);
                     jit_conv_ker_pipeline_ow_thr(jit_ker, par_conv, src_w,
                             dst_w, wht_w, bias_w, icb, 1, owb, ic_work, oc_work,
                             flags, oc_off);
@@ -594,7 +594,7 @@ void jit_avx512_common_convolution_fwd_t<src_type, wei_type,
                                 dilate_h);
                         int kh_padding = nstl::max(
                                 0, jcp.kh - i_t_overflow - i_b_overflow);
-                        int oc_off = oc_off_idx * (is_dst_layout_nxc ? 1 : jcp.oc_block) * sizeof(dst_data_t);
+                        int oc_off = oc_off_idx * (is_dst_layout_nxc ? 1 : jcp.oc_block) * sizeof(float);
                         jit_conv_3d_ker_pipeline_ow_thr(jit_ker, par_conv,
                                 src_c + i_t_overflow * dilate_h * src_h_stride,
                                 dst_c, wht_w + i_t_overflow * wht_h_stride,
