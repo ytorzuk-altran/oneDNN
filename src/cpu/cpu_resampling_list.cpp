@@ -36,6 +36,7 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const pd_create_f impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_resampling_fwd_t, avx512_common)
         CPU_INSTANCE_X64(jit_uni_resampling_fwd_t, avx)
         CPU_INSTANCE_X64(jit_uni_resampling_fwd_t, sse41)
@@ -49,6 +50,7 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE(ref_resampling_fwd_t, bf16)
         CPU_INSTANCE(ref_resampling_bwd_t, f32)
         CPU_INSTANCE(ref_resampling_bwd_t, bf16)
+#endif
         /* eol */
         nullptr,
 };
