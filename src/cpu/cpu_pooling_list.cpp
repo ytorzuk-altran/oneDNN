@@ -39,27 +39,47 @@ using namespace dnnl::impl::data_type;
 const pd_create_f impl_list[] = {
         /* fp */
         CPU_INSTANCE_X64(jit_uni_pooling_fwd_t, avx512_core, bf16)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_pooling_bwd_t, avx512_core, bf16)
+#endif
         CPU_INSTANCE_X64(jit_uni_pooling_fwd_t, avx512_core, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_pooling_bwd_t, avx512_core, f32)
+#endif
         CPU_INSTANCE_X64(jit_uni_pooling_fwd_t, avx512_common, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_pooling_bwd_t, avx512_common, f32)
+#endif
         CPU_INSTANCE_X64(jit_uni_pooling_fwd_t, avx, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_pooling_bwd_t, avx, f32)
+#endif
         CPU_INSTANCE_X64(jit_uni_pooling_fwd_t, sse41, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_pooling_bwd_t, sse41, f32)
+#endif
         CPU_INSTANCE(nchw_pooling_fwd_t, bf16)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(nchw_pooling_bwd_t, bf16)
+#endif
         CPU_INSTANCE(nchw_pooling_fwd_t, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(nchw_pooling_bwd_t, f32)
+#endif
         CPU_INSTANCE(nhwc_pooling_fwd_t, bf16)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(nhwc_pooling_bwd_t, bf16)
+#endif
         CPU_INSTANCE(nhwc_pooling_fwd_t, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(nhwc_pooling_bwd_t, f32)
+#endif
         CPU_INSTANCE(ref_pooling_fwd_t, f32, f32, f32)
         CPU_INSTANCE(ref_pooling_fwd_t, bf16, bf16, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(ref_pooling_bwd_t, f32)
         CPU_INSTANCE(ref_pooling_bwd_t, bf16)
+#endif
         /* int */
         CPU_INSTANCE_X64(jit_uni_i8i8_pooling_fwd_t, avx512_core)
         CPU_INSTANCE_X64(jit_uni_i8i8_pooling_fwd_t, avx2)
@@ -69,7 +89,9 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE(ref_pooling_fwd_t, s8, f32, f32)
         CPU_INSTANCE(ref_pooling_fwd_t, u8, u8, s32)
         CPU_INSTANCE(ref_pooling_fwd_t, u8, f32, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(ref_pooling_bwd_t, s32)
+#endif
         /* eol */
         nullptr,
 };

@@ -530,6 +530,7 @@ const impl_list_map_t regular_impl_list_map {
 
 /* conv reorders w/ compensation */
 const impl_list_map_t comp_s8s8_impl_list_map {
+#ifdef ENABLE_UNUSED_PRIM
     // f32 -> s8
     {{f32, s8, 3}, {
         REG_SR(f32, any, s8, wio, fmt_order_keep, spec_conv_s8s8)
@@ -734,6 +735,7 @@ const impl_list_map_t comp_s8s8_impl_list_map {
 
         nullptr,
     }},
+#endif
 };
 
 // clang-format on
