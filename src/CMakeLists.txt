@@ -14,6 +14,7 @@
 # limitations under the License.
 #===============================================================================
 
+
 file(GLOB_RECURSE HEADERS
     ${PROJECT_BINARY_DIR}/include/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/../include/*.h
@@ -144,74 +145,60 @@ install(EXPORT ${LIB_EXPORT_NAME}
     DESTINATION ${LIB_CONFIG_INSTALL_DIR})
 
 # Intel MKL-DNN compat cmake files
-install(CODE "execute_process(COMMAND ${CMAKE_COMMAND}
-    -DDIR=\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake
-    -P ${PROJECT_SOURCE_DIR}/cmake/gen_mkldnn_compat_cmakes.cmake)")
+#install(CODE "execute_process(COMMAND ${CMAKE_COMMAND}
+#    -DDIR=\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/cmake
+#    -P ${PROJECT_SOURCE_DIR}/cmake/gen_mkldnn_compat_cmakes.cmake)")
 
 # Intel MKL-DNN compat libraries
-if (WIN32)
-    if (NOT MINGW)
-        set(prefix "")
-        set(ext ".lib")
-    else()
-        set(prefix "lib")
-        if (DNNL_LIBRARY_TYPE STREQUAL "SHARED")
-            set(ext ".dll.a")
-        else()
-            set(ext ".a")
-        endif()
-    endif()
-    add_custom_target(compat_libs ALL
-        ${CMAKE_COMMAND} -E copy
-        $<TARGET_LINKER_FILE_DIR:${LIB_NAME}>/$<TARGET_LINKER_FILE_NAME:${LIB_NAME}>
-        $<TARGET_LINKER_FILE_DIR:${LIB_NAME}>/${prefix}mkldnn${ext}
-        # Workaround for MSB8065 warning.
-        COMMAND ${CMAKE_COMMAND} -E touch "CMakeFiles/compat_libs"
-        DEPENDS ${LIB_NAME})
-    install(FILES $<TARGET_LINKER_FILE_DIR:${LIB_NAME}>/${prefix}mkldnn${ext}
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
-else()
-    if(DNNL_LIBRARY_TYPE STREQUAL "SHARED")
-        set_ternary(ext APPLE ".dylib" ".so")
-        set(vers ".${DNNL_VERSION_MAJOR};.${DNNL_VERSION_MAJOR}.${DNNL_VERSION_MINOR}")
-    else()
-        set(ext ".a")
-        set(vers "")
-    endif()
-    foreach(ver "" ${vers})
-        set_ternary(ext_and_ver APPLE "${ver}${ext}" "${ext}${ver}")
-        get_property(lib_location TARGET ${LIB_NAME} PROPERTY LIBRARY_OUTPUT_DIRECTORY)
-        if(lib_location)
-            set(compat_link "${lib_location}/libmkldnn${ext_and_ver}")
-        else()
-            set(compat_link "${CMAKE_CURRENT_BINARY_DIR}/libmkldnn${ext_and_ver}")
-        endif()
-        add_custom_command(OUTPUT ${compat_link}
-            # to make the next command work fine
-            COMMAND ${CMAKE_COMMAND} -E remove -f ${compat_link}
-            COMMAND ${CMAKE_COMMAND} -E create_symlink libdnnl${ext_and_ver} ${compat_link}
-            DEPENDS ${LIB_NAME})
-        add_custom_target(compat_libs${ver} ALL DEPENDS ${compat_link})
-        install(FILES ${compat_link} DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
-    endforeach()
-endif()
+#if (WIN32)
+#    if (NOT MINGW)
+#        set(prefix "")
+#        set(ext ".lib")
+#    else()
+#        set(prefix "lib")
+#        if (DNNL_LIBRARY_TYPE STREQUAL "SHARED")
+#            set(ext ".dll.a")
+#        else()
+#            set(ext ".a")
+#        endif()
+#    endif()
+#    add_custom_target(compat_libs ALL
+#        ${CMAKE_COMMAND} -E copy
+#        $<TARGET_LINKER_FILE_DIR:${LIB_NAME}>/$<TARGET_LINKER_FILE_NAME:${LIB_NAME}>
+#        $<TARGET_LINKER_FILE_DIR:${LIB_NAME}>/${prefix}mkldnn${ext}
+#        # Workaround for MSB8065 warning.
+#        COMMAND ${CMAKE_COMMAND} -E touch "CMakeFiles/compat_libs"
+#        DEPENDS ${LIB_NAME})
+#    install(FILES $<TARGET_LINKER_FILE_DIR:${LIB_NAME}>/${prefix}mkldnn${ext}
+#        DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+#else()
+#    if(DNNL_LIBRARY_TYPE STREQUAL "SHARED")
+#        set_ternary(ext APPLE ".dylib" ".so")
+#        set(vers ".${DNNL_VERSION_MAJOR};.${DNNL_VERSION_MAJOR}.${DNNL_VERSION_MINOR}")
+#    else()
+#        set(ext ".a")
+#        set(vers "")
+#    endif()
+#    foreach(ver "" ${vers})
+#        set_ternary(ext_and_ver APPLE "${ver}${ext}" "${ext}${ver}")
+#        get_property(lib_location TARGET ${LIB_NAME} PROPERTY LIBRARY_OUTPUT_DIRECTORY)
+#        if(lib_location)
+#            set(compat_link "${lib_location}/libmkldnn${ext_and_ver}")
+#        else()
+#            set(compat_link "${CMAKE_CURRENT_BINARY_DIR}/libmkldnn${ext_and_ver}")
+#        endif()
+#        add_custom_command(OUTPUT ${compat_link}
+#            # to make the next command work fine
+#            COMMAND ${CMAKE_COMMAND} -E remove -f ${compat_link}
+#            COMMAND ${CMAKE_COMMAND} -E create_symlink libdnnl${ext_and_ver} ${compat_link}
+#            DEPENDS ${LIB_NAME})
+#        add_custom_target(compat_libs${ver} ALL DEPENDS ${compat_link})
+#        install(FILES ${compat_link} DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+#    endforeach()
+#endif()
 
 # Install custom find modules for transitive dependencies
 set(LIB_CONFIG_INSTALL_DIR_COMPAT "${CMAKE_INSTALL_LIBDIR}/cmake/mkldnn")
-if("${DNNL_CPU_RUNTIME}" MATCHES "^(TBB|TBB_AUTO)$")
-    if(WIN32)
-        install(FILES "../cmake/win/TBBConfig.cmake" RENAME "FindTBB.cmake"
-            DESTINATION ${LIB_CONFIG_INSTALL_DIR})
-    elseif(APPLE)
-        install(FILES "../cmake/mac/TBBConfig.cmake" RENAME "FindTBB.cmake"
-            DESTINATION ${LIB_CONFIG_INSTALL_DIR})
-    elseif(UNIX)
-        install(FILES "../cmake/lnx/TBBConfig.cmake" RENAME "FindTBB.cmake"
-            DESTINATION ${LIB_CONFIG_INSTALL_DIR})
-    endif()
-    install(FILES "${CMAKE_INSTALL_PREFIX}/${LIB_CONFIG_INSTALL_DIR}/FindTBB.cmake"
-            DESTINATION ${LIB_CONFIG_INSTALL_DIR_COMPAT})
-endif()
 
 if(DNNL_GPU_RUNTIME STREQUAL "OCL")
     install(FILES
