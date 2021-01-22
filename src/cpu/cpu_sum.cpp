@@ -57,12 +57,14 @@ DNNL_DEF_PD_BUILDER(spd_builder,
 #define INSTANCE SPD_INSTANCE
 #define INSTANCE_X64(...) DNNL_X64_ONLY(INSTANCE(__VA_ARGS__))
 const spd_create_f cpu_sum_impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         INSTANCE_X64(jit_bf16_sum_t, bf16, bf16)
         INSTANCE_X64(jit_bf16_sum_t, bf16, f32)
         INSTANCE(simple_sum_t, bf16)
         INSTANCE(simple_sum_t, bf16, f32)
         INSTANCE(simple_sum_t, f32)
         INSTANCE(ref_sum_t)
+#endif
         nullptr,
 };
 #undef SPD_INSTANCE

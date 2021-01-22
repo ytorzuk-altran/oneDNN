@@ -35,6 +35,7 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const pd_create_f impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t, avx512_common, f32)
         CPU_INSTANCE_X64(jit_uni_eltwise_bwd_t, avx512_common, f32)
         CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t, avx512_core, bf16)
@@ -59,6 +60,7 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE(ref_eltwise_fwd_t, s32)
         CPU_INSTANCE(ref_eltwise_fwd_t, s8)
         CPU_INSTANCE(ref_eltwise_fwd_t, u8)
+#endif
         /* eol */
         nullptr,
 };
