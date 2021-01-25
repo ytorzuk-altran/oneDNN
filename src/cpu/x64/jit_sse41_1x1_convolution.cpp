@@ -235,7 +235,7 @@ void jit_sse41_1x1_convolution_fwd_t::execute_forward_thr(const int ithr,
 
             par_conv_dw.filt
                     = &weights_dw[dw_weights_d.blk_off(ch, 0, 0, kh, kw)];
-            if (bias)
+            if (bias_dw)
                 par_conv_dw.bias
                         = &bias_dw[dw_bias_d.blk_off(ch * jcp_dw.ch_block)];
 
