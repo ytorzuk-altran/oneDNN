@@ -178,6 +178,13 @@ void jit_uni_eltwise_injector_f32<isa>::test_mask() {
 template <cpu_isa_t isa>
 void jit_uni_eltwise_injector_f32<isa>::exp_compute_vector_fwd(
         const Vmm &vmm_src) {
+    // TODO: debug only: test the table
+    h->uni_vmovups(vmm_aux1, table_val(one));
+    h->uni_vmovups(vmm_aux1, table_val(half));
+    h->uni_vmovups(vmm_aux1, table_val(exp_ln_flt_min_f));
+    h->uni_vmovups(vmm_aux1, table_val(exp_ln_flt_max_f));
+    h->uni_vmovups(vmm_aux1, table_val(exp_log2ef));
+
     // get mask of values lower than log(FLT_MIN) to zero them in the output
     compute_cmp_mask(vmm_src, table_val(exp_ln_flt_min_f), _cmp_lt_os);
 
