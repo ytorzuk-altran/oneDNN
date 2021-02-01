@@ -167,7 +167,7 @@ struct jit_avx2_1x1_convolution_fwd_t : public primitive_t {
             const auto &src_md = dst_md_;
             const memory_desc_wrapper src_d(src_md);
             const auto nthr = dnnl_get_max_threads();
-            auto l2_cache = platform::get_per_core_cache_size(2) * nthr;
+//            auto l2_cache = platform::get_per_core_cache_size(2) * nthr;
 
             // Note: A robust fusion implementation would be to check if both
             // 1x1 conv and dw conv that are considered here for fusion are
@@ -181,7 +181,7 @@ struct jit_avx2_1x1_convolution_fwd_t : public primitive_t {
             bool ok = true && (!mayiuse(avx512_common))
                     && (attr_1x1.post_ops_.find(primitive_kind::sum) == -1)
                     // TODO: Below may be further tuned.
-                    && (l2_cache * 2 < src_d.size())
+//                    && (l2_cache * 2 < src_d.size())
                     // load_grp_count check can be redundant due to l2 check
                     // above. Adding it explicitly as the current driver doesn't
                     // work if this condition fails.
