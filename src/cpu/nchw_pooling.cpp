@@ -94,6 +94,11 @@ status_t nchw_pooling_fwd_t<d_type>::execute_forward(
     const auto ker_max = [=](data_t *d, dim_t mb, dim_t c, dim_t od, dim_t oh,
                                  dim_t ow) {
         bool is_initialized = false;
+
+        const auto src_offset = (size_t)IW * IH * ID * C * mb + (size_t)IW * IH * ID * c;
+        const auto local_src = &src[src_offset];
+        const auto IWH = (size_t)IW * IH;
+
         for_(dim_t kd = 0; kd < KD; ++kd)
         for_(dim_t kh = 0; kh < KH; ++kh)
         for (dim_t kw = 0; kw < KW; ++kw) {
@@ -105,10 +110,8 @@ status_t nchw_pooling_fwd_t<d_type>::execute_forward(
             if (ih < 0 || ih >= IH) continue;
             if (iw < 0 || iw >= IW) continue;
 
-            const auto src_offset = (size_t)IW * IH * ID * C * mb
-                    + (size_t)IW * IH * ID * c + (size_t)IW * IH * id
-                    + (size_t)IW * ih + (size_t)iw;
-            const auto s = src[src_offset];
+            const auto local_src_offset = IWH * id + (size_t)IW * ih + (size_t)iw;
+            const auto s = local_src[local_src_offset];
             if (!is_initialized) {
                 d[0] = s;
                 set_ws(mb, c, od, oh, ow, kd * KH * KW + kh * KW + kw);
@@ -149,13 +152,17 @@ status_t nchw_pooling_fwd_t<d_type>::execute_forward(
             num_summands = (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
         if (num_summands == 0) return d_val;
 
+        const auto src_offset = (size_t)IW * IH * ID * C * mb + (size_t)IW * IH * ID * c  + (size_t)iw_start;
+        const auto IWH = (size_t)IW * IH;
+        const dim_t iw_range = iw_end - iw_start;
+
         for_(dim_t id = id_start; id < id_end; ++id)
-        for_(dim_t ih = ih_start; ih < ih_end; ++ih)
-        for (dim_t iw = iw_start; iw < iw_end; ++iw) {
-            const auto src_offset = (size_t)IW * IH * ID * C * mb
-                    + (size_t)IW * IH * ID * c + (size_t)IW * IH * id
-                    + (size_t)IW * ih + (size_t)iw;
-            d_val += src[src_offset];
+        for_(dim_t ih = ih_start; ih < ih_end; ++ih) {
+            auto local_src_offset = src_offset + IWH * id + (size_t) IW * ih;
+            const auto tmp_src = &src[local_src_offset];
+            for (dim_t iw = 0; iw < iw_range; ++iw) {
+                d_val += tmp_src[iw];
+            }
         }
 
         return d_val / num_summands;
@@ -267,6 +274,11 @@ status_t nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
     auto ker_max = [=](float *d, dim_t mb, dim_t c, dim_t od, dim_t oh,
                            dim_t ow) {
         bool is_initialized = false;
+
+        const auto src_offset = (size_t)IW * IH * ID * C * mb + (size_t)IW * IH * ID * c;
+        const auto local_src = &bf16cvt_wsp[src_offset];
+        const auto IWH = (size_t)IW * IH;
+
         for_(dim_t kd = 0; kd < KD; ++kd)
         for_(dim_t kh = 0; kh < KH; ++kh)
         for (dim_t kw = 0; kw < KW; ++kw) {
@@ -278,10 +290,8 @@ status_t nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
             if (ih < 0 || ih >= IH) continue;
             if (iw < 0 || iw >= IW) continue;
 
-            auto src_offset = (size_t)IW * IH * ID * C * mb
-                    + (size_t)IW * IH * ID * c + (size_t)IW * IH * id
-                    + (size_t)IW * ih + (size_t)iw;
-            auto &s = bf16cvt_wsp[src_offset];
+            const auto local_src_offset = IWH * id + (size_t)IW * ih + (size_t)iw;
+            const auto s = local_src[local_src_offset];
 
             if (!is_initialized) {
                 d[0] = s;
@@ -320,13 +330,17 @@ status_t nchw_pooling_fwd_t<data_type::bf16>::execute_forward(
             num_summands = (id_end - id_start)*(ih_end - ih_start)*(iw_end - iw_start);
         if (num_summands == 0) return;
 
+        const auto src_offset = (size_t)IW * IH * ID * C * mb + (size_t)IW * IH * ID * c + (size_t)iw_start;
+        const auto IWH = (size_t)IW * IH;
+        const dim_t iw_range = iw_end - iw_start;
+
         for_(dim_t id = id_start; id < id_end; ++id)
-        for_(dim_t ih = ih_start; ih < ih_end; ++ih)
-        for (dim_t iw = iw_start; iw < iw_end; ++iw) {
-            auto src_offset = (size_t)IW * IH * ID * C * mb
-                    + (size_t)IW * IH * ID * c + (size_t)IW * IH * id
-                    + (size_t)IW * ih + (size_t)iw;
-            d[0] += bf16cvt_wsp[src_offset];
+        for_(dim_t ih = ih_start; ih < ih_end; ++ih) {
+            auto local_src_offset = src_offset + IWH * id + (size_t)IW * ih;
+            const auto tmp_src = &bf16cvt_wsp[local_src_offset];
+            for (dim_t iw = 0; iw < iw_range; ++iw) {
+                d[0] += tmp_src[iw];
+            }
         }
 
         d[0] = out_round<float>((float)d[0] / num_summands);
