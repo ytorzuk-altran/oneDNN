@@ -20,6 +20,7 @@
 #include <cfloat>
 #include "jit_generator.hpp"
 #include "jit_primitive_conf.hpp"
+#include "cpu/x64/jit_avx512_core_bf16cvt.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -34,7 +35,7 @@ struct jit_uni_fork_softmax_kernel_f32 : public jit_generator {
     using Vmm = typename utils::conditional3<isa == sse41, Xmm,
             isa == avx2, Ymm, Zmm>::type;
 
-    jit_uni_fork_softmax_kernel_f32(jit_softmax_conf_t ajpp) : jpp(ajpp) {}
+    jit_uni_fork_softmax_kernel_f32(jit_softmax_conf_t ajpp);
 
     jit_softmax_conf_t jpp;
 
@@ -70,6 +71,7 @@ private:
     Reg64 reg_ch_work       = r13;
     Reg64 reg_min           = rdx;
     Reg64 imm_addr64        = r14;
+    Reg64 bf16_emu_gpr      = r15;
 
     Vmm vmm_aux0            = Vmm(0);
     Vmm vmm_aux1            = Vmm(1);
@@ -86,6 +88,12 @@ private:
     Xmm xmm_denom           = Xmm(6);
     Xmm xmm_src             = Xmm(7);
 
+    Zmm bf16_emu_zmm_1      = Zmm(27);
+    Zmm bf16_emu_zmm_2      = Zmm(28);
+    Zmm bf16_emu_zmm_3      = Zmm(29);
+    Zmm bf16_emu_zmm_4      = Zmm(30);
+    Zmm bf16_emu_zmm_5      = Zmm(31);
+
     Opmask k_mask_tmp       = Opmask(2);
 
     unsigned char _cmp_gt_os = isa == avx512_common ? 14 : 6;
@@ -98,11 +106,18 @@ private:
     auto vreg_denom(int ur_inner) -> Vmm;
     auto vreg_src(int ur_inner) -> Vmm;
 
+    void load_vector(Vmm vmm_src, const Xbyak::Address &op);
+    void load_scalar(Xmm xmm_src, const Xbyak::Address &op);
+    void store_vector(const Xbyak::Address &op, Vmm vmm_dst);
+    void store_scalar(const Xbyak::Address &op, Xmm xmm_dst);
+
     Label loop_simd_unroll;
     Label loop_simd;
     Label loop_scalar;
     Label loop_end;
     Label l_table;
+
+    std::unique_ptr<bf16_emulation_t> bf16_emu_;
 
     unsigned char _op_floor = 1;
 
