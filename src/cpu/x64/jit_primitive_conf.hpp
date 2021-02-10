@@ -901,11 +901,13 @@ struct jit_softmax_conf_t {
     size_t ur_channel;
     size_t ur_inner;
     size_t outer_block;
+    size_t dt_size;
+    data_type_t dt;
 };
 
 struct jit_softmax_call_s {
-    const float *src;
-    float *dst;
+    const uint8_t* src;
+    uint8_t* dst;
 
     size_t channels;
     size_t work;
