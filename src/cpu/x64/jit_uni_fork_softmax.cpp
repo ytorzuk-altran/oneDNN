@@ -30,8 +30,8 @@ jit_uni_fork_softmax_fwd_t<isa>::jit_uni_fork_softmax_fwd_t(const pd_t *apd)
 
 template <cpu_isa_t isa>
 status_t jit_uni_fork_softmax_fwd_t<isa>::execute(const exec_ctx_t &ctx) const {
-    auto src = CTX_IN_MEM(const float *, DNNL_ARG_SRC);
-    auto dst = CTX_OUT_MEM(float *, DNNL_ARG_DST);
+    auto src = CTX_IN_MEM(const uint8_t*, DNNL_ARG_SRC);
+    auto dst = CTX_OUT_MEM(uint8_t*, DNNL_ARG_DST);
 
     const memory_desc_wrapper data_d(pd()->src_md());
 
@@ -58,8 +58,8 @@ status_t jit_uni_fork_softmax_fwd_t<isa>::execute(const exec_ctx_t &ctx) const {
                 args.channels = jpp.channels;
                 args.work = jpp.inner_size;
                 size_t off = data_d.off_l(ou * dim);
-                args.src = src + off;
-                args.dst = dst + off;
+                args.src = src + off * jpp.dt_size;
+                args.dst = dst + off * jpp.dt_size;
 
                 (*kernel_)(&args);
 
@@ -87,8 +87,8 @@ status_t jit_uni_fork_softmax_fwd_t<isa>::execute(const exec_ctx_t &ctx) const {
                 args.channels = jpp.channels;
                 args.work = work;
                 size_t off = data_d.off_l(oub * jpp.outer_block * dim);
-                args.src = src + off;
-                args.dst = dst + off;
+                args.src = src + off * jpp.dt_size;
+                args.dst = dst + off * jpp.dt_size;
 
                 (*kernel_)(&args);
 
