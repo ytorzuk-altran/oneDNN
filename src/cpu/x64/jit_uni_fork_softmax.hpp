@@ -62,7 +62,7 @@ struct jit_uni_fork_softmax_fwd_t : public primitive_t {
             using namespace data_type;
             bool ok = src_d == dst_d && mayiuse(isa) && is_fwd()
                       && !has_zero_dim_memory()
-                      && utils::one_of(data_type, f32)
+                      && utils::one_of(data_type, f32, bf16)
                       && attr()->has_default_values()
                       && src_d.is_dense(true)
                       && src_d.matches_one_of_tag(dat_tag) == dat_tag

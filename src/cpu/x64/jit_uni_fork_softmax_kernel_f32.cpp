@@ -26,6 +26,15 @@ using namespace Xbyak;
 
 #define GET_OFF(field) offsetof(jit_softmax_call_s, field)
 
+template<cpu_isa_t isa>
+jit_uni_fork_softmax_kernel_f32<isa>::jit_uni_fork_softmax_kernel_f32(jit_softmax_conf_t ajpp) : jpp(ajpp) {
+    if (jpp.dt == data_type::bf16 && !mayiuse(avx512_core_bf16)) {
+        bf16_emu_.reset(new bf16_emulation_t(this, bf16_emu_zmm_1, bf16_emu_zmm_2, bf16_emu_zmm_3,
+                                             bf16_emu_gpr, bf16_emu_zmm_4, bf16_emu_zmm_5));
+    }
+}
+
+
 template <cpu_isa_t isa>
 status_t jit_uni_fork_softmax_kernel_f32<isa>::init_conf(jit_softmax_conf_t &jpp,
                    const softmax_desc_t &pd, const memory_desc_wrapper &src_d,
@@ -34,7 +43,20 @@ status_t jit_uni_fork_softmax_kernel_f32<isa>::init_conf(jit_softmax_conf_t &jpp
     auto dims = pd.data_desc.dims;
     auto axis = pd.softmax_axis;
 
+    jpp.dt = src_d.data_type();
+    jpp.dt_size = src_d.data_type_size();
+
     size_t nregs = cpu_isa_traits<isa>::n_vregs;
+
+    if (jpp.dt == data_type::bf16) {
+        if (isa != avx512_common) {
+            return status::unimplemented;
+        }
+        else if (!mayiuse(avx512_core_bf16)) {
+            nregs -= 5; // reserved for the bf16 emulator
+        }
+    }
+
     size_t aux_simd_registers = 5; // 3 aux for exp + one + (-FTL_MAX)
     size_t regs_for_one_unroll = 2;
     size_t max_inner_unroll = (nregs - aux_simd_registers) / regs_for_one_unroll;
@@ -95,6 +117,73 @@ auto jit_uni_fork_softmax_kernel_f32<isa>::vreg_denom(int ur_inner) -> Vmm {
 template <cpu_isa_t isa>
 auto jit_uni_fork_softmax_kernel_f32<isa>::vreg_src(int ur_inner) -> Vmm {
     return Vmm(id_vreg_src(ur_inner));
+}
+
+template <cpu_isa_t isa>
+void jit_uni_fork_softmax_kernel_f32<isa>::load_vector(Vmm vmm_src_, const Xbyak::Address &op) {
+    switch (jpp.dt) {
+        case data_type::f32:
+            uni_vmovups(vmm_src_, op);
+            break;
+        case data_type::bf16:
+            uni_vpmovzxwd(vmm_src_, op);
+            uni_vpslld(vmm_src_, vmm_src_, 16);
+            break;
+        default:
+            assert(!"unknown data type");
+    }
+}
+
+template <cpu_isa_t isa>
+void jit_uni_fork_softmax_kernel_f32<isa>::load_scalar(Xmm xmm_src_, const Xbyak::Address &op) {
+    switch (jpp.dt) {
+        case data_type::f32:
+            movss(xmm_src_, op);
+            break;
+        case data_type::bf16:
+            pinsrw(xmm_src_, op, 0x0);
+            uni_vpslld(xmm_src_, xmm_src_, 16);
+            break;
+        default:
+            assert(!"unknown data type");
+    }
+}
+
+template <cpu_isa_t isa>
+void jit_uni_fork_softmax_kernel_f32<isa>::store_vector(const Xbyak::Address &op, Vmm vmm_dst_) {
+    Ymm ymm_dst_ = Ymm(vmm_dst_.getIdx());
+    switch (jpp.dt) {
+        case data_type::f32:
+            uni_vmovups(op, vmm_dst_);
+            break;
+        case data_type::bf16:
+            if (mayiuse(avx512_core_bf16))
+                vcvtneps2bf16(ymm_dst_, vmm_dst_);
+            else
+                bf16_emu_->vcvtneps2bf16(ymm_dst_, Zmm(vmm_dst_.getIdx()));
+            vmovdqu16(op, ymm_dst_);
+            break;
+        default:
+            assert(!"unknown data type");
+    }
+}
+
+template <cpu_isa_t isa>
+void jit_uni_fork_softmax_kernel_f32<isa>::store_scalar(const Xbyak::Address &op, Xmm xmm_dst_) {
+    switch (jpp.dt) {
+        case data_type::f32:
+            movss(op, xmm_dst_);
+            break;
+        case data_type::bf16:
+            if (mayiuse(avx512_core_bf16))
+                vcvtneps2bf16(xmm_dst_, xmm_dst_);
+            else
+                bf16_emu_->vcvtneps2bf16(xmm_dst_, Ymm(xmm_dst_.getIdx()));
+            pextrw(op, xmm_dst_, 0x0);
+            break;
+        default:
+            assert(!"unknown dst_dt");
+    }
 }
 
 template <cpu_isa_t isa>
@@ -229,9 +318,7 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_max(int ur_inner) {
     }
 
     mov(reg_ch_work, reg_channels);
-
     mov(reg_src_ptr, reg_src_base_ptr);
-    mov(reg_dst_ptr, reg_dst_base_ptr);
 
     L(loop_channel_blocks); {
         cmp(reg_ch_work, jpp.ur_channel);
@@ -239,14 +326,13 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_max(int ur_inner) {
 
         for (int i = 0; i < ur_inner; ++i) {
             for (int c = 0; c < (int)jpp.ur_channel; ++c) {
-                uni_vmovups(vreg_src(i), ptr[reg_src_ptr + (i*simd_w + c*jpp.inner_size) * sizeof(float)]);
+                load_vector(vreg_src(i), ptr[reg_src_ptr + (i*simd_w + c*jpp.inner_size) * jpp.dt_size]);
                 uni_vmaxps(vreg_max(i), vreg_max(i), vreg_src(i));
             }
         }
 
         sub(reg_ch_work, jpp.ur_channel);
-        add(reg_src_ptr, jpp.ur_channel * jpp.inner_size * sizeof(float));
-        add(reg_dst_ptr, jpp.ur_channel * jpp.inner_size * sizeof(float));
+        add(reg_src_ptr, jpp.ur_channel * jpp.inner_size * jpp.dt_size);
 
         jmp(loop_channel_blocks, T_NEAR);
     }
@@ -256,12 +342,11 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_max(int ur_inner) {
         jle(loop_channel_end, T_NEAR);
 
         for (int i = 0; i < ur_inner; ++i) {
-            uni_vmovups(vreg_src(i), ptr[reg_src_ptr + i*simd_w*sizeof(float)]);
+            load_vector(vreg_src(i), ptr[reg_src_ptr + i * simd_w * jpp.dt_size]);
             uni_vmaxps(vreg_max(i), vreg_max(i), vreg_src(i));
         }
 
-        add(reg_src_ptr, jpp.inner_size*sizeof(float));
-        add(reg_dst_ptr, jpp.inner_size*sizeof(float));
+        add(reg_src_ptr, jpp.inner_size * jpp.dt_size);
 
         dec(reg_ch_work);
         jmp(loop_channel_tail, T_NEAR);
@@ -291,17 +376,17 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_exp(int ur_inner) {
 
         for (int i = 0; i < ur_inner; ++i) {
             for (int c = 0; c < (int)jpp.ur_channel; ++c) {
-                uni_vmovups(vreg_src(i), ptr[reg_src_ptr + (i*simd_w + c*jpp.inner_size) *sizeof(float)]);
+                load_vector(vreg_src(i), ptr[reg_src_ptr + (i*simd_w + c*jpp.inner_size) * jpp.dt_size]);
                 uni_vsubps(vreg_src(i),vreg_src(i), vreg_max(i));
                 simd_expf(vreg_src(i));
                 uni_vaddps(vreg_denom(i), vreg_denom(i), vreg_src(i));
-                uni_vmovups(ptr[reg_dst_ptr + (i*simd_w + c*jpp.inner_size)*sizeof(float)], vreg_src(i));
+                store_vector(ptr[reg_dst_ptr + (i*simd_w + c*jpp.inner_size) * jpp.dt_size], vreg_src(i));
             }
         }
 
         sub(reg_ch_work, jpp.ur_channel);
-        add(reg_src_ptr, jpp.ur_channel * jpp.inner_size * sizeof(float));
-        add(reg_dst_ptr, jpp.ur_channel * jpp.inner_size * sizeof(float));
+        add(reg_src_ptr, jpp.ur_channel * jpp.inner_size * jpp.dt_size);
+        add(reg_dst_ptr, jpp.ur_channel * jpp.inner_size * jpp.dt_size);
 
         jmp(loop_channel_blocks, T_NEAR);
     }
@@ -311,15 +396,15 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_exp(int ur_inner) {
         jle(loop_channel_end, T_NEAR);
 
         for (int i = 0; i < ur_inner; ++i) {
-            uni_vmovups(vreg_src(i), ptr[reg_src_ptr + i*simd_w*sizeof(float)]);
+            load_vector(vreg_src(i), ptr[reg_src_ptr + i * simd_w * jpp.dt_size]);
             uni_vsubps(vreg_src(i), vreg_src(i), vreg_max(i));
             simd_expf(vreg_src(i));
             uni_vaddps(vreg_denom(i), vreg_denom(i), vreg_src(i));
-            uni_vmovups(ptr[reg_dst_ptr + i*simd_w*sizeof(float)], vreg_src(i));
+            store_vector(ptr[reg_dst_ptr + i * simd_w * jpp.dt_size], vreg_src(i));
         }
 
-        add(reg_src_ptr, jpp.inner_size*sizeof(float));
-        add(reg_dst_ptr, jpp.inner_size*sizeof(float));
+        add(reg_src_ptr, jpp.inner_size * jpp.dt_size);
+        add(reg_dst_ptr, jpp.inner_size * jpp.dt_size);
 
         dec(reg_ch_work);
         jmp(loop_channel_tail, T_NEAR);
@@ -356,15 +441,15 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_div(int ur_inner) {
 
         for (int i = 0; i < ur_inner; ++i) {
             for (int c = 0; c < (int)jpp.ur_channel; ++c) {
-                uni_vmovups(vreg_src(i), ptr[reg_dst_ptr + (i*simd_w + c*jpp.inner_size)*sizeof(float)]);
+                load_vector(vreg_src(i), ptr[reg_dst_ptr + (i*simd_w + c*jpp.inner_size) * jpp.dt_size]);
                 uni_vmulps(vreg_src(i), vreg_src(i), vreg_denom(i));
-                uni_vmovups(ptr[reg_dst_ptr + (i*simd_w + c*jpp.inner_size)*sizeof(float)], vreg_src(i));
+                store_vector(ptr[reg_dst_ptr + (i*simd_w + c*jpp.inner_size) * jpp.dt_size], vreg_src(i));
             }
         }
 
         sub(reg_ch_work, jpp.ur_channel);
-        add(reg_src_ptr, jpp.ur_channel * jpp.inner_size * sizeof(float));
-        add(reg_dst_ptr, jpp.ur_channel * jpp.inner_size * sizeof(float));
+        add(reg_src_ptr, jpp.ur_channel * jpp.inner_size * jpp.dt_size);
+        add(reg_dst_ptr, jpp.ur_channel * jpp.inner_size * jpp.dt_size);
 
         jmp(loop_channel_blocks, T_NEAR);
     }
@@ -374,13 +459,13 @@ void jit_uni_fork_softmax_kernel_f32<isa>::simd_loop_div(int ur_inner) {
         jle(loop_channel_end, T_NEAR);
 
         for (int i = 0; i < ur_inner; ++i) {
-            uni_vmovups(vreg_src(i), ptr[reg_dst_ptr + i*simd_w*sizeof(float)]);
+            load_vector(vreg_src(i), ptr[reg_dst_ptr + i * simd_w * jpp.dt_size]);
             uni_vmulps(vreg_src(i), vreg_src(i), vreg_denom(i));
-            uni_vmovups(ptr[reg_dst_ptr + i*simd_w*sizeof(float)], vreg_src(i));
+            store_vector(ptr[reg_dst_ptr + i * simd_w * jpp.dt_size], vreg_src(i));
         }
 
-        add(reg_src_ptr, jpp.inner_size*sizeof(float));
-        add(reg_dst_ptr, jpp.inner_size*sizeof(float));
+        add(reg_src_ptr, jpp.inner_size * jpp.dt_size);
+        add(reg_dst_ptr, jpp.inner_size * jpp.dt_size);
 
         dec(reg_ch_work);
         jmp(loop_channel_tail, T_NEAR);
@@ -402,10 +487,10 @@ void jit_uni_fork_softmax_kernel_f32<isa>::scalar_loop_max() {
         cmp(reg_ch_work, 0);
         jle(loop_channel_end, T_NEAR);
 
-        movss(xmm_src, ptr[reg_src_ptr]);
+        load_scalar(xmm_src, ptr[reg_src_ptr]);
         maxss(xmm_max, xmm_src);
 
-        add(reg_src_ptr, jpp.inner_size*sizeof(float));
+        add(reg_src_ptr, jpp.inner_size * jpp.dt_size);
 
         dec(reg_ch_work);
         jmp(loop_channel_tail);
@@ -430,14 +515,14 @@ void jit_uni_fork_softmax_kernel_f32<isa>::scalar_loop_exp() {
         cmp(reg_ch_work, 0);
         jle(loop_channel_end, T_NEAR);
 
-        movss(xmm_src, ptr[reg_src_ptr]);
+        load_scalar(xmm_src, ptr[reg_src_ptr]);
         subss(xmm_src, xmm_max);
         scalar_expf(xmm_src);
         addss(xmm_denom, xmm_src);
-        movss(ptr[reg_dst_ptr], xmm_src);
+        store_scalar(ptr[reg_dst_ptr], xmm_src);
 
-        add(reg_src_ptr, jpp.inner_size*sizeof(float));
-        add(reg_dst_ptr, jpp.inner_size*sizeof(float));
+        add(reg_src_ptr, jpp.inner_size * jpp.dt_size);
+        add(reg_dst_ptr, jpp.inner_size * jpp.dt_size);
 
         dec(reg_ch_work);
         jmp(loop_channel_tail);
@@ -459,12 +544,12 @@ void jit_uni_fork_softmax_kernel_f32<isa>::scalar_loop_div() {
         cmp(reg_ch_work, 0);
         jle(loop_channel_end, T_NEAR);
 
-        movss(xmm_src, ptr[reg_dst_ptr]);
+        load_scalar(xmm_src, ptr[reg_dst_ptr]);
         divss(xmm_src, xmm_denom);
-        movss(ptr[reg_dst_ptr], xmm_src);
+        store_scalar(ptr[reg_dst_ptr], xmm_src);
 
-        add(reg_src_ptr, jpp.inner_size*sizeof(float));
-        add(reg_dst_ptr, jpp.inner_size*sizeof(float));
+        add(reg_src_ptr, jpp.inner_size * jpp.dt_size);
+        add(reg_dst_ptr, jpp.inner_size * jpp.dt_size);
 
         dec(reg_ch_work);
         jmp(loop_channel_tail);
@@ -478,54 +563,57 @@ void jit_uni_fork_softmax_kernel_f32<isa>::dense_loop(int ou_block) {
     for (int ou = 0; ou < ou_block; ou++) {
         movups(xmm_max, xmm_float_min);
         for (int ch = 0; ch < (int)jpp.channels; ch++) {
-            maxss(xmm_max, ptr[reg_src_base_ptr + (ou * jpp.channels + ch) * sizeof(float)]);
+            load_scalar(xmm_src, ptr[reg_src_base_ptr + (ou * jpp.channels + ch) * jpp.dt_size]);
+            maxss(xmm_max, xmm_src);
         }
 
         for (int ch = 0; ch < (int)jpp.channels; ch++) {
-            movss(xmm_src, ptr[reg_src_base_ptr + (ou * jpp.channels + ch) * sizeof(float)]);
+            load_scalar(xmm_src, ptr[reg_src_base_ptr + (ou * jpp.channels + ch) * jpp.dt_size]);
             subss(xmm_src, xmm_max);
-            movss(ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * sizeof(float)], xmm_src);
+            store_scalar(ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * jpp.dt_size], xmm_src);
         }
     }
 
     int full_work = ou_block * (int)jpp.channels;
     int i = 0;
     for (; i <= full_work - simd_w; i += simd_w) {
-        uni_vmovups(vreg_src(0), ptr[reg_dst_base_ptr + i * sizeof(float)]);
+        load_vector(vreg_src(0), ptr[reg_dst_base_ptr + i * jpp.dt_size]);
         simd_expf(vreg_src(0));
-        uni_vmovups(ptr[reg_dst_base_ptr + i * sizeof(float)], vreg_src(0));
+        store_vector(ptr[reg_dst_base_ptr + i * jpp.dt_size], vreg_src(0));
     }
 
     for (; i < full_work; i++) {
-        movss(xmm_src, ptr[reg_dst_base_ptr + i * sizeof(float)]);
+        load_scalar(xmm_src, ptr[reg_dst_base_ptr + i * jpp.dt_size]);
         scalar_expf(xmm_src);
-        movss(ptr[reg_dst_base_ptr + i * sizeof(float)], xmm_src);
+        store_scalar(ptr[reg_dst_base_ptr + i * jpp.dt_size], xmm_src);
     }
 
     for (int ou = 0; ou < ou_block; ou++) {
         pxor(xmm_denom, xmm_denom);
         for (int ch = 0; ch < (int)jpp.channels; ch++) {
-            addss(xmm_denom, ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * sizeof(float)]);
+            load_scalar(xmm_src, ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * jpp.dt_size]);
+            addss(xmm_denom, xmm_src);
         }
 
         movss(xmm_one, ptr[imm_addr64 + 0 * vlen]);
         divss(xmm_one, xmm_denom);
         movss(xmm_denom, xmm_one);
         for (int ch = 0; ch < (int)jpp.channels; ch++) {
-            movss(xmm_src, ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * sizeof(float)]);
+            load_scalar(xmm_src, ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * jpp.dt_size]);
             mulss(xmm_src, xmm_denom);
-            movss(ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * sizeof(float)], xmm_src);
+            store_scalar(ptr[reg_dst_base_ptr + (ou * jpp.channels + ch) * jpp.dt_size], xmm_src);
         }
     }
 }
 
 template <cpu_isa_t isa>
 void jit_uni_fork_softmax_kernel_f32<isa>::generate() {
+    this->preamble();
+    if (bf16_emu_) bf16_emu_->init_vcvtneps2bf16();
+
     if (jpp.inner_size == 1) {
         this->generate_dense();
     } else {
-        this->preamble();
-
         mov(reg_src_base_ptr, ptr[abi_param1 + GET_OFF(src)]);
         mov(reg_dst_base_ptr, ptr[abi_param1 + GET_OFF(dst)]);
         mov(reg_work_amount, ptr[abi_param1 + GET_OFF(work)]);
@@ -546,8 +634,8 @@ void jit_uni_fork_softmax_kernel_f32<isa>::generate() {
             simd_loop_exp(jpp.ur_inner);
             simd_loop_div(jpp.ur_inner);
 
-            add(reg_src_base_ptr, jpp.ur_inner * simd_w * sizeof(float));
-            add(reg_dst_base_ptr, jpp.ur_inner * simd_w * sizeof(float));
+            add(reg_src_base_ptr, jpp.ur_inner * simd_w * jpp.dt_size);
+            add(reg_dst_base_ptr, jpp.ur_inner * simd_w * jpp.dt_size);
 
             sub(reg_work_amount, jpp.ur_inner * simd_w);
             cmp(reg_work_amount, jpp.ur_inner * simd_w);
@@ -563,8 +651,8 @@ void jit_uni_fork_softmax_kernel_f32<isa>::generate() {
             simd_loop_exp(1);
             simd_loop_div(1);
 
-            add(reg_src_base_ptr, simd_w * sizeof(float));
-            add(reg_dst_base_ptr, simd_w * sizeof(float));
+            add(reg_src_base_ptr, simd_w * jpp.dt_size);
+            add(reg_dst_base_ptr, simd_w * jpp.dt_size);
 
             sub(reg_work_amount, simd_w);
             jmp(loop_simd, T_NEAR);
@@ -579,8 +667,8 @@ void jit_uni_fork_softmax_kernel_f32<isa>::generate() {
             scalar_loop_exp();
             scalar_loop_div();
 
-            add(reg_src_base_ptr, sizeof(float));
-            add(reg_dst_base_ptr, sizeof(float));
+            add(reg_src_base_ptr, jpp.dt_size);
+            add(reg_dst_base_ptr, jpp.dt_size);
 
             dec(reg_work_amount);
             jmp(loop_scalar, T_NEAR);
@@ -596,8 +684,6 @@ void jit_uni_fork_softmax_kernel_f32<isa>::generate() {
 
 template <cpu_isa_t isa>
 void jit_uni_fork_softmax_kernel_f32<isa>::generate_dense() {
-    this->preamble();
-
     mov(reg_src_base_ptr, ptr[abi_param1 + GET_OFF(src)]);
     mov(reg_dst_base_ptr, ptr[abi_param1 + GET_OFF(dst)]);
     mov(reg_work_amount, ptr[abi_param1 + GET_OFF(work)]);
@@ -634,8 +720,8 @@ void jit_uni_fork_softmax_kernel_f32<isa>::generate_dense() {
 
         dense_loop(1);
 
-        add(reg_src_base_ptr, sizeof(float)*jpp.channels);
-        add(reg_dst_base_ptr, sizeof(float)*jpp.channels);
+        add(reg_src_base_ptr, jpp.dt_size * jpp.channels);
+        add(reg_dst_base_ptr, jpp.dt_size * jpp.channels);
         dec(reg_work_amount);
 
         jmp(ou_loop_tail_1_label, T_NEAR);
