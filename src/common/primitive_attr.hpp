@@ -441,7 +441,19 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             dnnl::impl::alg_kind_t alg;
             const float* weights_data;
             const float* output_mask_data;
-        } ;
+        };
+
+        struct depthwise_conv_old_t {
+            int in_h;
+            int in_w;
+            int ker_h;
+            int ker_w;
+            int str_h;
+            int str_w;
+            dnnl::impl::data_type_t in_dt;
+            const float* weights_data;
+            const float* biases_data;
+        };
 
         dnnl::impl::primitive_kind_t kind
                 = dnnl::impl::primitive_kind::undefined;
@@ -452,6 +464,7 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             } sum;
             eltwise_t eltwise;
             depthwise_conv_t depthwise_conv;
+            depthwise_conv_old_t depthwise_conv_old;
             binary_t binary;
             depthwise_t depthwise;
             quantization_t quantization;
@@ -521,25 +534,33 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
                             && sum.dt == rhs.sum.dt;
                     break;
                 case primitive_kind::convolution:
-                    // Depthwise Only
-                    ret = depthwise_conv.stride == rhs.depthwise_conv.stride
-                            && depthwise_conv.wei_dt
-                                    == rhs.depthwise_conv.wei_dt
-                            && depthwise_conv.bias_dt
-                                    == rhs.depthwise_conv.bias_dt
-                            && depthwise_conv.dst_dt
-                                    == rhs.depthwise_conv.dst_dt
-                            && depthwise_conv.count == rhs.depthwise_conv.count
-                            && depthwise_conv.mask == rhs.depthwise_conv.mask;
-                    if (!ret) break;
-
-                    // only call memcmp with valid pointers
-                    if (depthwise_conv.count == 0) break;
-                    ret = !utils::any_null(depthwise_conv.scales,
-                                  rhs.depthwise_conv.scales)
-                            && !std::memcmp(depthwise_conv.scales,
-                                    rhs.depthwise_conv.scales,
-                                    sizeof(float) * depthwise_conv.count);
+                    // todo: [antonvor] uncomment when new behavior of dw convolution fusing from oneDNN 1.6 will be supported
+//                    // Depthwise Only
+//                    ret = depthwise_conv.stride == rhs.depthwise_conv.stride
+//                            && depthwise_conv.wei_dt
+//                                    == rhs.depthwise_conv.wei_dt
+//                            && depthwise_conv.bias_dt
+//                                    == rhs.depthwise_conv.bias_dt
+//                            && depthwise_conv.dst_dt
+//                                    == rhs.depthwise_conv.dst_dt
+//                            && depthwise_conv.count == rhs.depthwise_conv.count
+//                            && depthwise_conv.mask == rhs.depthwise_conv.mask;
+//                    if (!ret) break;
+//
+//                    // only call memcmp with valid pointers
+//                    if (depthwise_conv.count == 0) break;
+//                    ret = !utils::any_null(depthwise_conv.scales,
+//                                  rhs.depthwise_conv.scales)
+//                            && !std::memcmp(depthwise_conv.scales,
+//                                    rhs.depthwise_conv.scales,
+//                                    sizeof(float) * depthwise_conv.count);
+                    ret = depthwise_conv_old.in_h == rhs.depthwise_conv_old.in_h
+                            && depthwise_conv_old.in_w == rhs.depthwise_conv_old.in_w
+                            && depthwise_conv_old.ker_h == rhs.depthwise_conv_old.ker_h
+                            && depthwise_conv_old.ker_w == rhs.depthwise_conv_old.ker_w
+                            && depthwise_conv_old.str_h == rhs.depthwise_conv_old.str_h
+                            && depthwise_conv_old.str_w == rhs.depthwise_conv_old.str_w
+                            && depthwise_conv_old.in_dt == rhs.depthwise_conv_old.in_dt;
                     break;
                 case primitive_kind::binary:
                     ret = binary.alg == rhs.binary.alg
@@ -577,8 +598,9 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
 
     private:
         void clear() {
-            if (is_convolution() && depthwise_conv.scales)
-                dnnl::impl::free(depthwise_conv.scales);
+            // todo: [antonvor] uncomment when new behavior of dw convolution fusing from oneDNN 1.6 will be supported
+//            if (is_convolution() && depthwise_conv.scales)
+//                dnnl::impl::free(depthwise_conv.scales);
             depthwise_conv.scales = nullptr;
             return;
         }
@@ -589,9 +611,10 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
             // else if(is_relu()) {} seems to be unreliable. memcpying for now.
             dnnl::impl::utils::array_copy(
                     (char *)this, (char *)&other, sizeof(*this));
-            if (other.is_convolution()) {
-                return set_depthwise_scales(other.depthwise_conv.scales);
-            }
+            // todo: [antonvor] uncomment when new behavior of dw convolution fusing from oneDNN 1.6 will be supported
+//            if (other.is_convolution()) {
+//                return set_depthwise_scales(other.depthwise_conv.scales);
+//            }
             return dnnl::impl::status::success;
         }
     };
@@ -618,6 +641,10 @@ struct dnnl_post_ops : public dnnl::impl::c_compatible {
                                              const void* output_scale, const void* output_shift);
     dnnl::impl::status_t append_binarization(dnnl::impl::alg_kind_t alg, const float* weights_data,
                                              const float* output_mask_data);
+    dnnl::impl::status_t append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w,
+                                          dnnl::impl::data_type_t in_dt,
+                                          const float* weights_data,
+                                          const float* biases_data);
 
     int find(dnnl::impl::primitive_kind_t kind, int start = 0,
             int stop = -1) const {
