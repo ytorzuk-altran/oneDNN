@@ -68,6 +68,8 @@ struct jit_sse41_1x1_convolution_fwd_t : public primitive_t {
             if (status != status::success) return status;
 
             if (jcp_.with_dw_conv) {
+                // todo: [antonvor] enable when new behavior of dw convolution fusing from oneDNN 1.6 will be supported
+                return status::unimplemented;
                 status = depthwise_po_init(engine);
                 if (status != status::success) return status;
             }
