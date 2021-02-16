@@ -719,6 +719,15 @@ dnnl_status_t DNNL_API dnnl_post_ops_get_params_eltwise(
         const_dnnl_post_ops_t post_ops, int index, float *scale,
         dnnl_alg_kind_t *alg_kind, float *alpha, float *beta);
 
+/** Appends DW convolution post operation to the @p post_ops with given parameters
+ * @p weights and @p bias.
+ *
+ * The kind of this post operation is #dnnl_convolution.
+ */
+dnnl_status_t DNNL_API dnnl_post_ops_append_dw_conv(
+        dnnl_post_ops_t post_ops, int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w, dnnl_data_type_t in_dt,
+        const float* weights_data, const float* biases_data);
+
 /// Appends a depthwise post-op convolution with stride 1.
 ///
 /// This post-op can only be fused with a 2D 1x1 convolution (convolution with

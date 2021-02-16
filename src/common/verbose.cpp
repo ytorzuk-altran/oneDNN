@@ -289,6 +289,10 @@ void attr2str(char *str, int len, int written, const primitive_attr_t *attr) {
                     const char *alg_str = dnnl_alg_kind2str(qt.alg);
                     DPRINT(str, len, written, "%s;", alg_str);
                 } break;
+                case primitive_kind::convolution: {
+                    const char *alg_str = "depthwise_conv_old";
+                    DPRINT(str, len, written, "%s;", alg_str);
+                } break;
                 default: assert(!"unsupported post op primitive kind!"); break;
             }
         }
