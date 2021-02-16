@@ -2661,6 +2661,13 @@ struct post_ops : public handle<dnnl_post_ops_t> {
         error::wrap_c_api(dnnl_post_ops_append_binarization(get(), convert_to_c(alg), weights_data, output_mask),
                           "could not append binarization");
     }
+
+    void append_dw_conv(int in_h, int in_w, int ker_h, int ker_w, int str_h, int str_w, dnnl_data_type_t in_dt,
+                        const float* weights_data, const float* biases_data) {
+        error::wrap_c_api(dnnl_post_ops_append_dw_conv(get(),
+                in_h, in_w, ker_h, ker_w, str_h, str_w, in_dt, weights_data, biases_data),
+                          "could not append dw conv");
+    }
 };
 
 /// @cond DO_NOT_DOCUMENT_THIS
