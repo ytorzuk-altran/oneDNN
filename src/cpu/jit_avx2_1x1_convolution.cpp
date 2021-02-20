@@ -198,12 +198,27 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward_with_dw_conv() const {
         return remaining < tail_step ? remaining : default_step;
     };
 
-    auto ker = [&](const int ithr, const int nthr) {
+    if (pd()->wants_padded_bias()) {
+        auto padded_bias = scratchpad().get<data_t>(key_conv_padded_bias);
+        utils::array_copy(padded_bias, bias, jcp.oc_without_padding);
+        utils::array_set(padded_bias + jcp.oc_without_padding, 0.f,
+                jcp.oc - jcp.oc_without_padding);
+        bias = padded_bias;
+
+        auto dw_padded_bias = scratchpad().get<data_t>(key_dw_conv_padded_bias);
+        utils::array_copy(dw_padded_bias, dw_bias, jcp.oc_without_padding);
+        utils::array_set(dw_padded_bias + jcp.oc_without_padding, 0.f,
+                         jcp.oc - jcp.oc_without_padding);
+        dw_bias = dw_padded_bias;
+    }
+
+    const int ithr = 0, nthr = 1;
+    {
         // TODO (Roma): remove this restriction
         assert(jcp.stride_w == 1 && jcp.stride_h == 1);
 
         auto compute_block_1x1 = [&](float* ws_p, int n, int g, int oh, int ow, int ih, int iw, int os, int os_block, int bcast_step, int ocb, int load_step,
-                                    int num_rows) {
+                                     int num_rows) {
             auto rp = rtus_driver_t<avx2>::call_params_t();
             auto p = jit_1x1_conv_call_s();
 
@@ -336,23 +351,7 @@ void jit_avx2_1x1_convolution_fwd_t::execute_forward_with_dw_conv() const {
 
             iwork += bcast_step;
         }
-    };
-
-    if (pd()->wants_padded_bias()) {
-        auto padded_bias = scratchpad().get<data_t>(key_conv_padded_bias);
-        utils::array_copy(padded_bias, bias, jcp.oc_without_padding);
-        utils::array_set(padded_bias + jcp.oc_without_padding, 0.f,
-                jcp.oc - jcp.oc_without_padding);
-        bias = padded_bias;
-
-        auto dw_padded_bias = scratchpad().get<data_t>(key_dw_conv_padded_bias);
-        utils::array_copy(dw_padded_bias, dw_bias, jcp.oc_without_padding);
-        utils::array_set(dw_padded_bias + jcp.oc_without_padding, 0.f,
-                         jcp.oc - jcp.oc_without_padding);
-        dw_bias = dw_padded_bias;
     }
-
-    parallel(0, (size_t)work_amount, ker);
 
     if (pd()->wants_zero_pad_dst())
         output_memory_primitive(0)->zero_pad();
