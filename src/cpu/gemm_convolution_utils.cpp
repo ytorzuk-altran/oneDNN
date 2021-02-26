@@ -2118,7 +2118,8 @@ status_t init_conf(conv_gemm_conf_t &jcp,
         }
     }
 
-    if (scratchpad.size() > scratchpad_limit) return status::unimplemented;
+    // [WA] Disabled condition to prevent fallback on ref convolution implementation
+//    if (scratchpad.size() > scratchpad_limit) return status::unimplemented;
     return status::success;
 }
 
