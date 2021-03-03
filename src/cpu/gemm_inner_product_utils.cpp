@@ -270,7 +270,6 @@ void jit_pp_kernel_t<isa, acc_type, dst_type>::generate()
                     uni_vmovups(vreg_scale, scale_addr);
             }
         }
-
         auto vreg_dst_ = vreg_dst(idx);
         if (utils::one_of(isa, avx512_core_bf16, avx512_common)) {
             if (apply_mask)
@@ -283,6 +282,7 @@ void jit_pp_kernel_t<isa, acc_type, dst_type>::generate()
         } else {
             if (apply_mask) {
                 if (isa != sse42) {
+                    return;
                     uni_vblendvps(vreg_dst_, vreg_zero, acc_addr, vreg_mask);
                 } else {
                     uni_vmovups(vreg_dst_, acc_addr);
@@ -301,7 +301,6 @@ void jit_pp_kernel_t<isa, acc_type, dst_type>::generate()
                 }
             }
         }
-
         if (do_bias_) {
             auto bias_addr = ptr[reg_bias + offset * bias_data_type_size_];
             auto vreg_bias_ = vreg_bias(idx);
