@@ -59,6 +59,7 @@ struct jit_uni_dw_conv_row_f32: public jit_generator {
     static bool post_ops_ok(jit_conv_conf_t &jcp,
                             const primitive_attr_t &attr);
     static status_t init_conf(jit_1x1_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw, const primitive_attr_t &attr);
+    static status_t init_conf(jit_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw, const primitive_attr_t &attr);
 
     jit_conv_conf_t jcp;
     const primitive_attr_t &attr_;

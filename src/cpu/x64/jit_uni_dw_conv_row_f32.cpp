@@ -663,6 +663,54 @@ status_t jit_uni_dw_conv_row_f32<isa>::init_conf(jit_1x1_conv_conf_t &jcp, jit_c
     return status::success;
 }
 
+template <cpu_isa_t isa>
+status_t jit_uni_dw_conv_row_f32<isa>::init_conf(jit_conv_conf_t &jcp, jit_conv_conf_t &jcp_dw,
+                                                 const primitive_attr_t &attr) {
+    if (!mayiuse(isa)) return status::unimplemented;
+    const int simd_w = isa == avx512_common ? 16 : 8;
+
+    const auto &p = attr.post_ops_;
+
+    int dw_conv_ind = p.find(primitive_kind::convolution);
+    jcp_dw.with_sum = p.find(primitive_kind::sum, dw_conv_ind) != -1;
+
+    jcp_dw.ch_block = simd_w;
+    jcp_dw.with_bias = true;
+
+    jcp_dw.kh = p.entry_[dw_conv_ind].depthwise_conv_old.ker_h;
+    jcp_dw.kw = p.entry_[dw_conv_ind].depthwise_conv_old.ker_w;
+    jcp_dw.ic = jcp.oc;
+    jcp_dw.oc = jcp.oc;
+    jcp_dw.ih = p.entry_[dw_conv_ind].depthwise_conv_old.in_h;
+    jcp_dw.iw = p.entry_[dw_conv_ind].depthwise_conv_old.in_w;
+    jcp_dw.oh = jcp.dw_conv_oh;
+    jcp_dw.ow = jcp.dw_conv_ow;
+    jcp_dw.stride_h = p.entry_[dw_conv_ind].depthwise_conv_old.str_h;
+    jcp_dw.stride_w = p.entry_[dw_conv_ind].depthwise_conv_old.str_w;
+    jcp_dw.conv_weights = p.entry_[dw_conv_ind].depthwise_conv_old.weights_data;
+    jcp_dw.conv_biases = p.entry_[dw_conv_ind].depthwise_conv_old.biases_data;
+
+    if (jcp_dw.kh != 3 || jcp_dw.kw != 3)
+        return status::unimplemented;
+
+    if (!post_ops_ok(jcp_dw, attr))
+        return status::unimplemented;
+
+    jcp_dw.ur_w = 4;
+
+    jcp_dw.src_dt = jcp.dst_dt;
+    jcp_dw.dst_dt = jcp.dw_conv_dst_dt;
+    jcp_dw.bia_dt = jcp.bia_dt == dnnl_data_type_undef ? dnnl_f32 : jcp.bia_dt;
+    jcp_dw.typesize_in = (int)types::data_type_size(jcp_dw.src_dt);
+    jcp_dw.typesize_bia = (int)types::data_type_size(jcp_dw.bia_dt);
+    jcp_dw.typesize_out = (int)types::data_type_size(jcp_dw.dst_dt);
+
+    if (jcp_dw.src_dt != dnnl_f32 && jcp_dw.src_dt != dnnl_u8)
+        return status::unimplemented;
+
+    return status::success;
+}
+
 template struct jit_uni_dw_conv_row_f32<avx512_common>;
 template struct jit_uni_dw_conv_row_f32<avx2>;
 template struct jit_uni_dw_conv_row_f32<sse41>;

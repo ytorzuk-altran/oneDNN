@@ -106,6 +106,7 @@ struct jit_conv_conf_t {
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
+    bool with_dw_conv;
     bool is_fused_conv;
     int dw_conv_buffer_oc;
 
