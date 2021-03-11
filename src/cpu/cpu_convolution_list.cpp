@@ -109,7 +109,7 @@ const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
         CPU_INSTANCE_X64(jit_sse41_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_sse41_fork_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_sse41_1x1_convolution_fwd_t)
-        CPU_INSTANCE_X64(jit_avx2_convolution_with_dw_conv_fwd_t)
+//        CPU_INSTANCE_X64(jit_avx2_convolution_with_dw_conv_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_sse41_convolution_fwd_t)
 #ifdef ENABLE_UNUSED_PRIM
@@ -117,7 +117,7 @@ const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
 #endif
         CPU_INSTANCE(gemm_convolution_fwd_t)
         CPU_INSTANCE(ref_convolution_fwd_t, f32)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, bf16, bf16, f32}, {

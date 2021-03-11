@@ -553,6 +553,7 @@ status_t jit_avx2_1x1_conv_kernel_f32_old::init_conf(jit_1x1_conv_conf_t &jcp,
     const auto dat_tag_nxc = utils::pick(ndims - 3, nwc, nhwc, ndhwc);
     const auto dat_tag_nCx8c = utils::pick(ndims - 3, nCw8c, nChw8c, nCdhw8c);
     jcp.src_tag = src_d.mb_stride_relaxed_match(dat_tag_nxc, dat_tag_nCx8c);
+//    jcp.src_tag = dat_tag_nCx8c;
     jcp.with_bias = cd.bias_desc.format_kind != format_kind::undef;
 
     jcp.src_dt = cd.src_desc.data_type;

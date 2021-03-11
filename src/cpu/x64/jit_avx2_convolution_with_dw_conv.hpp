@@ -42,7 +42,7 @@ struct jit_avx2_convolution_with_dw_conv_fwd_t : public primitive_t {
                 : cpu_convolution_fwd_pd_t(adesc, attr, hint_fwd_pd), jcp_(), jcp_dw_() {}
 
         DECLARE_COMMON_PD_T(
-                JIT_IMPL_NAME_HELPER("jit:", avx2, ""),
+                JIT_IMPL_NAME_HELPER("jit_with_dw_conv:", avx2, ""),
                 jit_avx2_convolution_with_dw_conv_fwd_t);
 
         status_t init(engine_t *engine) {
