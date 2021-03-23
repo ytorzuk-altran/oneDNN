@@ -41,6 +41,10 @@ const impl_list_map_t regular_u8_impl_list_map {
         REG_SR_BIDIR(u8, any, bf16, nChw16c),
         REG_SR_BIDIR(u8, any, s8, nChw16c),
         REG_SR_BIDIR(u8, any, u8, nChw16c),
+        REG_SR_BIDIR(u8, any, f32, nChw8c),
+        REG_SR_BIDIR(u8, any, s32, nChw8c),
+        REG_SR_BIDIR(u8, any, s8, nChw8c),
+        REG_SR_BIDIR(u8, any, u8, nChw8c),
 
         REG_SR(u8, any, f32, any, fmt_order::any, spec::reference),
         REG_SR(u8, any, s32, any, fmt_order::any, spec::reference),
