@@ -45,6 +45,10 @@ const impl_list_map_t regular_s8_impl_list_map {
         REG_SR_BIDIR(s8, any, bf16, nChw16c),
         REG_SR_BIDIR(s8, any, s8, nChw16c),
         REG_SR_BIDIR(s8, any, u8, nChw16c),
+        REG_SR_BIDIR(s8, any, f32, nChw8c),
+        REG_SR_BIDIR(s8, any, s32, nChw8c),
+        REG_SR_BIDIR(s8, any, s8, nChw8c),
+        REG_SR_BIDIR(s8, any, u8, nChw8c),
 
         REG_SR_BIDIR(s8, any, f32, OIhw4i16o4i),
         REG_SR_BIDIR(s8, any, bf16, OIhw4i16o4i),
