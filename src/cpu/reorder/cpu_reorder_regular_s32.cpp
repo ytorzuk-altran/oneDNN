@@ -37,6 +37,10 @@ const impl_list_map_t regular_s32_impl_list_map {
         REG_SR_BIDIR(s32, any, s32, nChw16c),
         REG_SR_BIDIR(s32, any, s8, nChw16c),
         REG_SR_BIDIR(s32, any, u8, nChw16c),
+        REG_SR_BIDIR(s32, any, f32, nChw8c),
+        REG_SR_BIDIR(s32, any, s32, nChw8c),
+        REG_SR_BIDIR(s32, any, s8, nChw8c),
+        REG_SR_BIDIR(s32, any, u8, nChw8c),
 
         REG_SR(s32, any, f32, any, fmt_order::any, spec::reference),
         REG_SR(s32, any, s32, any, fmt_order::any, spec::reference),

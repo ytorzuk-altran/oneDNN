@@ -35,6 +35,7 @@ const impl_list_map_t regular_f32_s8_impl_list_map {
         DNNL_AARCH64_ONLY(aarch64::jit_uni_reorder_create,)
 
         REG_SR_BIDIR(f32, any, s8, nChw16c),
+        REG_SR_BIDIR(f32, any, s8, nChw8c),
         REG_SR_BIDIR(f32, any, s8, OIhw4i16o4i),
         REG_SR_BIDIR(f32, any, s8, gOIhw4i16o4i),
 
