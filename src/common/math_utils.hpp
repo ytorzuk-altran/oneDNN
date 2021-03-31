@@ -260,7 +260,11 @@ inline U logsigmoid_bwd(T dd, T s) {
 
 template <typename T, typename U = typename utils::remove_reference<T>::type>
 inline U mish_fwd(T s) {
-    return s * tanh_fwd(soft_relu_fwd(s));
+    float threshold = 20.f;
+    float in = (float)s;
+    float v = ::expf(in) * (::expf(in) + 2.f);
+    float result = (in * v) / (v + 2.f);
+    return in < threshold ? (U)(result) : (U)(in);
 }
 template <typename T, typename U = typename utils::remove_reference<T>::type>
 inline U mish_bwd(T dd, T s) {
