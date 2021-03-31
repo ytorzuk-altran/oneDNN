@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2019-2020 Intel Corporation
+* Copyright 2019-2021 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -86,6 +86,7 @@ static status_t conv_descr_create(
 }
 
 struct ref_deconvolution_fwd_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     struct pd_t : public gpu_deconvolution_fwd_pd_t {
         pd_t(const deconvolution_desc_t *adesc, const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
@@ -104,12 +105,10 @@ struct ref_deconvolution_fwd_t : public gpu_primitive_t {
             CHECK(conv_descr_create(desc(), &cd));
             primitive_attr_t conv_attr(*attr());
             if (!conv_attr.is_initialized()) return status::out_of_memory;
-            conv_attr.set_scratchpad_mode(scratchpad_mode::user);
             dnnl_primitive_desc_iterator it(
                     engine, (op_desc_t *)&cd, &conv_attr, nullptr);
             if (!it.is_initialized()) return status::out_of_memory;
-            ++it;
-            conv_pd_.reset(it.fetch_once());
+            conv_pd_ = *(++it);
             return status::success;
         }
 
@@ -161,7 +160,7 @@ struct ref_deconvolution_fwd_t : public gpu_primitive_t {
             return status::unimplemented;
         }
 
-        std::unique_ptr<primitive_desc_t> conv_pd_;
+        std::shared_ptr<primitive_desc_t> conv_pd_;
 
     private:
         void init_scratchpad() {
@@ -170,8 +169,6 @@ struct ref_deconvolution_fwd_t : public gpu_primitive_t {
                     conv_pd_->scratchpad_registry());
         }
     };
-
-    ref_deconvolution_fwd_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         status_t conv_status
@@ -215,6 +212,7 @@ private:
 };
 
 struct ref_deconvolution_bwd_data_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     struct pd_t : public gpu_deconvolution_bwd_data_pd_t {
         pd_t(const deconvolution_desc_t *adesc, const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
@@ -234,12 +232,10 @@ struct ref_deconvolution_bwd_data_t : public gpu_primitive_t {
             CHECK(conv_descr_create(desc(), &cd));
             primitive_attr_t conv_attr(*attr());
             if (!conv_attr.is_initialized()) return status::out_of_memory;
-            conv_attr.set_scratchpad_mode(scratchpad_mode::user);
             dnnl_primitive_desc_iterator it(
                     engine, (op_desc_t *)&cd, &conv_attr, nullptr);
             if (!it.is_initialized()) return status::out_of_memory;
-            ++it;
-            conv_pd_.reset(it.fetch_once());
+            conv_pd_ = *(++it);
             return status::success;
         }
 
@@ -274,7 +270,7 @@ struct ref_deconvolution_bwd_data_t : public gpu_primitive_t {
             return status::unimplemented;
         }
 
-        std::unique_ptr<primitive_desc_t> conv_pd_;
+        std::shared_ptr<primitive_desc_t> conv_pd_;
 
     private:
         void init_scratchpad() {
@@ -283,8 +279,6 @@ struct ref_deconvolution_bwd_data_t : public gpu_primitive_t {
                     conv_pd_->scratchpad_registry());
         }
     };
-
-    ref_deconvolution_bwd_data_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         status_t conv_status
@@ -320,6 +314,7 @@ private:
 };
 
 struct ref_deconvolution_bwd_weights_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     struct pd_t : public gpu_deconvolution_bwd_weights_pd_t {
         pd_t(const deconvolution_desc_t *adesc, const primitive_attr_t *attr,
                 const deconvolution_fwd_pd_t *hint_fwd_pd)
@@ -338,12 +333,10 @@ struct ref_deconvolution_bwd_weights_t : public gpu_primitive_t {
             CHECK(conv_descr_create(desc(), &cd));
             primitive_attr_t conv_attr(*attr());
             if (!conv_attr.is_initialized()) return status::out_of_memory;
-            conv_attr.set_scratchpad_mode(scratchpad_mode::user);
             dnnl_primitive_desc_iterator it(
                     engine, (op_desc_t *)&cd, &conv_attr, nullptr);
             if (!it.is_initialized()) return status::out_of_memory;
-            ++it;
-            conv_pd_.reset(it.fetch_once());
+            conv_pd_ = *(++it);
             return status::success;
         }
 
@@ -381,7 +374,7 @@ struct ref_deconvolution_bwd_weights_t : public gpu_primitive_t {
             return status::unimplemented;
         }
 
-        std::unique_ptr<primitive_desc_t> conv_pd_;
+        std::shared_ptr<primitive_desc_t> conv_pd_;
 
     private:
         void init_scratchpad() {
@@ -390,8 +383,6 @@ struct ref_deconvolution_bwd_weights_t : public gpu_primitive_t {
                     conv_pd_->scratchpad_registry());
         }
     };
-
-    ref_deconvolution_bwd_weights_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         // Creating convolution primitve

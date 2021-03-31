@@ -79,16 +79,17 @@ public:
             desc.primitive_kind = primitive_kind::zero_pad;
             dnnl_primitive_desc_iterator it(
                     this, (op_desc_t *)&desc, nullptr, nullptr);
-            ++it;
-            std::unique_ptr<primitive_desc_t> zero_pad_pd(it.fetch_once());
+            std::shared_ptr<primitive_desc_t> zero_pad_pd(*(++it));
             if (zero_pad_pd == nullptr) return;
 
             status_t status
                     = zero_pad_pd->create_primitive(zero_pad_primitive_, this);
+#ifndef DNNL_USE_RT_OBJECTS_IN_PRIMITIVE_CACHE
             if (status == status::success) {
                 status = zero_pad_primitive_->create_resource(
                         this, zero_pad_resources_);
             }
+#endif
             if (status != status::success) { zero_pad_primitive_.reset(); }
         });
 
@@ -139,6 +140,10 @@ public:
 
 protected:
     virtual status_t init_device_info() = 0;
+
+#ifdef DNNL_USE_RT_OBJECTS_IN_PRIMITIVE_CACHE
+    ~compute_engine_t() override = default;
+#endif
 
     std::shared_ptr<device_info_t> device_info_;
 

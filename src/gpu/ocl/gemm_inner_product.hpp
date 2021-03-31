@@ -37,6 +37,7 @@ namespace gpu {
 namespace ocl {
 
 struct gemm_inner_product_fwd_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     struct pd_t : public gpu_inner_product_fwd_pd_t {
         pd_t(const inner_product_desc_t *adesc, const primitive_attr_t *attr,
                 const inner_product_fwd_pd_t *hint_fwd_pd)
@@ -87,7 +88,7 @@ struct gemm_inner_product_fwd_t : public gpu_primitive_t {
         }
 
         attr_info_t attr_info_ = {};
-        std::unique_ptr<primitive_desc_t> gemm_pd_;
+        std::shared_ptr<primitive_desc_t> gemm_pd_;
 
     private:
         void init_scratchpad() {
@@ -96,8 +97,6 @@ struct gemm_inner_product_fwd_t : public gpu_primitive_t {
                     gemm_pd_->scratchpad_registry());
         }
     };
-
-    gemm_inner_product_fwd_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         status_t gemm_status = pd()->gemm_pd_->create_primitive(gemm_, engine);
@@ -123,6 +122,7 @@ private:
 };
 
 struct gemm_inner_product_bwd_data_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     struct pd_t : public gpu_inner_product_bwd_data_pd_t {
         pd_t(const inner_product_desc_t *adesc, const primitive_attr_t *attr,
                 const inner_product_fwd_pd_t *hint_fwd_pd)
@@ -168,7 +168,7 @@ struct gemm_inner_product_bwd_data_t : public gpu_primitive_t {
             return status::success;
         }
 
-        std::unique_ptr<primitive_desc_t> gemm_pd_;
+        std::shared_ptr<primitive_desc_t> gemm_pd_;
 
     private:
         void init_scratchpad() {
@@ -177,8 +177,6 @@ struct gemm_inner_product_bwd_data_t : public gpu_primitive_t {
                     gemm_pd_->scratchpad_registry());
         }
     };
-
-    gemm_inner_product_bwd_data_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         status_t gemm_status = pd()->gemm_pd_->create_primitive(gemm_, engine);
@@ -203,6 +201,7 @@ private:
 };
 
 struct gemm_inner_product_bwd_weights_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     using gpu_ip_bwd_weights_pd_t = gpu_inner_product_bwd_weights_pd_t;
     struct pd_t : public gpu_ip_bwd_weights_pd_t {
         pd_t(const inner_product_desc_t *adesc, const primitive_attr_t *attr,
@@ -261,7 +260,7 @@ struct gemm_inner_product_bwd_weights_t : public gpu_primitive_t {
             return wmd.format_desc.blocking.strides[0] == 1;
         }
 
-        std::unique_ptr<primitive_desc_t> gemm_pd_;
+        std::shared_ptr<primitive_desc_t> gemm_pd_;
 
     private:
         void init_scratchpad() {
@@ -270,8 +269,6 @@ struct gemm_inner_product_bwd_weights_t : public gpu_primitive_t {
                     gemm_pd_->scratchpad_registry());
         }
     };
-
-    gemm_inner_product_bwd_weights_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         status_t gemm_status = pd()->gemm_pd_->create_primitive(gemm_, engine);

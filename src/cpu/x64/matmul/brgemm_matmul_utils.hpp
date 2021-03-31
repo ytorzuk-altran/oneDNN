@@ -49,9 +49,16 @@ struct brgemm_matmul_conf_t {
     bool with_scales;
     bool signed_input;
     bool is_oscale_per_n;
+    brgemm_broadcast_t src_zp_type;
+    brgemm_broadcast_t wei_zp_type;
+    brgemm_broadcast_t dst_zp_type;
+
     bool use_buffer_b;
     bool use_buffer_a;
     bool use_buffer_a_tail_only;
+
+    bool is_A_broadcast;
+    bool is_B_broadcast;
 
     data_type_t src_dt;
     data_type_t dst_dt;

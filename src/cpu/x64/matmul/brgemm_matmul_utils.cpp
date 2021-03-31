@@ -48,6 +48,12 @@ bool post_ops_ok(brgemm_matmul_conf_t &bgmmc, const primitive_attr_t &attr,
                     broadcasting_strategy_t::scalar}));
 }
 
+brgemm_broadcast_t get_zp_type(const primitive_attr_t &attr, int arg) {
+    return attr.zero_points_.has_default_values(arg)
+            ? brgemm_broadcast_t::none
+            : brgemm_broadcast_t::per_tensor;
+}
+
 status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
         const matmul_desc_t &mmd, memory_desc_t &src_md,
         memory_desc_t &weights_md, memory_desc_t &dst_md,
@@ -68,6 +74,7 @@ status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
     bgmmc.with_bias = mmd.bias_desc.format_kind != format_kind::undef;
     bgmmc.bia_dt = bgmmc.with_bias ? mmd.bias_desc.data_type : data_type::undef;
     bgmmc.signed_input = isa == avx512_core_vnni && bgmmc.src_dt == s8;
+    bgmmc.ndims = dst_d.ndims();
 
     const bool is_int8 = one_of(bgmmc.src_dt, u8, s8) && bgmmc.wei_dt == s8
             && one_of(bgmmc.dst_dt, u8, s8, s32, f32);
@@ -80,10 +87,10 @@ status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
 
     if (bgmmc.with_scales) {
         const auto &oscales = attr.output_scales_;
-        bgmmc.is_oscale_per_n = oscales.mask_ == 1 << 1;
+        bgmmc.is_oscale_per_n = oscales.mask_ == 1 << (bgmmc.ndims - 1);
 
         // only common and per-oc-channel scales are supported
-        const bool oscales_ok = one_of(oscales.mask_, 0, 1 << 1);
+        const bool oscales_ok = oscales.mask_ == 0 || bgmmc.is_oscale_per_n;
         if (!oscales_ok) return status::unimplemented;
     }
 
@@ -96,15 +103,28 @@ status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
 
     if (!post_ops_ok(bgmmc, attr, dst_d)) return status::unimplemented;
 
+    bgmmc.src_zp_type = get_zp_type(attr, DNNL_ARG_SRC);
+    bgmmc.wei_zp_type = get_zp_type(attr, DNNL_ARG_WEIGHTS);
+    bgmmc.dst_zp_type = get_zp_type(attr, DNNL_ARG_DST);
+
     if (IMPLICATION(is_int8,
                 !one_of(isa, avx512_core_vnni, avx512_core_bf16_amx_int8)))
         return status::unimplemented;
     matmul_helper_t helper(src_d, weights_d, dst_d);
-    bgmmc.ndims = dst_d.ndims();
-
-    if (bgmmc.ndims > 3) return status::unimplemented;
 
     bgmmc.batch_ndims = bgmmc.ndims - 2;
+    if (bgmmc.batch_ndims == 1) {
+        // Support broadcast across a single batch dimension only
+        bgmmc.is_A_broadcast = src_d.dims()[0] == 1;
+        bgmmc.is_B_broadcast = weights_d.dims()[0] == 1;
+    } else {
+        for (int d = 0; d < (int)bgmmc.batch_ndims; d++) {
+            if (!everyone_is(
+                        src_d.dims()[d], weights_d.dims()[d], dst_d.dims()[d]))
+                return status::unimplemented;
+        }
+    }
+
     bgmmc.M = helper.M();
     bgmmc.N = helper.N();
     bgmmc.K = helper.K();
@@ -115,7 +135,9 @@ status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
     const int k_blk_gran = is_amx ? 64 : 4;
 
     auto set_or_check_tags = [&]() -> status_t {
-        format_tag_t desired_src_tag = pick(bgmmc.ndims - 2, ab, abc);
+        format_tag_t desired_src_tag = pick(bgmmc.batch_ndims, ab, abc, abcd,
+                abcde, abcdef, abcdefg, abcdefgh, abcdefghi, abcdefghij,
+                abcdefghijk, abcdefghijkl);
         format_tag_t desired_dst_tag = desired_src_tag;
 
         if (src_d.format_kind() == format_kind::any) {
@@ -139,7 +161,9 @@ status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
             CHECK(memory_desc_init_by_tag(weights_md, desired_wei_tag));
             bgmmc.wei_tag = desired_wei_tag;
         } else {
-            format_tag_t transposed_wei_tag = pick(bgmmc.ndims - 2, ba, acb);
+            format_tag_t transposed_wei_tag = pick(bgmmc.batch_ndims, ba, acb,
+                    abdc, abced, abcdfe, abcdegf, abcdefhg, abcdefgih,
+                    abcdefghji, abcdefghikj, abcdefghijlk);
             bgmmc.wei_tag = memory_desc_matches_one_of_tag(
                     weights_md, desired_wei_tag, transposed_wei_tag);
         }
@@ -222,7 +246,8 @@ status_t init_brgemm_matmul_conf(cpu_isa_t isa, brgemm_matmul_conf_t &bgmmc,
     };
 
     const auto L2_treshold = 3 * platform::get_per_core_cache_size(2) / 4;
-    const bool is_copy_a_required = bgmmc.K % k_gran != 0;
+    const bool is_copy_a_required = bgmmc.K % k_gran != 0
+            || bgmmc.wei_zp_type != brgemm_broadcast_t::none;
     bgmmc.use_buffer_a = is_copy_a_required;
     // Supported computation with copy only part of A related to K_tail if
     // is_copy_a_required == true, but the current performance measurements
@@ -305,6 +330,21 @@ void init_scratchpad(memory_tracking::registrar_t &scratchpad,
         size_t nelements = (size_t)bgmmc.nthr * bgmmc.LDC * bgmmc.M_blk
                 * bgmmc.M_chunk_size * bgmmc.N_chunk_size;
         scratchpad.book(key_brgemm_primitive_buffer, nelements,
+                types::data_type_size(bgmmc.acc_dt));
+    }
+
+    if (bgmmc.src_zp_type != brgemm_broadcast_t::none) {
+        size_t nelements_comp
+                = (size_t)bgmmc.nthr * bgmmc.wei_n_blk * bgmmc.N_chunk_size;
+        scratchpad.book(key_brgemm_primitive_zp_comp_a, nelements_comp,
+                types::data_type_size(bgmmc.acc_dt));
+    }
+
+    if (bgmmc.wei_zp_type != brgemm_broadcast_t::none) {
+        const int s32_elems_in_cacheline = 16;
+        size_t nelements_comp = (size_t)bgmmc.nthr * bgmmc.M_blk
+                * bgmmc.M_chunk_size * (1 + s32_elems_in_cacheline);
+        scratchpad.book(key_brgemm_primitive_zp_comp_b, nelements_comp,
                 types::data_type_size(bgmmc.acc_dt));
     }
 

@@ -73,9 +73,7 @@ struct ip_convolution_fwd_t : public primitive_t {
             : cpu_convolution_fwd_pd_t(adesc, attr, hint_fwd_pd) {}
 
         pd_t(const pd_t &other)
-            : cpu_convolution_fwd_pd_t(other)
-            , ip_pd_(other.ip_pd_->clone())
-            , conv_supports_bias_(other.conv_supports_bias_) {}
+            : cpu_convolution_fwd_pd_t(other), ip_pd_(other.ip_pd_->clone()) {}
 
         ~pd_t() = default;
 
@@ -89,7 +87,7 @@ struct ip_convolution_fwd_t : public primitive_t {
             if (!it.is_initialized()) return status::out_of_memory;
 
             while (++it != it.end()) {
-                ip_pd_.reset(it.fetch_once());
+                ip_pd_ = *it;
                 const bool ok = ip_pd_->weights_md()->extra.flags == 0;
                 if (ok) return status::success;
             }
@@ -114,14 +112,6 @@ struct ip_convolution_fwd_t : public primitive_t {
                     && utils::everyone_is(1, KSD(), KSH(), KSW());
             if (!is_ip_applicable) return status::unimplemented;
 
-            // Check that nspc is default layout (ie data type is int8).
-            // TODO: Add support for bf16 on avx512_core and higher.
-            const bool is_nspc_default = false
-                    || (weights_md_.data_type == data_type::f32
-                            && mayiuse(avx512_core))
-                    || weights_md_.data_type == data_type::s8;
-            if (!is_nspc_default) return status::unimplemented;
-
             // Simple heuristic to only target arches and shapes that benefit.
             // TODO: Extend to other arches and shapes as performance allows.
             const dim_t ks = KD() * KH() * KW();
@@ -133,9 +123,21 @@ struct ip_convolution_fwd_t : public primitive_t {
             const bool ok = is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
                     && attr()->has_default_values(
-                            smask_t::oscale | smask_t::post_ops)
-                    && set_and_check_formats() == status::success;
+                            smask_t::oscale | smask_t::post_ops);
             if (!ok) return status::unimplemented;
+
+            // Check that nspc is the default layout for convolutions.
+            // Otherwise, do not set formats in case of `format_kind::any`.
+            // Currently this means:
+            //  - int8 with any forward prop_kind on any isa
+            //  - fp32/bf16 with `forward_inference` on avx512_core and higher
+            const bool set_any_to_nspc = false
+                    || (utils::one_of(weights_md_.data_type, data_type::f32,
+                                data_type::bf16)
+                            && desc()->prop_kind == prop_kind::forward_inference
+                            && mayiuse(avx512_core))
+                    || weights_md_.data_type == data_type::s8;
+            CHECK(set_and_or_check_formats(set_any_to_nspc));
 
             CHECK(init_ip(engine));
 
@@ -148,8 +150,7 @@ struct ip_convolution_fwd_t : public primitive_t {
             return status::success;
         }
 
-        std::unique_ptr<primitive_desc_t> ip_pd_;
-        bool conv_supports_bias_ = false;
+        std::shared_ptr<primitive_desc_t> ip_pd_;
 
     private:
         std::string name_ = "ip:";
@@ -185,7 +186,7 @@ struct ip_convolution_fwd_t : public primitive_t {
             return status::success;
         }
 
-        status_t set_and_check_formats() {
+        status_t set_and_or_check_formats(bool is_set_allowed) {
             using namespace format_tag;
             // NOTE: Only plain layouts should be supported since the dims of
             // dst_md_ must be reshaped from {N, C, H, W} to {N, C}. If the
@@ -193,19 +194,21 @@ struct ip_convolution_fwd_t : public primitive_t {
             // be blocked by channel (eg nChw16c -> nC16c). This can lead to
             // deployment of reference ip as well as strange weights layouts.
             auto atag = utils::pick(ndims() - 3, nwc, nhwc, ndhwc);
-            if (src_md_.format_kind == format_kind::any)
+            if (is_set_allowed && src_md_.format_kind == format_kind::any)
                 CHECK(memory_desc_init_by_tag(src_md_, atag));
             else
                 CHECK(check_tag(src_md_, atag));
-            if (dst_md_.format_kind == format_kind::any)
+            if (is_set_allowed && dst_md_.format_kind == format_kind::any)
                 CHECK(memory_desc_init_by_tag(dst_md_, atag));
             else
                 CHECK(check_tag(dst_md_, atag));
-            auto btag = x;
-            if (bias_md_.format_kind == format_kind::any)
-                CHECK(memory_desc_init_by_tag(bias_md_, btag));
-            else
-                CHECK(check_tag(bias_md_, btag));
+            if (bias_md_.format_kind != format_kind::undef) {
+                auto btag = x;
+                if (bias_md_.format_kind == format_kind::any)
+                    CHECK(memory_desc_init_by_tag(bias_md_, btag));
+                else
+                    CHECK(check_tag(bias_md_, btag));
+            }
             return status::success;
         }
     };

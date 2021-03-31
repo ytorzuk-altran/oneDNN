@@ -31,6 +31,7 @@
 #include "cpu/x64/jit_brgemm_inner_product_utils.hpp"
 #include "cpu/x64/jit_brgemm_post_ops.hpp"
 #include "cpu/x64/jit_brgemm_transpose_utils.hpp"
+#include "cpu/x64/jit_transpose_utils.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -217,10 +218,12 @@ struct brgemm_inner_product_bwd_data_t : public primitive_t {
 
             bool ok = true && desc()->prop_kind == prop_kind::backward_data
                     && !has_zero_dim_memory() && mayiuse(isa)
-                    && (diff_dst_dt == data_type::bf16
-                            && wei_dt == data_type::bf16
-                            && utils::one_of(diff_src_dt, data_type::bf16,
-                                    data_type::f32))
+                    && ((diff_dst_dt == data_type::bf16
+                                && wei_dt == data_type::bf16
+                                && utils::one_of(diff_src_dt, data_type::bf16,
+                                        data_type::f32))
+                            || utils::everyone_is(data_type::f32, diff_dst_dt,
+                                    wei_dt, diff_src_dt))
                     && attr()->has_default_values(
                             primitive_attr_t::skip_mask_t::post_ops);
             if (!ok) return status::unimplemented;
@@ -304,6 +307,13 @@ struct brgemm_inner_product_bwd_data_t : public primitive_t {
 
         if (jbgp.use_buffer_b)
             CHECK(create_brgemm_trans_wei(trans_B_kernel_, &pd()->jbgp_));
+
+        if (jbgp.nthr_oc_b > 1) {
+            CHECK(safe_ptr_assign(
+                    acc_ker_, new cpu_accumulator_1d_t<data_type::f32>()));
+            CHECK(acc_ker_->create_kernel());
+        }
+
         return status::success;
     }
 
@@ -318,6 +328,7 @@ private:
 
     std::unique_ptr<brgemm_kernel_t> brg_kernels_[max_num_brg_kernels_ip];
     std::unique_ptr<jit_brgemm_trans_wei_t> trans_B_kernel_;
+    std::unique_ptr<cpu_accumulator_1d_t<data_type::f32>> acc_ker_;
     char brg_kernel_palettes_[max_num_brg_kernels_ip][64];
 };
 
@@ -339,10 +350,12 @@ struct brgemm_inner_product_bwd_weights_t : public primitive_t {
 
             bool ok = true && desc()->prop_kind == prop_kind::backward_weights
                     && !has_zero_dim_memory() && mayiuse(isa)
-                    && (src_dt == data_type::bf16
-                            && diff_dst_type == data_type::bf16
-                            && utils::one_of(diff_wei_type, data_type::bf16,
-                                    data_type::f32))
+                    && ((src_dt == data_type::bf16
+                                && diff_dst_type == data_type::bf16
+                                && utils::one_of(diff_wei_type, data_type::bf16,
+                                        data_type::f32))
+                            || utils::everyone_is(data_type::f32, src_dt,
+                                    diff_dst_type, diff_wei_type))
                     && attr()->has_default_values(
                             primitive_attr_t::skip_mask_t::post_ops);
             if (!ok) return status::unimplemented;
@@ -369,6 +382,16 @@ struct brgemm_inner_product_bwd_weights_t : public primitive_t {
                 CHECK(brgemm_desc_init(&brg, isa, jbgp_.brg_type, jbgp_.src_dt,
                         jbgp_.dst_dt, false, false, brgemm_row_major, alpha,
                         vbeta, jbgp_.LDA, jbgp_.LDB, jbgp_.LDC, vM, vN, vK));
+                if (isa == avx512_core_bf16_amx_bf16) {
+                    brgemm_attr_t brgattr;
+                    brgattr.max_bs = jbgp_.gemm_batch_size;
+                    brgattr.wary_tail_read = false;
+                    brgattr.hint_expected_A_size = jbgp_.mb * jbgp_.ic;
+                    brgattr.hint_expected_B_size = jbgp_.mb * jbgp_.oc;
+                    brgattr.hint_expected_C_size = jbgp_.ic * jbgp_.oc;
+
+                    CHECK(brgemm_desc_set_attr(&brg, brgattr));
+                }
             }
 
             auto scratchpad = scratchpad_registry().registrar();
@@ -401,6 +424,9 @@ struct brgemm_inner_product_bwd_weights_t : public primitive_t {
             brgemm_kernel_t *ker = nullptr;
             CHECK(brgemm_kernel_create(&ker, pd()->brg_descs_[idx]));
             CHECK(safe_ptr_assign(brg_kernels_[idx], ker));
+            if (isa == avx512_core_bf16_amx_bf16)
+                CHECK(brgemm_init_tiles(
+                        pd()->brg_descs_[idx], &brg_kernel_palettes_[idx][0]));
 
             if (jbgp.with_bias && i_M == 0 && i_init == 0) {
                 kernels_db_[i_K][i_N] = nullptr;
@@ -429,6 +455,11 @@ struct brgemm_inner_product_bwd_weights_t : public primitive_t {
                     acc_ker_, new cpu_accumulator_1d_t<data_type::f32>()));
             CHECK(acc_ker_->create_kernel());
         }
+        CHECK(safe_ptr_assign(diff_wei_trans_kernel_,
+                new jit_diff_wei_trans_to_vnni_t((pd()->jbgp_).kd,
+                        (pd()->jbgp_).kh, (pd()->jbgp_).kw,
+                        (pd()->jbgp_).ic_block, (pd()->jbgp_).oc_block)));
+        CHECK(diff_wei_trans_kernel_->create_kernel());
 
         return status::success;
     }
@@ -446,6 +477,7 @@ private:
     std::unique_ptr<jit_brgemm_trans_to_vnni_t> trans_B_kernel_;
     std::unique_ptr<jit_brgemm_trans_to_vnni_t> trans_C_kernel_;
     std::unique_ptr<cpu_accumulator_1d_t<data_type::f32>> acc_ker_;
+    std::unique_ptr<jit_diff_wei_trans_to_vnni_t> diff_wei_trans_kernel_;
 
     void execute_backward_weights(const exec_ctx_t &ctx) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
@@ -456,6 +488,26 @@ private:
             int trans_batch, int current_m, int current_k) const;
     void transform_matrix_b_chunk(char *tr_diff_dst, const char *diff_dst,
             int trans_batch, int current_col_size, int current_row_size) const;
+
+    char brg_kernel_palettes_[max_num_brg_kernels_ip][64];
+    dim_t get_wei_offset(const memory_desc_wrapper &diff_weights_d, int ocb,
+            int icb, bool is_internal = false) const;
+    void store_in_vnni_format(const thread_info_t *ti) const;
+
+    inline bool is_bf16_out() const {
+        const memory_desc_wrapper diff_weights_d(pd()->diff_weights_md(0));
+        return diff_weights_d.data_type() == data_type::bf16;
+    }
+
+    inline bool store_amx_vnni_weights() const {
+        constexpr bool is_amx = (isa == avx512_core_bf16_amx_bf16);
+        return is_amx && is_bf16_out();
+    }
+
+    inline bool store_cpx_vnni_weights() const {
+        constexpr bool is_amx = (isa == avx512_core_bf16_amx_bf16);
+        return !is_amx && is_bf16_out();
+    }
 };
 
 } // namespace x64

@@ -30,10 +30,43 @@
 #include "oneapi/dnnl/dnnl_sycl.hpp"
 #endif
 
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
+#include "oneapi/dnnl/dnnl_threadpool.h"
+#endif
+
+#ifndef DNNL_DISABLE_PRIMITIVE_CACHE
+#include "src/common/primitive_cache.hpp"
+#endif
+
 #include "dnnl_common.hpp"
 #include "dnnl_memory.hpp"
+#include "tests/test_thread.hpp"
 
 #include "cpu/platform.hpp"
+
+int check_pd_cache(dnnl_primitive_desc_t pd) {
+#ifndef DNNL_DISABLE_PRIMITIVE_CACHE
+    if (!dnnl::impl::is_pd_in_cache(pd)) {
+        BENCHDNN_PRINT(0, "error: %s\n",
+                "primitive descriptor is expected to be fetched from "
+                "the primitive cache");
+        return FAIL;
+    }
+#endif
+    return OK;
+}
+
+int check_primitive_cache(dnnl_primitive_t p) {
+#ifndef DNNL_DISABLE_PRIMITIVE_CACHE
+    if (!dnnl::impl::is_primitive_in_cache(p)) {
+        BENCHDNN_PRINT(0, "error: %s\n",
+                "primitive is expected to be fetched from the primitive "
+                "cache");
+        return FAIL;
+    }
+#endif
+    return OK;
+}
 
 float round_to_nearest_representable(dnnl_data_type_t dt, float value) {
     switch (dt) {
@@ -433,7 +466,10 @@ int init_md(dnnl_memory_desc_t *md, int ndims, const dnnl_dims_t dims,
             dnnl_dim_t fib = full_inner_blks[dim_idx];
             dnnl_dim_t padded_dim = (md->dims[dim_idx] + fib - 1) / fib * fib;
             md->padded_dims[dim_idx] = padded_dim;
-            stride *= (padded_dim / fib);
+            if (padded_dim == DNNL_RUNTIME_DIM_VAL)
+                stride = DNNL_RUNTIME_DIM_VAL;
+            else
+                stride *= (padded_dim / fib);
         } else {
             full_inner_blks[dim_idx] *= block;
             blk.inner_blks[blk.inner_nblks] = block;
@@ -662,4 +698,70 @@ sycl_memory_kind_ext_t str2sycl_memory_kind(const char *str) {
 
     assert(!"not expected");
     return sycl_memory_kind_ext_t::usm;
+}
+
+engine_t::engine_t(dnnl_engine_kind_t engine_kind) : is_owner_(true) {
+    size_t idx = engine_kind == dnnl_cpu ? 0 : engine_index;
+    DNN_SAFE_V(dnnl_engine_create(&engine_, engine_kind, idx));
+}
+
+engine_t::engine_t(dnnl_engine_t engine) : engine_(engine), is_owner_(false) {}
+
+engine_t::engine_t(const engine_t &other) {
+    is_owner_ = other.is_owner_;
+
+    if (!is_owner_) {
+        engine_ = other.engine_;
+        return;
+    }
+
+    dnnl_engine_kind_t engine_kind;
+    DNN_SAFE_V(dnnl_engine_get_kind(other.engine_, &engine_kind));
+
+    if (engine_kind == dnnl_cpu) {
+#if DNNL_CPU_RUNTIME == DNNL_RUNTIME_SYCL
+        void *dev;
+        void *ctx;
+        DNN_SAFE_V(dnnl_sycl_interop_engine_get_device(other.engine_, &dev));
+        DNN_SAFE_V(dnnl_sycl_interop_engine_get_context(other.engine_, &ctx));
+        DNN_SAFE_V(dnnl_sycl_interop_engine_create(&engine_, dev, ctx));
+#else
+        DNN_SAFE_V(dnnl_engine_create(&engine_, dnnl_cpu, 0));
+#endif
+    }
+
+    if (engine_kind == dnnl_gpu) {
+#if DNNL_GPU_RUNTIME == DNNL_RUNTIME_OCL
+        cl_device_id dev;
+        cl_context ctx;
+        DNN_SAFE_V(dnnl_ocl_interop_get_device(other.engine_, &dev));
+        DNN_SAFE_V(dnnl_ocl_interop_engine_get_context(other.engine_, &ctx));
+        DNN_SAFE_V(dnnl_ocl_interop_engine_create(&engine_, dev, ctx));
+#elif DNNL_GPU_RUNTIME == DNNL_RUNTIME_SYCL
+        void *dev;
+        void *ctx;
+        DNN_SAFE_V(dnnl_sycl_interop_engine_get_device(other.engine_, &dev));
+        DNN_SAFE_V(dnnl_sycl_interop_engine_get_context(other.engine_, &ctx));
+        DNN_SAFE_V(dnnl_sycl_interop_engine_create(&engine_, dev, ctx));
+#endif
+    }
+}
+
+engine_t::~engine_t() {
+    if (is_owner_) DNN_SAFE_V(dnnl_engine_destroy(engine_));
+}
+
+stream_t::stream_t(dnnl_engine_t engine) {
+#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
+    if (is_cpu(engine)) {
+        SAFE_V(dnnl_threadpool_interop_stream_create(
+                &stream_, engine, dnnl::testing::get_threadpool()));
+        return;
+    }
+#endif
+    DNN_SAFE_V(dnnl_stream_create(&stream_, engine, dnnl_stream_default_flags));
+}
+
+stream_t::~stream_t() {
+    DNN_SAFE_V(dnnl_stream_destroy(stream_));
 }

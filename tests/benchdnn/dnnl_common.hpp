@@ -28,6 +28,9 @@
 #include "src/common/float16.hpp"
 #include "src/common/nstl.hpp"
 
+int check_pd_cache(dnnl_primitive_desc_t pd);
+int check_primitive_cache(dnnl_primitive_t p);
+
 #include "common.hpp"
 #include "dnn_types.hpp"
 #include "dnnl_debug.hpp"
@@ -309,6 +312,29 @@ benchdnn_dnnl_wrapper_t<T> make_benchdnn_dnnl_wrapper(T t) {
     return benchdnn_dnnl_wrapper_t<T>(t);
 }
 
+struct engine_t {
+    engine_t(dnnl_engine_kind_t engine_kind);
+    engine_t(dnnl_engine_t engine);
+    engine_t(const engine_t &other);
+    ~engine_t();
+    operator dnnl_engine_t() const { return engine_; }
+
+private:
+    engine_t &operator=(engine_t &other) = delete;
+    dnnl_engine_t engine_;
+    bool is_owner_;
+};
+
+struct stream_t {
+    stream_t(dnnl_engine_t engine);
+    ~stream_t();
+    operator dnnl_stream_t() const { return stream_; }
+
+private:
+    BENCHDNN_DISALLOW_COPY_AND_ASSIGN(stream_t);
+    dnnl_stream_t stream_;
+};
+
 // Engine used to run oneDNN primitives for testing.
 inline const engine_t &get_test_engine() {
     static const engine_t instance(engine_tgt_kind);
@@ -331,6 +357,16 @@ int init_prim(benchdnn_dnnl_wrapper_t<dnnl_primitive_t> &user_prim,
     dnnl_primitive_t prim_ {};
 
 #ifndef DNNL_DISABLE_PRIMITIVE_CACHE
+
+    // The first primitive creation using a temporary engine.
+#ifdef DNNL_USE_RT_OBJECTS_IN_PRIMITIVE_CACHE
+    // The idea is to create the requested primitive twice using different
+    // engines but the same device and context in the case of OpenCL and DPCPP.
+    // Rationale: make sure that the primitive cache is robust in the case
+    // where CPU and GPU engines are re-created because this is a commonly
+    // used scenario in the frameworks.
+    engine_t engine(get_test_engine());
+#else
     // The idea is to create the requested primitive twice using
     // different engines.
     // Rationale:
@@ -342,9 +378,9 @@ int init_prim(benchdnn_dnnl_wrapper_t<dnnl_primitive_t> &user_prim,
     // implementations, e.g. if a primitive implementation contains
     // a memory_storage_t (for scales, zero points or buffers), which depends
     // on a particular engine then it should fail at execution time.
-
-    // The first primitive creation using a temporary engine.
     engine_t engine(engine_tgt_kind);
+#endif
+
     SAFE(init_pd_func(engine, prb, pd, res, dir, hint), WARN);
     auto pd1 = make_benchdnn_dnnl_wrapper(pd);
     if (res->state == SKIPPED || res->state == UNIMPLEMENTED) return OK;
@@ -357,12 +393,17 @@ int init_prim(benchdnn_dnnl_wrapper_t<dnnl_primitive_t> &user_prim,
     SAFE(init_pd_func(get_test_engine(), prb, pd, res, dir, hint), WARN);
     auto pd2 = make_benchdnn_dnnl_wrapper(pd);
     if (res->state == SKIPPED || res->state == UNIMPLEMENTED) return OK;
+    int check_pd_cache_status = check_pd_cache(pd2);
 
     // Collect memory footprint for a given primitive descriptor.
     SAFE(get_memory_footprint(pd, res), WARN);
 
     // This primitive is expected to come from the cache.
     DNN_SAFE(dnnl_primitive_create(&prim_, pd), WARN);
+    int check_primitive_cache_status = check_primitive_cache(prim_);
+
+    SAFE(check_pd_cache_status | check_primitive_cache_status, WARN);
+
     user_prim.reset(prim_);
 
     return OK;

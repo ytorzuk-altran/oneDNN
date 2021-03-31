@@ -39,29 +39,18 @@ namespace gpu {
 namespace ocl {
 
 struct gemm_post_ops_inner_product_fwd_t : public gpu_primitive_t {
+    using gpu_primitive_t::gpu_primitive_t;
     struct pd_t : public gpu_inner_product_fwd_pd_t {
         pd_t(const inner_product_desc_t *adesc, const primitive_attr_t *attr,
                 const inner_product_fwd_pd_t *hint_fwd_pd)
             : gpu_inner_product_fwd_pd_t(adesc, attr, hint_fwd_pd) {}
 
         pd_t(const pd_t &rhs) : gpu_inner_product_fwd_pd_t(rhs) {
-            gemm_pd_.reset(rhs.gemm_pd_->clone());
+            gemm_pd_ = rhs.gemm_pd_;
             ip_scratchpad_md_ = rhs.ip_scratchpad_md_;
             scales_md_ = rhs.scales_md_;
             attr_info_ = rhs.attr_info_;
             is_int8_ = rhs.is_int8_;
-        }
-
-        ~pd_t() = default;
-
-        pd_t &operator=(const pd_t &rhs) {
-            DNNL_SHORT_CIRCUIT_SELF_ASSIGN(rhs);
-            gemm_pd_.reset(rhs.gemm_pd_->clone());
-            ip_scratchpad_md_ = rhs.ip_scratchpad_md_;
-            scales_md_ = rhs.scales_md_;
-            attr_info_ = rhs.attr_info_;
-            is_int8_ = rhs.is_int8_;
-            return *this;
         }
 
         DECLARE_COMMON_PD_T(
@@ -166,7 +155,7 @@ struct gemm_post_ops_inner_product_fwd_t : public gpu_primitive_t {
             return status::success;
         }
 
-        std::unique_ptr<primitive_desc_t> gemm_pd_;
+        std::shared_ptr<primitive_desc_t> gemm_pd_;
 
         memory_desc_t scales_md_;
         memory_desc_t ip_scratchpad_md_;
@@ -189,8 +178,6 @@ struct gemm_post_ops_inner_product_fwd_t : public gpu_primitive_t {
                     gemm_pd_->scratchpad_registry());
         }
     };
-
-    gemm_post_ops_inner_product_fwd_t(const pd_t *apd) : gpu_primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
         status_t gemm_status = pd()->gemm_pd_->create_primitive(gemm_, engine);

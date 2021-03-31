@@ -30,14 +30,15 @@ namespace dnnl {
 namespace impl {
 namespace cpu {
 
-using pd_create_f = engine_t::primitive_desc_create_f;
-
 namespace {
 using namespace dnnl::impl::data_type;
 
 // clang-format off
-const pd_create_f impl_list[] = {
+const impl_list_item_t impl_list[] = {
         /* f32 */
+        CPU_INSTANCE_X64(brgemm_inner_product_fwd_t<avx512_core>)
+        CPU_INSTANCE_X64(brgemm_inner_product_bwd_data_t<avx512_core>)
+        CPU_INSTANCE_X64(brgemm_inner_product_bwd_weights_t<avx512_core>)
         CPU_INSTANCE(gemm_inner_product_fwd_t<f32>)
         CPU_INSTANCE(gemm_inner_product_bwd_data_t<f32>)
         CPU_INSTANCE(gemm_inner_product_bwd_weights_t<f32>)
@@ -49,6 +50,7 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE_X64(brgemm_inner_product_fwd_t<avx512_core_bf16>)
         CPU_INSTANCE_X64(brgemm_inner_product_bwd_data_t<avx512_core_bf16_amx_bf16>)
         CPU_INSTANCE_X64(brgemm_inner_product_bwd_data_t<avx512_core_bf16>)
+        CPU_INSTANCE_X64(brgemm_inner_product_bwd_weights_t<avx512_core_bf16_amx_bf16>)
         CPU_INSTANCE_X64(brgemm_inner_product_bwd_weights_t<avx512_core_bf16>)
         CPU_INSTANCE_X64(gemm_bf16_inner_product_fwd_t<f32>)
         CPU_INSTANCE_X64(gemm_bf16_inner_product_fwd_t<bf16>)
@@ -83,7 +85,7 @@ const pd_create_f impl_list[] = {
 // clang-format on
 } // namespace
 
-const pd_create_f *get_inner_product_impl_list(
+const impl_list_item_t *get_inner_product_impl_list(
         const inner_product_desc_t *desc) {
     UNUSED(desc);
     return impl_list;

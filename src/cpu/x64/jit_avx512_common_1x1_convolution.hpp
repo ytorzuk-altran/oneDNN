@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2017-2020 Intel Corporation
+* Copyright 2017-2021 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@
 
 #include "cpu/x64/cpu_reducer.hpp"
 #include "cpu/x64/jit_avx512_common_1x1_conv_kernel.hpp"
-#include "cpu/x64/jit_transpose_src_utils.hpp"
+#include "cpu/x64/jit_transpose_utils.hpp"
 #include "cpu/x64/jit_uni_1x1_conv_utils.hpp"
 #include "cpu/x64/jit_uni_dw_convolution.hpp"
 
@@ -151,7 +151,6 @@ struct jit_avx512_common_1x1_convolution_fwd_t : public primitive_t {
             auto &jcp_1x1 = jcp_;
             primitive_attr_t attr_1x1(*attr());
             if (!attr_1x1.is_initialized()) return status::out_of_memory;
-            attr_1x1.set_scratchpad_mode(scratchpad_mode::user);
             const auto &src_md = dst_md_;
             const memory_desc_wrapper src_d(src_md);
             const auto nthr = dnnl_get_max_threads();

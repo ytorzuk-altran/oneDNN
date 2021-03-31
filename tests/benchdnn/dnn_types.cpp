@@ -22,13 +22,10 @@
 #include <string.h>
 #include <string>
 
+#include <algorithm>
 #include <sstream>
 
 #include "oneapi/dnnl/dnnl.h"
-
-#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
-#include "oneapi/dnnl/dnnl_threadpool.h"
-#endif
 
 #include "common.hpp"
 #include "dnn_types.hpp"
@@ -36,7 +33,6 @@
 #include "dnnl_debug.hpp"
 #include "dnnl_memory.hpp"
 #include "src/common/math_utils.hpp"
-#include "tests/test_thread.hpp"
 
 #define BENCHDNN_DNNL_ARG_UNDEF 0
 
@@ -427,6 +423,8 @@ int attr_t::post_ops_t::from_str(const std::string &s) {
             if (subs_pos >= subs.size()) return FAIL; // to catch dangling ':'
 
             e.sum.dt = str2dt(get_substr(subs, subs_pos).c_str());
+            // sum dt, if specified, should be defined
+            if (e.sum.dt == dnnl_data_type_undef) return FAIL;
         } else if (e.is_convolution_kind()) {
             e.convolution.dst_dt = str2dt(get_substr(subs, subs_pos).c_str());
             if (subs_pos == std::string::npos) continue;
@@ -1271,54 +1269,6 @@ void maybe_post_ops(const attr_t &attr, float &val, float sum_val,
             it_bin_po++;
         }
     }
-}
-
-engine_t::engine_t(dnnl_engine_kind_t engine_kind) : is_owner_(true) {
-    size_t idx = engine_kind == dnnl_cpu ? 0 : engine_index;
-#ifdef DNNL_WITH_SYCL
-    // We need two static objects for CPU and GPU since we rely on CPU a lot
-    // when testing GPU. Otherwise, service reorder would fail due to inability
-    // create memory from host_ptr since static object would be initialized as
-    // GPU engine firstly.
-    if (engine_kind == dnnl_cpu) {
-        static dnnl_engine_t inst = nullptr;
-        if (!inst) DNN_SAFE_V(dnnl_engine_create(&inst, engine_kind, idx));
-        engine_ = inst;
-    } else if (engine_kind == dnnl_gpu) {
-        static dnnl_engine_t inst = nullptr;
-        if (!inst) DNN_SAFE_V(dnnl_engine_create(&inst, engine_kind, idx));
-        engine_ = inst;
-    } else
-        assert(!"unsupported engine_kind");
-#else
-    DNN_SAFE_V(dnnl_engine_create(&engine_, engine_kind, idx));
-#endif
-}
-
-engine_t::engine_t(dnnl_engine_t engine) : engine_(engine), is_owner_(false) {}
-
-engine_t::~engine_t() {
-    if (!is_owner_) return;
-#ifdef DNNL_WITH_SYCL
-    engine_ = nullptr;
-#else
-    DNN_SAFE_V(dnnl_engine_destroy(engine_));
-#endif
-}
-
-stream_t::stream_t(dnnl_engine_t engine) {
-#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_THREADPOOL
-    if (is_cpu(engine)) {
-        SAFE_V(dnnl_threadpool_interop_stream_create(
-                &stream_, engine, dnnl::testing::get_threadpool()));
-        return;
-    }
-#endif
-    DNN_SAFE_V(dnnl_stream_create(&stream_, engine, dnnl_stream_default_flags));
-}
-
-stream_t::~stream_t() {
-    DNN_SAFE_V(dnnl_stream_destroy(stream_));
 }
 
 #undef BENCHDNN_DNNL_ARG_UNDEF

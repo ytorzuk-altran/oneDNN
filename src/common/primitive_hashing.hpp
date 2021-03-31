@@ -25,6 +25,10 @@
 #include "primitive_attr.hpp"
 #include "type_helpers.hpp"
 
+#ifdef DNNL_USE_RT_OBJECTS_IN_PRIMITIVE_CACHE
+#include "engine_id.hpp"
+#endif
+
 namespace dnnl {
 namespace impl {
 
@@ -32,7 +36,11 @@ struct primitive_desc_t;
 namespace primitive_hashing {
 
 struct key_t {
-    key_t(const primitive_desc_t *pd, const engine_t *engine, int impl_nthr);
+    key_t(const engine_t *engine, const op_desc_t *op_desc,
+            const primitive_attr_t *attr, int pd_iterator_offset,
+            const std::vector<memory_desc_t> &hint_mds);
+
+    key_t(const primitive_desc_t *pd, const engine_t *engine);
 
     bool operator==(const key_t &other) const;
     const std::thread::id &thread_id() const { return thread_id_; }
@@ -42,20 +50,24 @@ struct key_t {
     // and adding a key (extract is available in C++17 only).
     mutable const op_desc_t *op_desc_;
     mutable const primitive_attr_t *attr_;
-    std::type_index impl_id_;
+    int pd_iterator_offset_;
     int impl_nthr_;
-    std::vector<memory_desc_t> mds;
+    std::vector<memory_desc_t> hint_mds_;
+#ifdef DNNL_USE_RT_OBJECTS_IN_PRIMITIVE_CACHE
+    engine_id_t engine_id_;
+#else
     engine_kind_t engine_kind_;
     runtime_kind_t runtime_kind_;
     device_id_t device_id_;
+#endif
 
 private:
-    void init_mds(const primitive_desc_t *pd);
-
     template <typename desc_t>
     static const desc_t &cast_to_desc(const void *p) {
         return *(reinterpret_cast<const desc_t *>(p));
     }
+
+    static primitive_kind_t get_pkind(primitive_kind_t pkind);
 
     // Thread ID is not used as part of the key, it's only used to get
     // information about what thread inserted the key and the corresponding
@@ -129,8 +141,12 @@ struct hash<dnnl::impl::primitive_hashing::key_t> {
         seed = hash_combine(seed,
                 hash_combine(0, static_cast<size_t>(key.primitive_kind_)));
         seed = hash_combine(seed, get_attr_hash(*key.attr_));
-        seed = hash_combine(seed, hash_combine(0, key.impl_id_));
+        seed = hash_combine(seed, hash_combine(0, key.pd_iterator_offset_));
         seed = hash_combine(seed, hash_combine(0, key.impl_nthr_));
+
+#ifdef DNNL_USE_RT_OBJECTS_IN_PRIMITIVE_CACHE
+        seed = hash_combine(seed, key.engine_id_.hash());
+#else
         seed = hash_combine(
                 seed, hash_combine(0, static_cast<size_t>(key.engine_kind_)));
         seed = hash_combine(
@@ -138,6 +154,7 @@ struct hash<dnnl::impl::primitive_hashing::key_t> {
         seed = hash_combine(seed, hash_combine(0, std::get<0>(key.device_id_)));
         seed = hash_combine(seed, hash_combine(0, std::get<1>(key.device_id_)));
         seed = hash_combine(seed, hash_combine(0, std::get<2>(key.device_id_)));
+#endif
         // Combine hash for op_desc with the computed hash
 #define CASE(pkind) \
     case primitive_kind::pkind: \
@@ -172,7 +189,8 @@ struct hash<dnnl::impl::primitive_hashing::key_t> {
         }
             // clang-format on
 #undef CASE
-        seed = get_array_hash(seed, key.mds.data(), (int)key.mds.size());
+        seed = get_array_hash(
+                seed, key.hint_mds_.data(), (int)key.hint_mds_.size());
 
         return seed;
     }
