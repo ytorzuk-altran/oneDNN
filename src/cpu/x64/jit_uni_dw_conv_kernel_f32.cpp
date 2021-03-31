@@ -159,11 +159,14 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(
             eltwise_injectors[eltwise_inj_idx]->compute_vector_range(start_idx, end_idx);
             eltwise_inj_idx++;
         } else if (post_op.is_depthwise()) {
+            push(aux_reg_blocks_offset);
+            add(aux_reg_blocks_offset, ptr[this->param1 + GET_OFF(oc_off)]); //add offset of processed blocks
+
             mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
             mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
 
-            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
-            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
+            add(reg_d_weights, aux_reg_blocks_offset);
+            add(reg_d_bias, aux_reg_blocks_offset);
 
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 for (int k = 0; k < repeats; k++) {
@@ -177,10 +180,14 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(
                     add(reg_d_bias, jcp.ch_block / repeats * sizeof(float));
                 }
             }
+            pop(aux_reg_blocks_offset);
 
             depthwise_inj_idx++;
         } else if (post_op.is_quantization()) {
-            quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
+            push(aux_reg_blocks_offset);
+            add(aux_reg_blocks_offset, ptr[this->param1 + GET_OFF(oc_off)]); //add offset of processed blocks
+
+            quantization_injectors[quantization_inj_idx]->init_crop_ptrs(aux_reg_blocks_offset);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 for (int k = 0; k < repeats; k++) {
                     int s_idx = get_acc_reg(k*ur_ch_blocks*ur_w + ch*ur_w).getIdx();
@@ -189,7 +196,7 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(
                 }
             }
 
-            quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
+            quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(aux_reg_blocks_offset);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 for (int k = 0; k < repeats; k++) {
                     int s_idx = get_acc_reg(k*ur_ch_blocks*ur_w + ch*ur_w).getIdx();
@@ -198,7 +205,7 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(
                 }
             }
 
-            quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
+            quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(aux_reg_blocks_offset);
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 for (int k = 0; k < repeats; k++) {
                     int s_idx = get_acc_reg(k*ur_ch_blocks*ur_w + ch*ur_w).getIdx();
@@ -206,6 +213,7 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::apply_postprocess(
                                                                                              (k * (jcp.ch_block / 2) + ch * jcp.ch_block) * sizeof(float));
                 }
             }
+            pop(aux_reg_blocks_offset);
 
             quantization_inj_idx++;
         }
@@ -267,6 +275,8 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::compute_loop(
         store_dst(ur_ch_blocks, ur_w);
     };
 
+    xor_(aux_reg_blocks_offset, aux_reg_blocks_offset);
+
     if (ch_loop) {
         Label ch_loop_label, ch_tail_label, skip_ch_tail_label;
         const int ch_tail = jcp.nb_ch % jcp.nb_ch_blocking;
@@ -290,6 +300,7 @@ void jit_uni_dw_conv_fwd_kernel_f32<isa>::compute_loop(
             add(reg_output, out_ch_stride);
             if (jcp.with_bias) add(reg_bias, bias_stride);
             sub(aux_reg_ch_blocks, jcp.nb_ch_blocking);
+            add(aux_reg_blocks_offset, jcp.nb_ch_blocking * jcp.ch_block * sizeof(float)); //add initial offset of processed blocks
             cmp(aux_reg_ch_blocks, jcp.nb_ch_blocking);
             jge(ch_loop_label, T_NEAR);
         }

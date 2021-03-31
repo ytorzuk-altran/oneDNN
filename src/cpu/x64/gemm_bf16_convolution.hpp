@@ -156,7 +156,7 @@ private:
         }
 
         void operator()(dst_data_t *dst, const acc_data_t *acc,
-                const acc_data_t *bias, float sum_scale, size_t oc_work);
+                const acc_data_t *bias, float sum_scale, size_t oc_work, size_t g_offset);
         void operator()(dst_data_t *dst, const acc_data_t *acc,
                 const acc_data_t *bias, size_t g_offset, size_t start_oc, float sum_scale, size_t dst_str,
                 size_t acc_str, size_t sp_len, size_t oc);

@@ -156,50 +156,20 @@ status_t gemm_convolution_fwd_t::execute_forward_thr_nspc(const int ithr,
                     &LDC);
             if (st != status::success) return st;
 
-            if (jcp.with_bias || eltwise_) {
-                parallel(0, [&](int ithr, int nthr) {
-                    size_t start, end;
-                    balance211((size_t)N * jcp.oc, nthr, ithr, start, end);
 
-                    const size_t first_oc = start % jcp.oc;
-                    const size_t last_oc = (end - 1) % jcp.oc;
-                    const size_t first_os = start / jcp.oc;
-                    const size_t last_os = (end - 1) / jcp.oc;
+            // todo[mkutakov]: temporal not optimal solution 52737
+            if (pp_kernel_) {
+                const size_t first_oc = g * jcp.oc;
+                const size_t last_oc = jcp.oc;
+                const size_t first_os = 0;
+                const size_t last_os = N;
 
-                    for (size_t os = first_os; os <= last_os; ++os) {
-                        const size_t start_oc = (os == first_os) ? first_oc : 0;
-                        const size_t end_oc
-                                = (os == last_os) ? last_oc : jcp.oc - 1;
+                const data_t* bias = bia_base + g * jcp.oc;
 
-                        const data_t *__restrict bia_arr
-                                = bia_base + g * jcp.oc;
-                        data_t *__restrict dst_arr = dst + os * dst_os_stride;
-
-                        if (jcp.with_bias) {
-                            PRAGMA_OMP_SIMD()
-                            for (size_t oc = start_oc; oc <= end_oc; oc++) {
-                                dst_arr[oc] += bia_arr[oc];
-                            }
-                        }
-
-                        // fast branch for ReLU case
-                        if (eltwise_
-                                && eltwise_->alg_ == alg_kind::eltwise_relu) {
-                            const auto alpha = eltwise_->alpha_;
-                            const auto scale = eltwise_->scale_;
-                            PRAGMA_OMP_SIMD()
-                            for (size_t oc = start_oc; oc <= end_oc; oc++) {
-                                if (dst_arr[oc] < 0) dst_arr[oc] *= alpha;
-                                dst_arr[oc] *= scale;
-                            }
-                        } else if (eltwise_) {
-                            for (size_t oc = start_oc; oc <= end_oc; oc++) {
-                                dst_arr[oc]
-                                        = eltwise_->compute_scalar(dst_arr[oc]);
-                            }
-                        }
-                    }
-                });
+                for (size_t os = first_os; os < last_os; ++os) {
+                    data_t* dst_local = dst + os * dst_os_stride;
+                    (*pp_kernel_)(dst_local, bias, 1, first_oc, last_oc, 1);
+                }
             }
         }
         nd_iterator_step(n, MB, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);

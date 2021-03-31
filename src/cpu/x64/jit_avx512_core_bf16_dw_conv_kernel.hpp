@@ -77,6 +77,7 @@ private:
     reg64_t iter_kh = rax;
     reg64_t reg_oi = rbx;
     reg64_t aux_reg_ch_blocks = rdx;
+    reg64_t aux_reg_blocks_offset = reg_oi;
 
     // fused convolution
     reg64_t reg_input_buffer_ptr = rdx;

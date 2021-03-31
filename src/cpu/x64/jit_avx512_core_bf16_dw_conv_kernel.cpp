@@ -145,11 +145,14 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::apply_postprocess(
             eltwise_injectors[eltwise_inj_idx]->compute_vector_range(start_idx, end_idx);
             eltwise_inj_idx++;
         } else if (post_op.is_depthwise()) {
+            push(aux_reg_blocks_offset);
+            add(aux_reg_blocks_offset, ptr[this->param1 + GET_OFF(oc_off)]); //add offset of processed blocks
+
             mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
             mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
 
-            add(reg_d_weights, ptr[this->param1 + GET_OFF(oc_off)]);
-            add(reg_d_bias, ptr[this->param1 + GET_OFF(oc_off)]);
+            add(reg_d_weights, aux_reg_blocks_offset);
+            add(reg_d_bias, aux_reg_blocks_offset);
 
             for (int ch = 0; ch < ur_ch_blocks; ch++) {
                 int start_idx = get_acc_reg(ur_w * ch).getIdx();
@@ -161,6 +164,7 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::apply_postprocess(
                 add(reg_d_weights, jcp.ch_block * sizeof(float));
                 add(reg_d_bias, jcp.ch_block * sizeof(float));
             }
+            pop(aux_reg_blocks_offset);
 
             depthwise_inj_idx++;
         }
@@ -291,6 +295,9 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::compute_loop(
         store_dst(ur_ch_blocks, ur_w);
     };
 
+    push(reg_oi);
+    xor_(aux_reg_blocks_offset, aux_reg_blocks_offset);
+
     if (ch_loop) {
         Label ch_loop_label, ch_tail_label, skip_ch_tail_label;
         const int ch_tail = jcp.nb_ch % jcp.nb_ch_blocking;
@@ -314,6 +321,7 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::compute_loop(
             add(reg_output, out_ch_stride);
             if (jcp.with_bias) add(reg_bias, bias_stride);
             sub(aux_reg_ch_blocks, jcp.nb_ch_blocking);
+            add(aux_reg_blocks_offset, jcp.nb_ch_blocking * jcp.ch_block * sizeof(float)); //add initial offset of processed blocks
             cmp(aux_reg_ch_blocks, jcp.nb_ch_blocking);
             jge(ch_loop_label, T_NEAR);
         }
@@ -334,6 +342,7 @@ void jit_avx512_dw_conv_fwd_kernel_bf16::compute_loop(
     } else {
         compute(ur_ch_blocks);
     }
+    pop(reg_oi);
 }
 
 void jit_avx512_dw_conv_fwd_kernel_bf16::loop_ow(int ur_ch_blocks) {

@@ -311,7 +311,7 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::generate() {
 template <data_type_t dst_data_type>
 void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::operator()(
         dst_data_t *dst, const acc_data_t *acc, const acc_data_t *bias,
-        float sum_scale, size_t oc_work) {
+        float sum_scale, size_t oc_work, size_t g_offset) {
 
     ker_args args;
     args.acc = acc;
@@ -322,6 +322,7 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::operator()(
     args.acc_stride_in_bytes = sizeof(acc_data_t);
     args.spatial_length = 1;
     args.oc_work = oc_work;
+    args.oc_offset = g_offset * sizeof(float);
     jit_generator::operator()(&args);
 }
 
@@ -496,7 +497,7 @@ status_t gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward_thr_nspc(
 
                             (*pp_ker_)(dst_arr,
                                     acc_needed ? acc_arr : (float *)dst_arr,
-                                    bia_arr, sum_scale, jcp.oc);
+                                    bia_arr, sum_scale, jcp.oc, g * jcp.oc);
                         });
             }
         }
