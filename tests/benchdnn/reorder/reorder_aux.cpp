@@ -43,6 +43,7 @@ uint64_t str2flag(const char *str) {
     if (!strcasecmp("gconv_s8s8", str)) flag |= FLAG_GCONV_S8S8;
     if (!strcasecmp("conv_zp_comp", str)) flag |= FLAG_CONV_ZP_COMP;
     if (!strcasecmp("gconv_zp_comp", str)) flag |= FLAG_GCONV_ZP_COMP;
+    if (!strcasecmp("sparse_compress", str)) flag |= FLAG_SPARSE_COMPRESS;
     if (strcasecmp("none", str) && flag == FLAG_NONE) assert(!"unknown flag");
     return flag;
 }
@@ -64,6 +65,7 @@ std::string flag2str(uint64_t flag) {
     CASE(FLAG_GCONV_S8S8, gconv_s8s8);
     CASE(FLAG_CONV_ZP_COMP, conv_zp_comp);
     CASE(FLAG_GCONV_ZP_COMP, gconv_zp_comp);
+    CASE(FLAG_SPARSE_COMPRESS, conv_compress);
 #undef CASE
 
     return s.str();

@@ -119,8 +119,10 @@ int fill_memory_extra(const prb_t *prb, dnnl_memory_extra_desc_t &extra) {
                     |= dnnl_memory_extra_flag_compensation_conv_asymmetric_src;
             extra.asymm_compensation_mask = (1 << 0) + with_groups * (1 << 1);
         }
+    } else if (prb->is_reorder_with_compression()) {
+        extra.flags = dnnl_memory_extra_flag_compression;
+        extra.compensation_mask = 13;
     }
-
     return OK;
 }
 
@@ -413,6 +415,20 @@ int doit(const prb_t *prb, res_t *res) {
             SAFE(compare_bootstrap(
                          ref_dst_dt_out_fmt_out, dst_dt_out_fmt_out, res),
                     WARN);
+        } else if (prb->is_reorder_with_compression()) {
+            const auto &rc = prb->reorder;
+            dnnl_memory_extra_desc_t dst_extra {};
+            fill_memory_extra(prb, dst_extra);
+
+            dnn_mem_t ref_dst_dt_direct_fmt_out_ref(
+                    dst_md, dst_dt, rc.tag_out, dst_engine);
+            ref_dst_dt_direct_fmt_out_ref.md_.extra = dst_extra;
+            
+            // reorder input to memory block, directly (ex: oihw to OIhw16i16o4i)
+            SAFE(ref_dst_dt_direct_fmt_out_ref.reorder(src_dt_in_fmt_ref),
+                    WARN);
+            // TO DO
+            // decompress and compare
         } else {
             /* (default) "reference" algorithm: compare to benchdnn reorder */
 

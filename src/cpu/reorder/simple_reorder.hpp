@@ -61,6 +61,7 @@ struct direct_copy {};
 struct direct_copy_except_dim_0 {};
 struct reference {};
 struct conv_req_comp {}; // {s8, u8: asymmetric quantization}
+struct compression {};
 } // namespace spec
 
 #define SIMPLE_REORDER_TEMPL_DECL \
@@ -238,6 +239,109 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 if (has_asymmetric_comp) zp[g * OC + oc] -= (int32_t)o;
             }
             if (req_comp) cp[g * OC + oc] *= 128;
+        });
+        return status::success;
+    }
+};
+
+/* specific reorders: compression */
+template <SIMPLE_REORDER_TEMPL_DECL>
+struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+        typename utils::enable_if<tag_i == format_tag::oi
+                        && utils::one_of(tag_o, format_tag::OI16i64o4i,
+                                format_tag::OI16i16o4i),
+                spec::compression>::type> {
+    static bool is_applicable(const memory_desc_wrapper &input_d,
+            const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
+        using namespace data_type;
+        using namespace utils;
+
+        if (input_d.has_runtime_dims_or_strides()) return false;
+        const size_t D_mask = utils::array_product(
+                input_d.dims(), math::ilog2q(attr->output_scales_.mask_ + 1));
+        const size_t oc = (input_d.dims()[0]);
+        const bool compensation_mask_ok
+                = output_d.extra().compensation_mask == 13;
+        return /* simple_attr_check(attr, true, false)
+                && */
+                output_d.matches_tag(tag_o)
+                && input_d.is_plain()
+                && (output_d.extra().flags & memory_extra_flags::compression)
+                && compensation_mask_ok
+                && (input_d.data_type() == s8)
+                && output_d.data_type() == s8 && (D_mask == 1 || D_mask == oc);
+    }
+
+    GET_SCRATCHPAD_SIZE_ZERO();
+
+    static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
+        DECLARE_COMMON_PARAMS();
+        const auto &input_dims = input_d.dims();
+        const auto &padded_dims = output_d.padded_dims();
+
+        const int i_outer_blksize = tag_o == format_tag::OI16i64o4i ? 4 : 16;
+        const int i_blksize = i_outer_blksize * 4;
+        const int o_blksize = 16;
+
+        const int OC = input_dims[0];
+        const int NB_OC = padded_dims[0] / o_blksize;
+        const int IC = input_dims[1];
+        const int NB_IC = padded_dims[1] / i_blksize;
+
+        const int plain_o_stride = input_d.blocking_desc().strides[0];
+        const int plain_i_stride = input_d.blocking_desc().strides[1];
+
+        const float *scales = pd->attr()->output_scales_.scales_;
+        const size_t D_mask = utils::array_product(input_d.dims(),
+                math::ilog2q(pd->attr()->output_scales_.mask_ + 1));
+
+        size_t offset = padded_dims[0] * padded_dims[1];
+        uint64_t *bitmask_ptr = reinterpret_cast<uint64_t *>(output + offset);
+        int count = 0;
+
+        assert(input_d.is_dense());
+
+        input += input_d.blk_off(0);
+        output += output_d.blk_off(0);
+
+        const size_t nelems = input_d.nelems();
+
+        constexpr int block_size = 16;
+        const auto num_blocks = nelems / block_size;
+        const auto rem_elems = nelems % block_size;
+
+        parallel_nd(NB_IC, NB_OC, [&](int I, int O) {
+            auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I)];
+            auto outp = &output[output_d.blk_off(O, I)];
+            const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
+            const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
+            int bitmask_idx = (O * NB_IC + I) * i_outer_blksize;
+            auto max_outp = &outp[o_blksize * i_blksize];
+            const float *scales_here
+                    = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
+            for (int ic_base = 0; ic_base < ic_block; ic_base += 2) {
+                bitmask_ptr[bitmask_idx] = 0;
+                int bit = 0;
+                for (int oc = 0; oc < oc_block; oc++) {
+                    int plain_off
+                            = oc * plain_o_stride + ic_base * plain_i_stride;
+                    int ic_block_here = nstl::min(2, ic_block - ic_base);
+                    for (int ic = 0; ic < ic_block_here; ic++) {
+                        data_t<type_o> o = inp[plain_off];
+                        if (o != 0) {
+                            *outp++ = o;
+                            bitmask_ptr[bitmask_idx] |= (1UL << bit);
+                        }
+
+                        plain_off += plain_i_stride;
+                        bit++;
+                        count++;
+                    }
+                }
+                bitmask_idx++;
+            }
+            while (outp < max_outp)
+                *outp++ = 0;
         });
         return status::success;
     }

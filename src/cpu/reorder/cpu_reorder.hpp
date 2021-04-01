@@ -82,6 +82,7 @@ extern const impl_list_map_t regular_u8_impl_list_map;
 extern const impl_list_map_t comp_f32_s8_impl_list_map;
 extern const impl_list_map_t comp_bf16_s8_impl_list_map;
 extern const impl_list_map_t comp_s8_s8_impl_list_map;
+extern const impl_list_map_t compression_impl_list_map;
 
 #define REG_SR(idt, ifmt, odt, ofmt, ...) \
     impl_list_item_t(impl_list_item_t::reorder_type_deduction_helper_t< \

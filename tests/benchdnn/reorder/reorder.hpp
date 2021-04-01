@@ -29,7 +29,7 @@
 
 namespace reorder {
 
-enum alg_t { ALG_REF, ALG_BOOT };
+enum alg_t { ALG_REF, ALG_BOOT, ALG_COMPRESS };
 alg_t str2alg(const char *str);
 const char *alg2str(alg_t alg);
 
@@ -39,7 +39,9 @@ enum flag_t {
     FLAG_GCONV_S8S8 = 0x2U,
     FLAG_CONV_ZP_COMP = 0x4U,
     FLAG_GCONV_ZP_COMP = 0x8U,
+    FLAG_SPARSE_COMPRESS = 0x16U
 };
+
 uint64_t str2flag(const char *str);
 std::string flag2str(uint64_t flag);
 
@@ -141,7 +143,12 @@ struct prb_t {
     int32_t *src_zp, *dst_zp;
 
     bool is_reorder_with_compensation() const {
-        return alg == ALG_BOOT && oflag != FLAG_NONE;
+        return alg == ALG_BOOT && oflag != FLAG_NONE
+                && oflag != FLAG_SPARSE_COMPRESS;
+    }
+
+    bool is_reorder_with_compression() const {
+        return alg == ALG_BOOT && oflag == FLAG_SPARSE_COMPRESS;
     }
     float *generate_oscales();
     int32_t *generate_zero_points(int arg);

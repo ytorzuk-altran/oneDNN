@@ -940,6 +940,8 @@ const memory_extra_flags_t rnn_u8s8_compensation
         = dnnl_memory_extra_flag_rnn_u8s8_compensation;
 const memory_extra_flags_t compensation_conv_asymmetric_src
         = dnnl_memory_extra_flag_compensation_conv_asymmetric_src;
+const memory_extra_flags_t compression
+        = dnnl_memory_extra_flag_compression;;
 } // namespace memory_extra_flags
 
 using engine_kind_t = dnnl_engine_kind_t;
