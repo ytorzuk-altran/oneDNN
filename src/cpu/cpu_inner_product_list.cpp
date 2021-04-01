@@ -65,12 +65,14 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, s32)
 #endif
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, f32)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, bf16)
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, u8)
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, s8)
 #ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, s32)
 #endif
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, f32)
+        CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, bf16)
 #ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(ref_inner_product_fwd_t, u8, s8, u8, s32)
         CPU_INSTANCE(ref_inner_product_fwd_t, u8, s8, s8, s32)

@@ -81,10 +81,12 @@ status_t gemm_x8s8s32x_inner_product_fwd_t<src_type, dst_type>::execute_forward(
 using namespace data_type;
 
 template struct gemm_x8s8s32x_inner_product_fwd_t<u8, f32>;
+template struct gemm_x8s8s32x_inner_product_fwd_t<u8, bf16>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<u8, s32>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<u8, s8>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<u8, u8>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<s8, f32>;
+template struct gemm_x8s8s32x_inner_product_fwd_t<s8, bf16>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<s8, s32>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<s8, s8>;
 template struct gemm_x8s8s32x_inner_product_fwd_t<s8, u8>;

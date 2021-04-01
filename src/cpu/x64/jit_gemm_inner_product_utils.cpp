@@ -888,6 +888,7 @@ pp_kernel_t<acc_type, dst_type> *jit_pp_kernel_create(size_t OC, size_t MB,
 using namespace data_type;
 INST(f32, f32);
 INST(s32, f32);
+INST(s32, bf16);
 INST(s32, s32);
 INST(s32, s8);
 INST(s32, u8);

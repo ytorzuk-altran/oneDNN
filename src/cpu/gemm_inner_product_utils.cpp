@@ -170,6 +170,7 @@ pp_kernel_t<acc_type, dst_type> *pp_kernel_t<acc_type, dst_type>::create(
 using namespace data_type;
 template struct pp_kernel_t<f32, f32>;
 template struct pp_kernel_t<s32, f32>;
+template struct pp_kernel_t<s32, bf16>;
 template struct pp_kernel_t<s32, s32>;
 template struct pp_kernel_t<s32, s8>;
 template struct pp_kernel_t<s32, u8>;
