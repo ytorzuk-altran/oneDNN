@@ -24,7 +24,7 @@
 #include "dnn_types.hpp"
 #include "dnnl_common.hpp"
 #include "dnnl_memory.hpp"
-
+#include <cstdint>
 #include "reorder.hpp"
 
 namespace reorder {
@@ -57,9 +57,11 @@ int fill_memory_int(const prb_t *prb, data_kind_t kind, dnn_mem_t &mem) {
                 (int)0,
                 (int)16,
         };
-
+        //printf("mona");
+        
         const int rng = kind == SRC ? (idx % 4) : ((idx * 5 / 4) % 4);
         const int value = gen[rng];
+        //printf(",%d",value);
         switch (dt) {
             case dnnl_s32: ((int *)mem)[idx] = value; break;
             case dnnl_s8: ((int8_t *)mem)[idx] = (int8_t)value; break;
@@ -161,11 +163,12 @@ int compare_bootstrap(dnn_mem_t &mem_ref, dnn_mem_t &mem_got, res_t *res) {
     bool ok = false;
     // demand bit-wise identical results
     const auto size_ref = mem_ref.size();
-    if (size_ref == 0) return res->state = PASSED, OK;
+    printf("size_ref %d \n",size_ref);
 
+    if (size_ref == 0) return res->state = PASSED, OK;
     if (size_ref == mem_got.size())
         ok = !std::memcmp((void *)mem_ref, (void *)mem_got, size_ref);
-
+    printf("mem_got.size() %d \n",mem_got.size());
     res->errors = !ok;
     res->state = ok ? PASSED : FAILED;
     res->total = 1;
@@ -358,6 +361,7 @@ int doit(const prb_t *prb, res_t *res) {
             WARN);
 
     dnn_mem_t src_dt_in_fmt_ref(src_md, src_dt, tag, src_engine);
+    dnn_mem_t src_dt_in_fmt_compress_ref(src_md, src_engine);
     dnn_mem_t src_dt_in_fmt_in(src_md, src_engine);
 
     dnn_mem_t scratchpad_dt(scratchpad_md, src_engine);
@@ -369,12 +373,15 @@ int doit(const prb_t *prb, res_t *res) {
     SAFE(fill_memory(prb, SRC, src_dt_in_fmt_ref), WARN);
 
     /* Step 5: execute necessary reorders */
+    printf("---src_dt_in_fmt_in.reorder---\n");
     SAFE(src_dt_in_fmt_in.reorder(src_dt_in_fmt_ref), WARN);
 
     const bool has_sum
             = prb->attr.post_ops.find(attr_t::post_ops_t::kind_t::SUM) >= 0;
     if (has_sum) {
+        printf("----------------------has sum ----------------------\n");
         SAFE(fill_memory(prb, DST, dst_dt_out_fmt_ref), WARN);
+        printf(" inside st_dt_out_fmt_out reordering \n");
         SAFE(dst_dt_out_fmt_out.reorder(dst_dt_out_fmt_ref), WARN);
     }
 
@@ -399,6 +406,7 @@ int doit(const prb_t *prb, res_t *res) {
     /* Step 6: check correctness */
     if (bench_mode & CORR) {
         if (prb->is_reorder_with_compensation()) {
+                printf("prb->is_reorder_with_compensation() \n");
             /* "bootstrap" algorithm: compare to another oneDNN reorder. use
              * this when benchdnn does not know about all details of the data
              * layout, as is the case for compensated weights formats. */
@@ -408,7 +416,6 @@ int doit(const prb_t *prb, res_t *res) {
             fill_memory_extra(prb, dst_extra);
             dnn_mem_t ref_dst_dt_out_fmt_out(dst_md, dst_engine);
             ref_dst_dt_out_fmt_out.md_.extra = dst_extra;
-
             SAFE(ref_dst_dt_out_fmt_out.reorder(src_dt_in_fmt_ref), WARN);
 
             /* Step 5b: compare results (expect bit-wise exactness) */
@@ -416,20 +423,25 @@ int doit(const prb_t *prb, res_t *res) {
                          ref_dst_dt_out_fmt_out, dst_dt_out_fmt_out, res),
                     WARN);
         } else if (prb->is_reorder_with_compression()) {
-            const auto &rc = prb->reorder;
+        printf("------------prb->is_reorder_with_compression()-----------\n");
+        const auto &rc = prb->reorder;
             dnnl_memory_extra_desc_t dst_extra {};
             fill_memory_extra(prb, dst_extra);
+            dnn_mem_t ref_dst_dt_compress_ref(
+                    dst_md, dst_engine);
+            ref_dst_dt_compress_ref.md_.extra = dst_extra;
 
-            dnn_mem_t ref_dst_dt_direct_fmt_out_ref(
-                    dst_md, dst_dt, rc.tag_out, dst_engine);
-            ref_dst_dt_direct_fmt_out_ref.md_.extra = dst_extra;
-            
-            // reorder input to memory block, directly (ex: oihw to OIhw16i16o4i)
-            SAFE(ref_dst_dt_direct_fmt_out_ref.reorder(src_dt_in_fmt_ref),
+            SAFE(ref_dst_dt_compress_ref.reorder(src_dt_in_fmt_ref), WARN);
+
+            /* Step 5b: compare results (expect bit-wise exactness) */
+            SAFE(compare_bootstrap(
+                         ref_dst_dt_compress_ref, dst_dt_out_fmt_out, res),
                     WARN);
-            // TO DO
+
+ 
             // decompress and compare
         } else {
+               printf("else \n");
             /* (default) "reference" algorithm: compare to benchdnn reorder */
 
             /* Step 5b: execute benchdnn reorder */

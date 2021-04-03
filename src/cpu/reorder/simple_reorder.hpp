@@ -255,7 +255,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
         using namespace data_type;
         using namespace utils;
-
+        printf("--------------------entering compression reorder--------------------\n");
         if (input_d.has_runtime_dims_or_strides()) return false;
         const size_t D_mask = utils::array_product(
                 input_d.dims(), math::ilog2q(attr->output_scales_.mask_ + 1));
@@ -272,22 +272,25 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 && output_d.data_type() == s8 && (D_mask == 1 || D_mask == oc);
     }
 
-    GET_SCRATCHPAD_SIZE_ZERO();
+  GET_SCRATCHPAD_SIZE_ZERO();
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
-        const auto &input_dims = input_d.dims();
-        const auto &padded_dims = output_d.padded_dims();
+        printf("--------------execute reorder compression-----------\n");
 
-        const int i_outer_blksize = tag_o == format_tag::OI16i64o4i ? 4 : 16;
+        const auto& input_dims = input_d.dims();
+        const auto& padded_dims = output_d.padded_dims();
+        //const int i_outer_blksize = tag_o == format_tag::OI16i64o4i ? 16 : 4;
+        const int i_outer_blksize = 16;
         const int i_blksize = i_outer_blksize * 4;
-        const int o_blksize = 16;
+        const int o_blksize = 64;
 
         const int OC = input_dims[0];
         const int NB_OC = padded_dims[0] / o_blksize;
         const int IC = input_dims[1];
         const int NB_IC = padded_dims[1] / i_blksize;
-
+        //printf("h %d %d %d \n", H, padded_dims[0], padded_dims[1]);
+        //printf("W %d \n", W);
         const int plain_o_stride = input_d.blocking_desc().strides[0];
         const int plain_i_stride = input_d.blocking_desc().strides[1];
 
@@ -296,55 +299,61 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 math::ilog2q(pd->attr()->output_scales_.mask_ + 1));
 
         size_t offset = padded_dims[0] * padded_dims[1];
-        uint64_t *bitmask_ptr = reinterpret_cast<uint64_t *>(output + offset);
+        
+        //printf("offset %d \n", offset);
+        uint64_t *bitmask_ptr = reinterpret_cast<uint64_t*>(output + offset);
+        //printf("output %d \n", output);
+        
         int count = 0;
 
-        assert(input_d.is_dense());
-
-        input += input_d.blk_off(0);
-        output += output_d.blk_off(0);
-
-        const size_t nelems = input_d.nelems();
-
-        constexpr int block_size = 16;
-        const auto num_blocks = nelems / block_size;
-        const auto rem_elems = nelems % block_size;
-
         parallel_nd(NB_IC, NB_OC, [&](int I, int O) {
-            auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I)];
-            auto outp = &output[output_d.blk_off(O, I)];
-            const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
-            const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
-            int bitmask_idx = (O * NB_IC + I) * i_outer_blksize;
-            auto max_outp = &outp[o_blksize * i_blksize];
-            const float *scales_here
-                    = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
-            for (int ic_base = 0; ic_base < ic_block; ic_base += 2) {
-                bitmask_ptr[bitmask_idx] = 0;
+          //printf("in parallel");
+          auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I)];
+          auto outp = &output[output_d.blk_off(O, I)];
+          const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
+          const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
+          int bitmask_idx = (O * NB_IC + I) * i_outer_blksize;
+          auto max_outp = &outp[o_blksize * i_blksize];
+          const float *scales_here = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
+           for (int ic_base = 0; ic_base < ic_block; ic_base += 4) {
+           //bitmask_ptr[bitmask_idx] = 0;
                 int bit = 0;
-                for (int oc = 0; oc < oc_block; oc++) {
-                    int plain_off
-                            = oc * plain_o_stride + ic_base * plain_i_stride;
-                    int ic_block_here = nstl::min(2, ic_block - ic_base);
-                    for (int ic = 0; ic < ic_block_here; ic++) {
-                        data_t<type_o> o = inp[plain_off];
-                        if (o != 0) {
+                //printf("in bit");    
+           for (int oc = 0; oc < oc_block; oc++) {
+                    int plain_off = oc * plain_o_stride + ic_base * plain_i_stride;
+                    int ic_block_here = nstl::min(4, ic_block - ic_base);
+            for (int ic = 0; ic < ic_block_here; ic++) {
+                data_t<type_o> o=inp[plain_off];
+               // if (o != 0) {
+               // printf(",%d",o);
                             *outp++ = o;
-                            bitmask_ptr[bitmask_idx] |= (1UL << bit);
-                        }
+                          //  bitmask_ptr[bitmask_idx] |= (1UL << bit);
+                        //}
 
-                        plain_off += plain_i_stride;
+                plain_off += plain_i_stride;
                         bit++;
                         count++;
-                    }
-                }
-                bitmask_idx++;
+
+
             }
-            while (outp < max_outp)
-                *outp++ = 0;
+
+                    }
+                   // bitmask_idx++;
+            }
+           // while (outp < max_outp) {
+                //*outp++ = 0;
+               //printf("0,");
+
+            //printf("in while");        
+
+          // }
+          //printf("\n");
+          
         });
+     printf("--------------exiting compression reorder-------------- \n");
         return status::success;
     }
+    
 };
 
 template <SIMPLE_REORDER_TEMPL_DECL>
@@ -1595,6 +1604,8 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 /* generic and direct-copy reorders */
 
+/* generic and direct-copy reorders */
+
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<tag_i == format_tag::any
@@ -1614,7 +1625,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
-
+        printf("-----------------entering direct reorder------------\n");
         assert(input_d.is_dense());
 
         input += input_d.blk_off(0);
@@ -1686,6 +1697,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
             }
         });
+        printf("-------------------exiting direct reorder------------------- \n");
         return status::success;
     }
 };
