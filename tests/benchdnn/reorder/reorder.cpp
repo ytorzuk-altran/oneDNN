@@ -67,7 +67,6 @@ int fill_memory_int(const prb_t *prb, data_kind_t kind, dnn_mem_t &mem) {
             default: assert(!"not expected"); break;
         }
     }
-
     return OK;
 }
 
@@ -280,6 +279,17 @@ void check_known_skipped_case(const prb_t *prb, res_t *res) {
     }
 }
 
+int show_memory(dnn_mem_t &mem) {
+    const auto nelems = mem.nelems(true);
+
+    for (int64_t idx = 0; idx < nelems; ++idx) {
+        std::cout << mem.get_elem(idx) << ",";
+    }
+
+    std::cout << std::endl;
+    return OK;
+}
+
 int doit(const prb_t *prb, res_t *res) {
     if (bench_mode == LIST) return res->state = LISTED, OK;
 
@@ -394,7 +404,10 @@ int doit(const prb_t *prb, res_t *res) {
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zero_points_m);
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zero_points_m);
 
+    show_memory(src_dt_in_fmt_in);
+
     SAFE(execute_and_wait(prim, args), WARN);
+    show_memory(dst_dt_out_fmt_out);
 
     /* Step 6: check correctness */
     if (bench_mode & CORR) {
@@ -417,16 +430,18 @@ int doit(const prb_t *prb, res_t *res) {
                     WARN);
         } else if (prb->is_reorder_with_compression()) {
             const auto &rc = prb->reorder;
-            dnnl_memory_extra_desc_t dst_extra {};
-            fill_memory_extra(prb, dst_extra);
-
-            dnn_mem_t ref_dst_dt_direct_fmt_out_ref(
+            dnn_mem_t ref_dst_dt_direct_ref(
                     dst_md, dst_dt, rc.tag_out, dst_engine);
-            ref_dst_dt_direct_fmt_out_ref.md_.extra = dst_extra;
-            
-            // reorder input to memory block, directly (ex: oihw to OIhw16i16o4i)
-            SAFE(ref_dst_dt_direct_fmt_out_ref.reorder(src_dt_in_fmt_ref),
+            // Direct reorder
+            SAFE(ref_dst_dt_direct_ref.reorder(src_dt_in_fmt_ref), WARN);
+            show_memory(ref_dst_dt_direct_ref);
+
+            // compare ip-custom-reorder minus compression and direct reorder
+            // 
+            SAFE(compare_bootstrap(
+                         ref_dst_dt_direct_ref, dst_dt_out_fmt_out, res),
                     WARN);
+
             // TO DO
             // decompress and compare
         } else {
@@ -475,3 +490,4 @@ int doit(const prb_t *prb, res_t *res) {
 }
 
 } // namespace reorder
+ 
