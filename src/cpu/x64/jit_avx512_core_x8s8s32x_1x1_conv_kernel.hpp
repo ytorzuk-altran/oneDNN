@@ -83,9 +83,6 @@ private:
     Xbyak::Zmm zmm_d_weights = Xbyak::Zmm(31);
     Xbyak::Zmm zmm_d_bias = Xbyak::Zmm(30);
 
-    const Xbyak::Opmask mask_post_op_reserved = k1;
-    Xbyak::Reg64 eltwise_reserved = rax;
-
     const Xbyak::Opmask ktail_mask = k6;
     const Xbyak::Opmask vmask = k7;
 
