@@ -388,6 +388,7 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
                 p.oc_blocks = occ * jcp.nb_oc_blocking;
 
                 p.oc_l_off = oc;
+                p.oc_off = oc * sizeof(float);
                 p.post_ops_binary_rhs_arg_vec
                         = post_ops_binary_rhs_arg_vec.data();
                 p.dst_orig = dst;
@@ -744,6 +745,7 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
                 p.oc_blocks = occ * jcp.nb_oc_blocking;
 
                 p.oc_l_off = oc;
+                p.oc_off = oc * sizeof(float);
                 p.post_ops_binary_rhs_arg_vec
                         = post_ops_binary_rhs_arg_vec.data();
                 p.dst_orig = dst;
