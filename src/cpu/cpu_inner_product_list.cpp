@@ -59,8 +59,8 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE(ref_inner_product_fwd_t, bf16, bf16, bf16, f32)
         CPU_INSTANCE(ref_inner_product_fwd_t, bf16, bf16, f32, f32)
         /* int */
-        CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8)
-        CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni)
+//        CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8)
+//        CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni)
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, u8)
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, s8)
         CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, s32)
