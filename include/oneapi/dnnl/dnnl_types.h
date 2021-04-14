@@ -1180,6 +1180,7 @@ typedef enum {
     dnnl_deconvolution_direct = 0xa,
     /// Winograd deconvolution
     dnnl_deconvolution_winograd = 0xb,
+    dnnl_ip_compress = 0x1,
     /// Eltwise: ReLU
     dnnl_eltwise_relu = 0x1f,
     /// Eltwise: hyperbolic tangent non-linearity (tanh)

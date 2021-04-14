@@ -33,6 +33,7 @@ void check_correctness(const settings_t &s) {
     for_(const auto &i_stag : s.stag)
     for_(const auto &i_wtag : s.wtag)
     for_(const auto &i_dtag : s.dtag)
+    for_(const auto &i_alg : s.alg)
     for_(const auto &i_oscale : s.oscale)
     for_(const auto &i_post_ops : s.post_ops)
     for_(const auto &i_scratchpad_mode : s.scratchpad_mode)
@@ -44,7 +45,7 @@ void check_correctness(const settings_t &s) {
         handle_legacy_attr(attr, s.attr);
 
         const prb_t prb(
-                s.desc, i_mb, i_dir, i_cfg, i_stag, i_wtag, i_dtag, attr);
+                s.desc, i_mb, i_dir, i_cfg, i_stag, i_wtag, i_dtag, i_alg, attr);
         std::stringstream ss;
         ss << prb;
         const std::string cpp_pstr = ss.str();

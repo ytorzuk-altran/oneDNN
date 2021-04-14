@@ -28,6 +28,11 @@
 
 namespace ip {
 
+enum alg_t { DIRECT, COMPRESS };
+alg_t str2alg(const char *str);
+const char *alg2str(alg_t alg);
+alg_t alg_kind2alg(dnnl_alg_kind_t alg);
+
 struct desc_t {
     int64_t mb, oc, ic, id, ih, iw;
     const char *name;
@@ -62,6 +67,7 @@ struct settings_t {
     std::vector<const dt_conf_t *> cfg {conf_f32};
     std::vector<std::string> stag {tag::any}, wtag {tag::any}, dtag {tag::any};
     std::vector<int64_t> mb {0};
+    std::vector<alg_t> alg {DIRECT};
     std::vector<attr_t::scale_t> oscale {attr_t::scale_t()};
     std::vector<attr_t::post_ops_t> post_ops {attr_t::post_ops_t()};
     std::vector<dnnl_scratchpad_mode_t> scratchpad_mode {
@@ -82,13 +88,15 @@ struct settings_t {
 struct prb_t : public desc_t {
     prb_t(const desc_t &desc, int64_t mb, dir_t dir, const dt_conf_t *cfg,
             const std::string &stag, const std::string &wtag,
-            const std::string &dtag, const attr_t &attr)
+            const std::string &dtag, const alg_t &alg,
+            const attr_t &attr)
         : desc_t(desc)
         , dir(dir)
         , cfg(cfg)
         , stag(stag)
         , wtag(wtag)
         , dtag(dtag)
+        , alg(alg)
         , attr(attr)
         , user_mb(mb)
         , ops(0)
@@ -104,6 +112,7 @@ struct prb_t : public desc_t {
     dir_t dir;
     const dt_conf_t *cfg;
     std::string stag, wtag, dtag;
+    alg_t alg;
     attr_t attr;
     int64_t user_mb;
 

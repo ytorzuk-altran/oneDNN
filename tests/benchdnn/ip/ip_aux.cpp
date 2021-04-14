@@ -27,6 +27,29 @@
 
 namespace ip {
 
+alg_t str2alg(const char *str) {
+#define CASE(_alg) \
+    if (!strcasecmp(STRINGIFY(_alg), str)) return _alg
+    CASE(COMPRESS);
+#undef CASE
+    assert(!"unknown algorithm");
+    return DIRECT;
+}
+
+const char *alg2str(alg_t alg) {
+    if (alg == DIRECT) return "direct";
+    if (alg == COMPRESS) return "compress";
+    assert(!"unknown algorithm");
+    return "unknown algorithm";
+}
+
+alg_t alg_kind2alg(dnnl_alg_kind_t alg) {
+    if (alg == dnnl_ip_compress) return COMPRESS;
+    assert(!"unknown algorithm");
+    return DIRECT;
+}
+
+
 void prb_t::generate_oscales() {
     if (attr.oscale.is_def()) return;
 

@@ -70,6 +70,16 @@ static int init_pd(dnnl_engine_t engine, const prb_t *prb,
             WARN);
     SAFE(init_md(&dst_d, 2, dst_dims, prb->cfg[DST].dt, prb->dtag), CRIT);
 
+    dnnl_alg_kind_t alg = dnnl_ip_compress;
+
+    if (prb->alg == alg_t::COMPRESS) {
+        alg = dnnl_ip_compress;
+        dnnl_memory_extra_desc_t wei_md_extra {};
+        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
+        wei_md_extra.compensation_mask = 13;
+        wei_d.extra = wei_md_extra;
+    }
+
     switch (prb->dir) {
         case FWD_D:
         case FWD_B:
