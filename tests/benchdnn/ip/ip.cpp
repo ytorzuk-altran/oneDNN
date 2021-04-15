@@ -310,11 +310,6 @@ int doit(const prb_t *prb, res_t *res) {
                  const_pd, binary_po_args, binary_po_dt, binary_po_fp),
             WARN);
 
-    dnn_mem_t src_fp(src_md, fp, src_tag, test_engine);
-    dnn_mem_t wei_fp(wei_md, fp, wei_tag, test_engine);
-    dnn_mem_t bia_fp(bia_md, fp, tag::x, test_engine);
-    dnn_mem_t dst_fp(dst_md, fp, tag::abx, test_engine);
-
     dnnl_alg_kind_t alg = dnnl_ip_compress;
     if (prb->alg == alg_t::COMPRESS) {
         alg = dnnl_ip_compress;
@@ -323,6 +318,11 @@ int doit(const prb_t *prb, res_t *res) {
         wei_md_extra.compensation_mask = 13;
         wei_md.extra = wei_md_extra;
     }
+
+    dnn_mem_t src_fp(src_md, fp, src_tag, test_engine);
+    dnn_mem_t wei_fp(wei_md, fp, wei_tag, test_engine);
+    dnn_mem_t bia_fp(bia_md, fp, tag::x, test_engine);
+    dnn_mem_t dst_fp(dst_md, fp, tag::abx, test_engine);
 
     SAFE(fill_src(prb, src_dt, src_fp, res), WARN);
     SAFE(fill_wei(prb, wei_dt, wei_fp, res), WARN);
