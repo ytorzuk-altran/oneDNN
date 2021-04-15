@@ -299,6 +299,15 @@ int doit(const prb_t *prb, res_t *res) {
 
     const auto &test_engine = get_test_engine();
 
+    dnnl_alg_kind_t alg = dnnl_ip_compress;
+    if (prb->alg == alg_t::COMPRESS) {
+        alg = dnnl_ip_compress;
+        dnnl_memory_extra_desc_t wei_md_extra {};
+        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
+        wei_md_extra.compensation_mask = 13;
+        wei_md.extra = wei_md_extra;
+    }
+
     dnn_mem_t src_dt(src_md, test_engine);
     dnn_mem_t wei_dt(wei_md, test_engine);
     dnn_mem_t bia_dt(bia_md, test_engine);
@@ -309,15 +318,6 @@ int doit(const prb_t *prb, res_t *res) {
     SAFE(binary::setup_binary_po(
                  const_pd, binary_po_args, binary_po_dt, binary_po_fp),
             WARN);
-
-    dnnl_alg_kind_t alg = dnnl_ip_compress;
-    if (prb->alg == alg_t::COMPRESS) {
-        alg = dnnl_ip_compress;
-        dnnl_memory_extra_desc_t wei_md_extra {};
-        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
-        wei_md_extra.compensation_mask = 13;
-        wei_md.extra = wei_md_extra;
-    }
 
     dnn_mem_t src_fp(src_md, fp, src_tag, test_engine);
     dnn_mem_t wei_fp(wei_md, fp, wei_tag, test_engine);
