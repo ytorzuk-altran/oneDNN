@@ -201,6 +201,7 @@ struct brgemm_kernel_params_t {
     const void *a_zp_compensations = nullptr;
     const void *b_zp_compensations = nullptr;
     const void *c_zp_values = nullptr;
+    bool weights_compressed = false;
 };
 
 struct jit_brgemm_kernel_base_t;

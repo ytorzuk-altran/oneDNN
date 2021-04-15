@@ -47,6 +47,7 @@ struct jit_brgemm_primitive_conf_t {
     bool with_binary;
     bool with_scales;
     bool signed_input;
+    bool weights_compressed;
     int nb_ic, ic_block;
     int nb_oc, oc_block;
     int nb_iw, iw_block;

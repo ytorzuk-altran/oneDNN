@@ -631,9 +631,13 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
         return status::unimplemented;
     if (!IMPLICATION(is_f32, isa == avx512_core)) return status::unimplemented;
 
+    jbgp.weights_compressed = false;
     if (is_int8) {
         jbgp.acc_dt = s32;
         jbgp.with_scales = true;
+        jbgp.weights_compressed 
+            = (weights_d.extra().flags & memory_extra_flags::compression) != 0;
+
     } else if (is_bf16) {
         jbgp.acc_dt = f32;
     } else if (is_f32) {
