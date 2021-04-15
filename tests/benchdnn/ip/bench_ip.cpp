@@ -80,6 +80,7 @@ int bench(int argc, char **argv) {
                 || parse_tag(s.stag, def.stag, argv[0], "stag")
                 || parse_tag(s.wtag, def.wtag, argv[0], "wtag")
                 || parse_tag(s.dtag, def.dtag, argv[0], "dtag")
+                || parse_alg(s.alg, def.alg, str2alg, argv[0])
                 || parse_mb(s.mb, def.mb, argv[0])
                 || parse_attr(s.attr, argv[0])
                 || parse_attr_oscale(s.oscale, argv[0])
