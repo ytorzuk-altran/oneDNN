@@ -127,8 +127,7 @@ struct memory_desc_wrapper : public c_compatible {
             assert(cmask == 1 || cmask == 3 || cmask == 13 || cmask == 27);
             dim_t prod = 1;
             if (cmask == 13) {
-                prod = padded_dims()[0] * padded_dims()[1] / 64
-                        * padded_dims()[2] * padded_dims()[3];
+                prod = padded_dims()[0] * padded_dims()[1];
             } else {
                 for (int d = 0; d < ndims(); ++d)
                     if (cmask & (1 << d)) prod *= padded_dims()[d];

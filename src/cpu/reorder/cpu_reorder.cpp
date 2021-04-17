@@ -41,12 +41,12 @@ std::map<reorder_impl_key_t, const void *> comp_s8s8_impl_list_map {
         {{f32, s8, 0}, &comp_f32_s8_impl_list_map},
         {{bf16, s8, 0}, &comp_bf16_s8_impl_list_map},
         {{s8, s8, 0}, &comp_s8_s8_impl_list_map},
-        {{s8, s8, 0}, &compression_impl_list_map},
 };
 
 /* conv reorders w/ compensation */
 std::map<reorder_impl_key_t, const void *> compression_s8s8_impl_list_map {
-        {{s8, s8, 0}, &compression_impl_list_map},
+        {{s8, s8, 0}, &compression_s8_s8_impl_list_map},
+        {{f32, s8, 0}, &compression_f32_s8_impl_list_map},		
 };
 
 const impl_list_item_t *cpu_engine_impl_list_t::get_reorder_implementation_list(

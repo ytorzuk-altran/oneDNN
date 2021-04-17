@@ -268,7 +268,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 && input_d.is_plain()
                 && (output_d.extra().flags & memory_extra_flags::compression)
                 && compensation_mask_ok
-                && (input_d.data_type() == s8)
+                && one_of(input_d.data_type(), f32, s8)
                 && output_d.data_type() == s8 && (D_mask == 1 || D_mask == oc);
     }
 
