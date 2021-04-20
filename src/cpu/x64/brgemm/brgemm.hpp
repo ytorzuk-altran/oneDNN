@@ -164,7 +164,8 @@ void brgemm_kernel_execute(const brgemm_kernel_t *brg_kernel, int bs,
 ///
 void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
         const brgemm_batch_element_t *batch, void *ptr_C, void *ptr_D,
-        const brgemm_post_ops_data_t &post_ops_data, void *scratch = nullptr);
+        const brgemm_post_ops_data_t &post_ops_data, void *scratch = nullptr, 
+        bool compressed = false);
 
 /// Execute BRGEMM kernel (brgemm_offs and brgemm_strd version)
 ///

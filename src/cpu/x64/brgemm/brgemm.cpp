@@ -70,9 +70,9 @@ void brgemm_kernel_execute(const brgemm_kernel_t *brg_kernel, int bs,
 
 void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
         const brgemm_batch_element_t *batch, void *ptr_C, void *ptr_D,
-        const brgemm_post_ops_data_t &post_ops_data, void *scratch) {
+        const brgemm_post_ops_data_t &post_ops_data, void *scratch, bool compressed) {
     brgemm_kernel_params_t brgemm_p;
-
+    // printf("brgemm_kernel_execute_postops 71 \n");
     brgemm_p.batch = batch;
     brgemm_p.ptr_A = nullptr;
     brgemm_p.ptr_B = nullptr;
@@ -89,7 +89,9 @@ void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
     brgemm_p.a_zp_compensations = post_ops_data.a_zp_compensations;
     brgemm_p.b_zp_compensations = post_ops_data.b_zp_compensations;
     brgemm_p.c_zp_values = post_ops_data.c_zp_values;
-
+    brgemm_p.weights_compressed = compressed;
+    // if(compressed)
+    //     printf("brgemm_p.weights_compressed is TRUE \n");
     (*brg_kernel)(&brgemm_p);
 }
 
@@ -98,7 +100,7 @@ void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
         const brgemm_batch_element_t *batch, void *ptr_C, void *ptr_D,
         const brgemm_post_ops_data_t &post_ops_data, void *scratch) {
     brgemm_kernel_params_t brgemm_p;
-
+    printf("brgemm_kernel_execute_postops 96 \n");
     brgemm_p.batch = batch;
     brgemm_p.ptr_A = addr_A;
     brgemm_p.ptr_B = addr_B;
