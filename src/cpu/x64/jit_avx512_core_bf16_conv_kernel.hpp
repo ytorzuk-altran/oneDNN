@@ -25,6 +25,7 @@
 #include "cpu/x64/jit_primitive_conf.hpp"
 #include "cpu/x64/jit_uni_eltwise_injector.hpp"
 #include "cpu/x64/jit_uni_depthwise_injector.hpp"
+#include "cpu/x64/jit_uni_quantization_injector.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -54,6 +55,10 @@ struct _jit_avx512_core_bf16_fwd_kernel : public jit_generator {
         for (auto inj : depthwise_injectors)
             delete inj;
         depthwise_injectors.clear();
+
+        for (auto inj : quantization_injectors)
+            delete inj;
+        quantization_injectors.clear();
 
         delete bf16_emu_;
     }
@@ -149,8 +154,12 @@ private:
     reg64_t reg_d_weights = r15;
     reg64_t reg_d_bias = reg_kj;
 
+    Xbyak::Zmm zmm_d_weights = Xbyak::Zmm(31);
+    Xbyak::Zmm zmm_d_bias = Xbyak::Zmm(30);
+
     nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
     nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<avx512_common>*> quantization_injectors;
 
     bf16_emulation_t *bf16_emu_;
 

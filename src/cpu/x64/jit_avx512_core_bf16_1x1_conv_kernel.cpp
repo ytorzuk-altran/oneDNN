@@ -307,6 +307,7 @@ void jit_avx512_core_bf16_1x1_conv_kernel::reduce_loop(
             /* Eltwise post-op */
             int eltwise_inj_idx = 0;
             int depthwise_inj_idx = 0;
+            int quantization_inj_idx = 0;
             const auto& p = attr_.post_ops_;
 
             for (int i = 0; i < p.len(); i++) {
@@ -333,6 +334,26 @@ void jit_avx512_core_bf16_1x1_conv_kernel::reduce_loop(
                     }
 
                     depthwise_inj_idx++;
+                } else if (post_op.is_quantization()) {
+                    quantization_injectors[quantization_inj_idx]->init_crop_ptrs(reg_oc_off);
+                    for (int j = 0; j < load_loop_blk; ++j) {
+                        int s_idx = vreg_accum(j, 0).getIdx();
+                        quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + ur, j * jcp.oc_block * sizeof(float));
+                    }
+
+                    quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(reg_oc_off);
+                    for (int j = 0; j < load_loop_blk; ++j) {
+                        int s_idx = vreg_accum(j, 0).getIdx();
+                        quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + ur, j * jcp.oc_block * sizeof(float), true);
+                    }
+
+                    quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(reg_oc_off);
+                    for (int j = 0; j < load_loop_blk; ++j) {
+                        int s_idx = vreg_accum(j, 0).getIdx();
+                        quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + ur, j * jcp.oc_block * sizeof(float));
+                    }
+
+                    quantization_inj_idx++;
                 }
             }
 
@@ -910,6 +931,12 @@ void jit_avx512_core_bf16_1x1_conv_kernel::generate() {
                     this,
                     post_op.depthwise.alg
             ));
+        } else if (post_op.is_quantization()) {
+            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_common>(
+                    this,
+                    post_op,
+                    zmm_d_weights, zmm_d_bias, reg_d_weights, reg_d_bias
+            ));
         }
     }
 
@@ -1093,7 +1120,8 @@ bool jit_avx512_core_bf16_1x1_conv_kernel::post_ops_ok(
         bool ok = true;
 
         for (int i = 0; i < p.len(); i++) {
-            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise);
+            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise,
+                                     primitive_kind::quantization);
         }
         return ok;
     };

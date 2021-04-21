@@ -151,6 +151,7 @@ void _jit_avx512_core_bf16_fwd_kernel<Vmm>::store_dst(int ur_w) {
 
     int eltwise_inj_idx = 0;
     int depthwise_inj_idx = 0;
+    int quantization_inj_idx = 0;
     const auto &p = attr_.post_ops_;
     for (int i = 0; i < p.len(); i++) {
         auto& post_op = p.entry_[i];
@@ -181,6 +182,26 @@ void _jit_avx512_core_bf16_fwd_kernel<Vmm>::store_dst(int ur_w) {
             }
 
             depthwise_inj_idx++;
+        } else if (post_op.is_quantization()) {
+            quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < jcp.nb_oc_blocking; k++) {
+                int s_idx = vmm_dst(0, k).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + ur_w, k * jcp.oc_block * sizeof(float));
+            }
+
+            quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < jcp.nb_oc_blocking; k++) {
+                int s_idx = vmm_dst(0, k).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + ur_w, k * jcp.oc_block * sizeof(float), true);
+            }
+
+            quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[this->param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < jcp.nb_oc_blocking; k++) {
+                int s_idx = vmm_dst(0, k).getIdx();
+                quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + ur_w, k * jcp.oc_block * sizeof(float));
+            }
+
+            quantization_inj_idx++;
         }
     }
 
@@ -492,6 +513,12 @@ void _jit_avx512_core_bf16_fwd_kernel<Vmm>::generate() {
                     this,
                     post_op.depthwise.alg
             ));
+        } else if (post_op.is_quantization()) {
+            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_common>(
+                    this,
+                    post_op,
+                    zmm_d_weights, zmm_d_bias, reg_d_weights, reg_d_bias
+            ));
         }
     }
 
@@ -730,7 +757,8 @@ bool jit_avx512_core_bf16_fwd_kernel::post_ops_ok(
         bool ok = true;
 
         for (int i = 0; i < p.len(); i++) {
-            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise);
+            ok = ok && utils::one_of(p.entry_[i].kind, primitive_kind::sum, primitive_kind::eltwise, primitive_kind::depthwise,
+                                     primitive_kind::quantization);
         }
         return ok;
     };
