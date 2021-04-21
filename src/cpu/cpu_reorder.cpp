@@ -679,7 +679,9 @@ const impl_list_map_t comp_s8s8_impl_list_map {
 
         nullptr,
     }},
+#endif
     {{s8, s8, 4}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_SR(s8, any, s8, hwio, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, any, s8, wigo, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goiw, s8, gOIw4i16o4i, fmt_order_keep, spec_conv_s8s8)
@@ -700,10 +702,13 @@ const impl_list_map_t comp_s8s8_impl_list_map {
         REG_SR(s8, wigo, s8, Goiw8g, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goiw, s8, Goiw4g, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, wigo, s8, Goiw4g, fmt_order_keep, spec_conv_s8s8)
+#endif
+        REG_SR(s8, iohw, s8, OIhw4i16o4i, fmt_order_keep, spec_conv_s8s8)
 
         nullptr,
     }},
     {{s8, s8, 5}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_SR(s8, any, s8, hwigo, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, any, s8, dhwio, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goihw, s8, gOIhw4i16o4i, fmt_order_keep, spec_conv_s8s8)
@@ -724,18 +729,23 @@ const impl_list_map_t comp_s8s8_impl_list_map {
         REG_SR(s8, hwigo, s8, Goihw8g, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goihw, s8, Goihw4g, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, hwigo, s8, Goihw4g, fmt_order_keep, spec_conv_s8s8)
+#endif
+        REG_SR(s8, giohw, s8, gOIhw4i16o4i, fmt_order_keep, spec_conv_s8s8)
+        REG_SR(s8, iodhw, s8, OIdhw4i16o4i, fmt_order_keep, spec_conv_s8s8)
 
         nullptr,
     }},
     {{s8, s8, 6}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_SR(s8, any, s8, dhwigo, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goidhw, s8, gOIdhw4i16o4i, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goidhw, s8, gOIdhw2i8o4i, fmt_order_keep, spec_conv_s8s8)
         REG_SR(s8, goidhw, s8, gOIdhw4o4i, fmt_order_keep, spec_conv_s8s8)
+#endif
+        REG_SR(s8, giodhw, s8, gOIdhw4i16o4i, fmt_order_keep, spec_conv_s8s8)
 
         nullptr,
     }},
-#endif
 };
 
 // clang-format on

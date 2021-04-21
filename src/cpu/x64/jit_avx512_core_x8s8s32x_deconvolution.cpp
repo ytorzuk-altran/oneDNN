@@ -219,6 +219,7 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
 
     jcp.nb_ch = div_up(jcp.ngroups, jcp.ch_block);
     jcp.nb_oc = jcp.oc / jcp.oc_block;
+    if (jcp.nb_oc == 0) return status::unimplemented;
     jcp.nb_ic = jcp.ic / jcp.ic_block;
 
     /* kernel blocking params */

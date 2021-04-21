@@ -251,7 +251,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                                 && (utils::one_of(tag_o,
                                         format_tag::gOIdhw4i16o4i,
                                         format_tag::gOIdhw2i8o4i,
-                                        format_tag::gOIdhw4o4i))),
+                                        format_tag::gOIdhw4o4i)))
+                        || ((utils::one_of(tag_i, format_tag::iohw))
+                                && (utils::one_of(tag_o, format_tag::OIhw4i16o4i)))
+                        || ((utils::one_of(tag_i, format_tag::iodhw))
+                               && (utils::one_of(tag_o, format_tag::OIdhw4i16o4i)))
+                        || ((utils::one_of(tag_i, format_tag::giohw))
+                                && (utils::one_of(tag_o, format_tag::gOIhw4i16o4i)))
+                        || ((utils::one_of(tag_i, format_tag::giodhw))
+                            && (utils::one_of(tag_o, format_tag::gOIdhw4i16o4i))),
                 spec::conv_s8s8>::type> {
     static bool is_applicable(const memory_desc_wrapper &input_d,
             const memory_desc_wrapper &output_d, const primitive_attr_t *attr) {
