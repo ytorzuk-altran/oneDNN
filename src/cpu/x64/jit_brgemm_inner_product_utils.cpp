@@ -623,10 +623,6 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
                             && jbgp.wei_dt == f32);
     const bool is_f32 = everyone_is(f32, jbgp.src_dt, jbgp.wei_dt, jbgp.dst_dt);
 
-    if(is_int8){
-        printf("jbgp.weights_compressed = true\n");
-        jbgp.weights_compressed = true;
-    }
     if (!IMPLICATION(is_int8,
                 one_of(isa, avx512_core_vnni, avx512_core_bf16_amx_int8)))
         return status::unimplemented;
@@ -641,7 +637,11 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
         jbgp.with_scales = true;
         jbgp.weights_compressed 
             = (weights_d.extra().flags & memory_extra_flags::compression) != 0;
-
+        if (jbgp.weights_compressed) {
+            printf("jbgp.weights_compressed = true\n");
+            jbgp.weights_compressed = true;
+            jbgp.weight_comp_bitmask_off = jbgp.ic * jbgp.oc;
+        }
     } else if (is_bf16) {
         jbgp.acc_dt = f32;
     } else if (is_f32) {

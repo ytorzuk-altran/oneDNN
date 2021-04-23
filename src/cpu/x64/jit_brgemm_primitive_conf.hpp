@@ -68,6 +68,7 @@ struct jit_brgemm_primitive_conf_t {
     bool use_buffer_b;
 
     int is_oc_scale;
+    size_t weight_comp_bitmask_off;
 
     int LDA, LDB, LDC, LDD;
     int M, N, K, M_tail, N_tail, K_tail;

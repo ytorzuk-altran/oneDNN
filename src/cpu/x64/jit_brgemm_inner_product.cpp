@@ -84,10 +84,11 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
 
     size_t offset = types::data_type_size(jbgp.wei_dt)
             * (weights_d.size() - weights_d.additional_buffer_size());
-    printf("offset %d\n", offset);
+    printf("offset %zd\n", offset);
     auto compensation = (jbgp.signed_input)
             ? reinterpret_cast<const int32_t *>(&weights[offset])
             : nullptr;
+    int8_t decomp_buf[1024];
 
     bool is_os_tail = (jbgp.mb < jbgp.os_block);
     bool is_oc_tail = (jbgp.oc < jbgp.oc_block);
@@ -135,7 +136,12 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                                 src_d, jbgp.src_dt, n, ic + b * jbgp.ic_block);
                 addr_batch[b].ptr.B = weights
                         + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b);
-                printf("  gemm_batch %d, weight offset %d \n",
+                addr_batch[b].scratch_buf = decomp_buf;
+                addr_batch[b].bitmask_ptr = weights
+                        + jbgp.weight_comp_bitmask_off
+                        + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b) / 8;
+
+                printf("  gemm_batch %d, weight offset %zd \n",
                         gemm_batch, get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b));                        
             }
 
