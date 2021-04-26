@@ -89,9 +89,9 @@ void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
     brgemm_p.a_zp_compensations = post_ops_data.a_zp_compensations;
     brgemm_p.b_zp_compensations = post_ops_data.b_zp_compensations;
     brgemm_p.c_zp_values = post_ops_data.c_zp_values;
+    brgemm_p.scratch_buf = batch->scratch_buf;
+    brgemm_p.bitmask_ptr = batch->bitmask_ptr;    
     brgemm_p.weights_compressed = compressed;
-    // if(compressed)
-    //     printf("brgemm_p.weights_compressed is TRUE \n");
     (*brg_kernel)(&brgemm_p);
 }
 
@@ -328,7 +328,9 @@ status_t brgemm_desc_init(brgemm_t *brg, cpu_isa_t isa,
     } else {
         brg->stride_a = brg->stride_b = 0;
     }
-
+    printf("brg->typesize_B %d, brg->rd_step %d, brg->ld_block %d\n", brg->typesize_B , brg->rd_step, brg->ld_block);
+    printf("brg.typesize_B * (brg.rd_step * ld * brg.ld_block) %d\n", brg->typesize_B * (brg->rd_step * brg->ld_block));
+    printf("brg->bd_block2 %d, brg->ld_block2 %d \n", brg->bd_block2, brg->ld_block2);
     return status::success;
 }
 
