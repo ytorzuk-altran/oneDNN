@@ -722,10 +722,12 @@ status_t jit_avx512_core_x8s8s32x_1x1_conv_kernel::init_conf(
         jcp.ic = rnd_up(jcp.ic, 16);
     }
 
+    /*
     const int simd_w = (jcp.ic % 16 == 0 && jcp.oc % 16 == 0)
             ? 16
             : (jcp.ic % 8 == 0 && jcp.oc % 8 == 0) ? 8 : 4;
-
+    */
+    const int simd_w = 8;
     auto set_or_check_wei_format = [&]() -> bool {
         using namespace format_tag;
         const format_tag_t wei_tags[3][2][3]

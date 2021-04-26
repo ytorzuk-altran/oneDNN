@@ -1261,9 +1261,13 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
         jcp.oc_block = 1;
     } else {
         jcp.ch_block = 1;
-        jcp.ic_block = 16;
-        jcp.oc_block = 16;
+        jcp.ic_block = 8;
+        jcp.oc_block = 8;
 
+        jcp.oc = rnd_up(jcp.oc, jcp.oc_block);
+        jcp.ic = rnd_up(jcp.ic, jcp.ic_block);
+
+#if 0
         if (jcp.ngroups == 1) {
             /* For non grouped convolutions, pad channels by 16 if needed */
             jcp.oc = rnd_up(jcp.oc, jcp.oc_block);
@@ -1279,6 +1283,8 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
             jcp.ic_block = (jcp.ic % 8 == 0) && (jcp.oc % 8 == 0) ? 8 : 4;
             jcp.oc_block = jcp.ic_block;
         }
+#endif
+
         if (jcp.ic % jcp.ic_block != 0 || jcp.oc % jcp.oc_block != 0)
             return status::unimplemented;
     }
@@ -1324,8 +1330,18 @@ status_t jit_avx512_core_x8s8s32x_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
                         : OIhw4i16o4i;
             }
         } else if (jcp.ic_block == 8) {
-            assert(with_groups);
-            wei_tag = is_3d ? gOIdhw2i8o4i : is_2d ? gOIhw2i8o4i : gOIw2i8o4i;
+            //assert(with_groups);
+            //wei_tag = is_3d ? gOIdhw2i8o4i : is_2d ? gOIhw2i8o4i : gOIw2i8o4i;
+            if (is_3d) {
+                wei_tag = with_groups ? gOIdhw2i8o4i : OIdhw2i8o4i;
+            } else if (is_1d) {
+                wei_tag = with_groups ? jcp.is_depthwise ? Goiw8g : gOIw2i8o4i
+                                      : OIw2i8o4i;
+            } else {
+                assert(is_2d);
+                wei_tag = with_groups ? jcp.is_depthwise ? Goihw8g : gOIhw2i8o4i
+                                      : OIhw2i8o4i;
+            }
         } else {
             assert(with_groups && jcp.ic_block == 4);
             wei_tag = is_3d ? gOIdhw4o4i : is_2d ? gOIhw4o4i : gOIw4o4i;
