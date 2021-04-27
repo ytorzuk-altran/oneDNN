@@ -150,6 +150,7 @@ struct brgemm_t {
     bool is_bf16 = false, is_bf16_amx = false;
     bool is_f32 = false;
     bool is_amx = false;
+    bool weights_compressed = false;
 
     dim_t stride_a = 0; // Offset in bytes
     dim_t stride_b = 0;

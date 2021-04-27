@@ -128,6 +128,7 @@ struct brgemm_inner_product_fwd_t : public primitive_t {
                 int idx = get_brg_kernel_idx(i_init, i_M, i_N, i_K);
                 if (idx < 0) continue;
                 brgemm_t &brg = brg_descs_[idx];
+                brg.weights_compressed = jbgp_.weights_compressed;
                 CHECK(brgemm_desc_init(&brg, isa, jbgp_.brg_type, jbgp_.src_dt,
                         jbgp_.wei_dt, false, false, brgemm_row_major, alpha,
                         vbeta, jbgp_.LDA, jbgp_.LDB, jbgp_.LDC, vM, vN, vK));

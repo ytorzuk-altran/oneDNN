@@ -100,7 +100,6 @@ void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
         const brgemm_batch_element_t *batch, void *ptr_C, void *ptr_D,
         const brgemm_post_ops_data_t &post_ops_data, void *scratch) {
     brgemm_kernel_params_t brgemm_p;
-    printf("brgemm_kernel_execute_postops 96 \n");
     brgemm_p.batch = batch;
     brgemm_p.ptr_A = addr_A;
     brgemm_p.ptr_B = addr_B;
@@ -328,9 +327,9 @@ status_t brgemm_desc_init(brgemm_t *brg, cpu_isa_t isa,
     } else {
         brg->stride_a = brg->stride_b = 0;
     }
-    printf("brg->typesize_B %d, brg->rd_step %d, brg->ld_block %d\n", brg->typesize_B , brg->rd_step, brg->ld_block);
-    printf("brg.typesize_B * (brg.rd_step * ld * brg.ld_block) %d\n", brg->typesize_B * (brg->rd_step * brg->ld_block));
-    printf("brg->bd_block2 %d, brg->ld_block2 %d \n", brg->bd_block2, brg->ld_block2);
+    //printf("brg->typesize_B %d, brg->rd_step %d, brg->ld_block %d\n", brg->typesize_B , brg->rd_step, brg->ld_block);
+    //printf("brg.typesize_B * (brg.rd_step * ld * brg.ld_block) %d\n", brg->typesize_B * (brg->rd_step * brg->ld_block));
+    //printf("brg->bd_block2 %d, brg->ld_block2 %d \n", brg->bd_block2, brg->ld_block2);
     return status::success;
 }
 
