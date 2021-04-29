@@ -385,7 +385,7 @@ int doit(const prb_t *prb, res_t *res) {
     /* Step 5: execute necessary reorders */
     printf("---src_dt_in_fmt_in.reorder---\n");
     SAFE(src_dt_in_fmt_in.reorder(src_dt_in_fmt_ref), WARN);
-
+    
     const bool has_sum
             = prb->attr.post_ops.find(attr_t::post_ops_t::kind_t::SUM) >= 0;
     if (has_sum) {
@@ -411,11 +411,12 @@ int doit(const prb_t *prb, res_t *res) {
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zero_points_m);
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zero_points_m);
 
-    show_memory(src_dt_in_fmt_in);
+    //show_memory(src_dt_in_fmt_in);
 
     SAFE(execute_and_wait(prim, args), WARN);
-    show_memory(dst_dt_out_fmt_out);
-
+    //show_memory(dst_dt_out_fmt_out);
+    printf("------src_dt_in_fmt_in----\n");
+    show_memory(src_dt_in_fmt_in);
     /* Step 6: check correctness */
     if (bench_mode & CORR) {
         if (prb->is_reorder_with_compensation()) {
@@ -441,7 +442,8 @@ int doit(const prb_t *prb, res_t *res) {
                     dst_md, dst_dt, rc.tag_out, dst_engine);
             // Direct reorder
             SAFE(ref_dst_dt_direct_ref.reorder(src_dt_in_fmt_ref), WARN);
-            show_memory(ref_dst_dt_direct_ref);
+            //printf("---------------direct reorder------\n");
+            //show_memory(ref_dst_dt_direct_ref);
 
             // compare ip-custom-reorder minus compression and direct reorder
             // 

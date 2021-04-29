@@ -247,7 +247,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 /* specific reorders: compression */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
-        typename utils::enable_if<tag_i == format_tag::oi
+        typename utils::enable_if<((tag_i == format_tag::io) || (tag_i == format_tag::oi))
                         && utils::one_of(tag_o, format_tag::OI16i64o4i,
                                 format_tag::OI16i16o4i),
                 spec::compression>::type> {
@@ -264,8 +264,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 = output_d.extra().compensation_mask == 13;
         return /* simple_attr_check(attr, true, false)
                 && */
-                output_d.matches_tag(tag_o)
-                && input_d.is_plain()
+                input_d.is_plain()
                 && (output_d.extra().flags & memory_extra_flags::compression)
                 && compensation_mask_ok
                 && one_of(input_d.data_type(), f32, s8)
@@ -283,9 +282,10 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
       const int i_blksize = i_outer_blksize * 4;
       const int o_blksize = 64;
 
-      const int OC = input_dims[0];
+      const int OC = input_dims[1];
       const int NB_OC = padded_dims[0] / o_blksize;
-      const int IC = input_dims[1];
+      const int IC = input_dims[0];
+       printf(" OC  IC--%d %d \n",OC, IC);
       const int NB_IC = padded_dims[1] / i_blksize;
       const int plain_o_stride = input_d.blocking_desc().strides[0];
       const int plain_i_stride = input_d.blocking_desc().strides[1];
@@ -304,12 +304,13 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
           auto outp = &output[output_d.blk_off(O, I)];
           const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
           const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
-          int bitmask_idx = (O * NB_IC + I) * i_outer_blksize;
+          //int bitmask_idx = (O * NB_IC + I) * i_outer_blksize;
+          //printf("-----bitmask_idx---O-NB_IC-I-i_outer_blksize %d %d %d %d %d --\n",bitmask_idx,O,NB_IC,I,i_outer_blksize);
           auto max_outp = &outp[o_blksize * i_blksize];
           const float *scales_here
                   = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
           for (int ic_base = 0; ic_base < ic_block; ic_base += 4) {
-              bitmask_ptr[bitmask_idx] = 0;
+             // bitmask_ptr[bitmask_idx] = 0;
               int bit = 0;
               for (int oc = 0; oc < oc_block; oc++) {
                   int plain_off
@@ -317,22 +318,24 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                   int ic_block_here = nstl::min(4, ic_block - ic_base);
                   for (int ic = 0; ic < ic_block_here; ic++) {
                       data_t<type_o> o = inp[plain_off];
-                      if (o != 0) {
+                      //if (o != 0) {
                           *outp++ = o;
-                          bitmask_ptr[bitmask_idx] |= (1UL << bit);
-                      }
+                          //printf("%d,",o);
+                          //bitmask_ptr[bitmask_idx] |= (1UL << bit);
+                      //}
 
                       plain_off += plain_i_stride;
                       bit++;
                       count++;
                   }
               }
-              bitmask_idx++;
+              //bitmask_idx++;
           }
-          while (outp < max_outp) {
-              *outp++ = 0;
-          }
+         // while (outp < max_outp) {
+             // *outp++ = 0;
+         // }
       });
+      printf("-----success----\n");
       return status::success;
   }
 };
