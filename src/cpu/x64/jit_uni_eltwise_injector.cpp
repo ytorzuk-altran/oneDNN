@@ -1246,13 +1246,13 @@ void jit_uni_eltwise_injector_f32<isa>::mish_compute_vector_fwd(
     h->uni_vdivps(vmm_src, vmm_src, vmm_aux0);
 
     // x * v / (v + 2.0f)
-    h->uni_vmovups(vmm_aux0, h->ptr[h->rsp]);
+    h->uni_vmovups(vmm_aux1, h->ptr[h->rsp]);
     h->add(h->rsp, vlen);
-    h->uni_vmulps(vmm_src, vmm_src, vmm_aux0);
+    h->uni_vmulps(vmm_src, vmm_src, vmm_aux1);
 
     // return linear function for large numbers
-    compute_cmp_mask(vmm_aux0, table_val(mish), _cmp_gt_os);
-    blend_with_mask(vmm_src, vmm_aux0);
+    compute_cmp_mask(vmm_aux1, table_val(mish), _cmp_gt_os);
+    blend_with_mask(vmm_src, vmm_aux1);
 }
 
 template <cpu_isa_t isa>
