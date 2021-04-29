@@ -381,9 +381,11 @@ int doit(const prb_t *prb, res_t *res) {
 
     /* Step 4: fill input memory */
     SAFE(fill_memory(prb, SRC, src_dt_in_fmt_ref), WARN);
+    // printf("---SRC:src_dt_in_fmt_ref ---\n");
+    // show_memory(src_dt_in_fmt_ref);
 
     /* Step 5: execute necessary reorders */
-    printf("---src_dt_in_fmt_in.reorder---\n");
+
     SAFE(src_dt_in_fmt_in.reorder(src_dt_in_fmt_ref), WARN);
     
     const bool has_sum
@@ -410,13 +412,11 @@ int doit(const prb_t *prb, res_t *res) {
     args.set(DNNL_ARG_ATTR_OUTPUT_SCALES, scales);
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_SRC, src_zero_points_m);
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zero_points_m);
-
-    //show_memory(src_dt_in_fmt_in);
-
     SAFE(execute_and_wait(prim, args), WARN);
     //show_memory(dst_dt_out_fmt_out);
-    printf("------src_dt_in_fmt_in----\n");
-    show_memory(src_dt_in_fmt_in);
+    printf("------dst_dt_out_fmt_out----\n");
+    show_memory(dst_dt_out_fmt_out);
+
     /* Step 6: check correctness */
     if (bench_mode & CORR) {
         if (prb->is_reorder_with_compensation()) {
