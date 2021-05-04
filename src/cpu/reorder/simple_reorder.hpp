@@ -1605,7 +1605,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     static status_t execute(const cpu_reorder_pd_t *pd, const exec_ctx_t &ctx) {
         DECLARE_COMMON_PARAMS();
-        printf("DEBUG: direct reorder\n");
         assert(input_d.is_dense());
 
         input += input_d.blk_off(0);

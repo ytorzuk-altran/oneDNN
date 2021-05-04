@@ -142,9 +142,9 @@ private:
     const reg64_t reg_aux_D = reg_BS_loop;
 
     // Compression
-    const Xbyak::Reg64 reg_ptr_decomp_src = rdx;
-    const Xbyak::Reg64 reg_ptr_decomp_dst = rax;
-    const Xbyak::Reg64 reg_ptr_decomp_mask = rbx;
+    const Xbyak::Reg64 reg_ptr_decomp_src = r9;
+    const Xbyak::Reg64 reg_ptr_decomp_dst = rdx;
+    const Xbyak::Reg64 reg_ptr_decomp_mask = r11; // rax;
     const Xbyak::Reg64 reg_popcnt = rsi;
     const Xbyak::Reg64 reg_comp_mask_tmp = rsi;
     
@@ -176,7 +176,11 @@ private:
     constexpr static int reg_aux_zp_comp_b_offs_ = 144;
     constexpr static int reg_zp_c_values_offs_ = 152;
     constexpr static int reg_aux_zp_c_values_offs_ = 160;
-    constexpr static int stack_space_needed_ = 168;
+    constexpr static int reg_decomp_src_offset_ = 168;
+    constexpr static int reg_decomp_dst_offset_ = 174;
+    constexpr static int reg_decomp_mask_offset_ = 182;
+    constexpr static int reg_decomp_popcount_offset_ = 190;
+    constexpr static int stack_space_needed_ = 198; //
 
     bool is_ldb_loop;
     bool with_binary_per_oc_bcast_ = false;
@@ -1109,11 +1113,12 @@ void jit_brgemm_kernel_base_t::gemm_microkernel_amx(int bd_block2,
     };
 
     if (brg.weights_compressed) {
-        push(rdx);
-        push(rax);
-        push(rbx);
-        push(rsi);
-        mov(reg_ptr_decomp_mask,
+        mov(ptr[rsp+reg_decomp_src_offset_], reg_ptr_decomp_src);
+        mov(ptr[rsp+reg_decomp_dst_offset_], reg_ptr_decomp_dst);
+        mov(ptr[rsp+reg_decomp_mask_offset_], reg_ptr_decomp_mask);
+        mov(ptr[rsp+reg_decomp_popcount_offset_], reg_popcnt);
+
+	    mov(reg_ptr_decomp_mask,
                 ptr[reg_addr_batch + GET_OFF_BATCH_ELEMENT(bitmask_ptr)]);
 
         for (int ldb = 0; ldb < ld_block2; ldb++) {
@@ -1151,10 +1156,10 @@ void jit_brgemm_kernel_base_t::gemm_microkernel_amx(int bd_block2,
             tileloadd(Tmm(brgemm_amx::get_B_tensor(idx)),
                     ptr[reg_ptr_decomp_dst + reg_stride_ldb]);
         }
-        pop(rsi);
-        pop(rbx);
-        pop(rax);
-        pop(rdx);
+        mov(reg_popcnt, ptr[rsp+reg_decomp_popcount_offset_]);
+        mov(reg_ptr_decomp_mask, ptr[rsp+reg_decomp_mask_offset_]);
+        mov(reg_ptr_decomp_dst, ptr[rsp+reg_decomp_dst_offset_]);
+	    mov(reg_ptr_decomp_src, ptr[rsp+reg_decomp_src_offset_]);
     } else {
         for (int ldb = 0; ldb < ld_block2; ldb++) {
             const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
