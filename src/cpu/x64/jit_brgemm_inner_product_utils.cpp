@@ -718,6 +718,10 @@ void init_scratchpad(memory_tracking::registrar_t &scratchpad,
     if (jbgp.brg_type == brgemm_addr) {
         scratchpad.book(key_brgemm_primitive_batch, n_elems, sc_size, 64);
     }
+    if (jbgp.weights_compressed) { 
+        scratchpad.book(key_brgemm_primitive_decomp_buffer, 1024, 1, 64);        
+    }
+
     if (jbgp.use_buffer) {
         size_t nelements = (size_t)jbgp.nthr * jbgp.LDC * jbgp.M;
         if (jbgp.prop_kind == dnnl_backward_weights
