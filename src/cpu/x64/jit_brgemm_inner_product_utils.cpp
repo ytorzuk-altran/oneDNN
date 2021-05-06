@@ -719,7 +719,7 @@ void init_scratchpad(memory_tracking::registrar_t &scratchpad,
         scratchpad.book(key_brgemm_primitive_batch, n_elems, sc_size, 64);
     }
     if (jbgp.weights_compressed) { 
-        scratchpad.book(key_brgemm_primitive_decomp_buffer, 1024, 1, 64);        
+        scratchpad.book(key_brgemm_primitive_decomp_buffer, jbgp.nthr * 1024, 1);        
     }
 
     if (jbgp.use_buffer) {

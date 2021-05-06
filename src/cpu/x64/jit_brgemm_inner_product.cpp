@@ -138,7 +138,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                                 src_d, jbgp.src_dt, n, ic + b * jbgp.ic_block);
                 addr_batch[b].ptr.B = weights
                         + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b);
-                addr_batch[b].scratch_buf = b_decomp_buf;
+                addr_batch[b].scratch_buf = b_decomp_buf + ithr * 1024;
                 addr_batch[b].bitmask_ptr = weights
                         + jbgp.weight_comp_bitmask_off
                         + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b) / 8;
