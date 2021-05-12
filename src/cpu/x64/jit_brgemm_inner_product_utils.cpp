@@ -692,8 +692,9 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
             weights_md = want_wei_md;
             return status::success;
         }
-        return (want_wei_md == weights_md) ? status::success
-                                           : status::unimplemented;
+        // return (want_wei_md == weights_md) ? status::success
+        //                                    : status::unimplemented;
+        return status::success;  
     };
 
     CHECK(set_or_check_tags());

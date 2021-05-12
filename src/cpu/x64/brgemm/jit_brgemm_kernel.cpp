@@ -177,10 +177,10 @@ private:
     constexpr static int reg_zp_c_values_offs_ = 152;
     constexpr static int reg_aux_zp_c_values_offs_ = 160;
     constexpr static int reg_decomp_src_offset_ = 168;
-    constexpr static int reg_decomp_dst_offset_ = 174;
-    constexpr static int reg_decomp_mask_offset_ = 182;
-    constexpr static int reg_decomp_popcount_offset_ = 190;
-    constexpr static int stack_space_needed_ = 198; //
+    constexpr static int reg_decomp_dst_offset_ = 176;
+    constexpr static int reg_decomp_mask_offset_ = 184;
+    constexpr static int reg_decomp_popcount_offset_ = 192;
+    constexpr static int stack_space_needed_ = 200; //
 
     bool is_ldb_loop;
     bool with_binary_per_oc_bcast_ = false;

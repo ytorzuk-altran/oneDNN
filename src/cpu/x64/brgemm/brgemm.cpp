@@ -72,7 +72,6 @@ void brgemm_kernel_execute_postops(const brgemm_kernel_t *brg_kernel, int bs,
         const brgemm_batch_element_t *batch, void *ptr_C, void *ptr_D,
         const brgemm_post_ops_data_t &post_ops_data, void *scratch, bool compressed) {
     brgemm_kernel_params_t brgemm_p;
-    // printf("brgemm_kernel_execute_postops 71 \n");
     brgemm_p.batch = batch;
     brgemm_p.ptr_A = nullptr;
     brgemm_p.ptr_B = nullptr;
