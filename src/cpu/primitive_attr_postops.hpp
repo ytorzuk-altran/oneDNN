@@ -79,6 +79,7 @@ private:
 
     std::vector<ref_eltwise_scalar_fwd_t> eltwise_po_;
     std::vector<ref_binary_scalar_t> binary_po_;
+    std::vector<ref>
 };
 
 } // namespace cpu

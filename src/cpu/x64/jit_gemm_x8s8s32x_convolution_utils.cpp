@@ -725,6 +725,7 @@ void jit_pp_ker_t::generate() {
 }
 
 bool mayiuse_jit_pp_kernel() noexcept {
+    // todo: [antonvor] avx2, sse41?
     return mayiuse(avx512_core);
 }
 
@@ -739,7 +740,7 @@ bool post_ops_ok(const post_ops_t &post_ops, const memory_desc_wrapper *dst_d) {
     static constexpr bool sum_requires_scale_one = false;
     return mayiuse_jit_pp_kernel()
             && dnnl::impl::cpu::x64::injector::post_ops_ok(
-                    {avx512_core, {binary, eltwise, sum}, post_ops, dst_d,
+                    {avx512_core, {binary, eltwise, sum, depthwise, quantization}, post_ops, dst_d,
                             sum_at_pos_0_only, sum_requires_scale_one});
 }
 

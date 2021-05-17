@@ -28,6 +28,7 @@
 #endif
 
 #include "cpu/gemm_x8s8s32x_convolution_utils.hpp"
+// #include "ref_depthwise_injector.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -148,7 +149,7 @@ bool post_ops_ok(const post_ops_t &post_ops, const memory_desc_wrapper *dst_d) {
     return std::all_of(post_ops.entry_.cbegin(), post_ops.entry_.cend(),
             [](const dnnl_post_ops::entry_t &post_op) {
                 return post_op.is_eltwise() || post_op.is_sum()
-                        || post_op.is_binary();
+                        || post_op.is_binary() || post_op.is_depthwise() || post_op.is_quantization();
             });
 }
 

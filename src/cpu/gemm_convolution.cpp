@@ -156,6 +156,7 @@ status_t gemm_convolution_fwd_t::execute_forward_thr_nspc(const exec_ctx_t &ctx,
                     &LDC);
             if (st != status::success) return st;
 
+            // todo: [antonvor] support post ops for nspc
             if (jcp.with_bias || jcp.with_eltwise || jcp.with_binary) {
                 parallel(0, [&](int ithr, int nthr) {
                     size_t start, end;
@@ -305,61 +306,66 @@ status_t gemm_convolution_fwd_t::execute_forward_ncsp(
                     &LDA, _weights, &LDB, &beta, _dst, &M);
             if (st != status::success) return st;
 
-            if (curr.ic == jcp.ic - step.ic) {
-                // TODO: for "outer threading" we have parallel section within
-                // outermost "parallel". It is not good. Consider to use
-                // "parallel" here with number of threads passed as parameter
-                const int oc_start = curr.g * jcp.oc + curr.oc;
-                if (jcp.with_eltwise || jcp.with_binary) {
-                    bool fast_relu_done = false;
-                    if (jcp.with_eltwise && jcp.post_ops.len() == 1) {
-                        // fast branch for ReLU case
-                        const auto &eltwise
-                                = jcp.post_ops.entry_.back().eltwise;
-                        if (eltwise.alg == alg_kind::eltwise_relu) {
-                            parallel_nd(step.oc, [&](const int oc) {
-                                data_t b = jcp.with_bias ? bias[oc_start + oc]
-                                                         : 0;
-                                data_t *d_ = _dst + oc * M;
-                                PRAGMA_OMP_SIMD()
-                                for (int oS = 0; oS < m; ++oS) {
-                                    d_[oS] += b;
-                                    if (d_[oS] < 0) d_[oS] *= eltwise.alpha;
-                                    d_[oS] *= eltwise.scale;
-                                }
-                            });
-                            fast_relu_done = true;
-                        }
-                    }
-                    if (!fast_relu_done) {
-                        parallel_nd(step.oc, [&](const int oc) {
-                            data_t b = jcp.with_bias ? bias[oc_start + oc] : 0;
-                            data_t *d_ = _dst + oc * M;
-
-                            ref_post_ops_t::args_t args;
-                            args.ctx = &ctx;
-                            args.dst_md = pd()->dst_md();
-                            args.l_offset = (oc_start + oc) * jcp.os;
-
-                            PRAGMA_OMP_SIMD()
-                            for (int oS = 0; oS < m; ++oS) {
-                                d_[oS] += b;
-                                post_ops_->execute(d_[oS], args);
-                            }
-                        });
-                    }
-
-                } else if (jcp.with_bias) {
-                    parallel_nd(step.oc, [&](const int oc) {
-                        data_t b = bias[oc_start + oc];
-                        data_t *d_ = _dst + oc * M;
-                        PRAGMA_OMP_SIMD()
-                        for (int oS = 0; oS < m; ++oS) {
-                            d_[oS] += b;
-                        }
-                    });
-                }
+            if (pp_kernel_ && curr.ic == jcp.ic - step.ic) {
+                (*pp_kernel_)(_dst, bias, m, curr.g * jcp.oc + curr.oc, step.oc, M);
             }
+
+            // todo: [antonvor] delete old behavior for post ops
+//            if (curr.ic == jcp.ic - step.ic) {
+//                // TODO: for "outer threading" we have parallel section within
+//                // outermost "parallel". It is not good. Consider to use
+//                // "parallel" here with number of threads passed as parameter
+//                const int oc_start = curr.g * jcp.oc + curr.oc;
+//                if (jcp.with_eltwise || jcp.with_binary) {
+//                    bool fast_relu_done = false;
+//                    if (jcp.with_eltwise && jcp.post_ops.len() == 1) {
+//                        // fast branch for ReLU case
+//                        const auto &eltwise
+//                                = jcp.post_ops.entry_.back().eltwise;
+//                        if (eltwise.alg == alg_kind::eltwise_relu) {
+//                            parallel_nd(step.oc, [&](const int oc) {
+//                                data_t b = jcp.with_bias ? bias[oc_start + oc]
+//                                                         : 0;
+//                                data_t *d_ = _dst + oc * M;
+//                                PRAGMA_OMP_SIMD()
+//                                for (int oS = 0; oS < m; ++oS) {
+//                                    d_[oS] += b;
+//                                    if (d_[oS] < 0) d_[oS] *= eltwise.alpha;
+//                                    d_[oS] *= eltwise.scale;
+//                                }
+//                            });
+//                            fast_relu_done = true;
+//                        }
+//                    }
+//                    if (!fast_relu_done) {
+//                        parallel_nd(step.oc, [&](const int oc) {
+//                            data_t b = jcp.with_bias ? bias[oc_start + oc] : 0;
+//                            data_t *d_ = _dst + oc * M;
+//
+//                            ref_post_ops_t::args_t args;
+//                            args.ctx = &ctx;
+//                            args.dst_md = pd()->dst_md();
+//                            args.l_offset = (oc_start + oc) * jcp.os;
+//
+//                            PRAGMA_OMP_SIMD()
+//                            for (int oS = 0; oS < m; ++oS) {
+//                                d_[oS] += b;
+//                                post_ops_->execute(d_[oS], args);
+//                            }
+//                        });
+//                    }
+//
+//                } else if (jcp.with_bias) {
+//                    parallel_nd(step.oc, [&](const int oc) {
+//                        data_t b = bias[oc_start + oc];
+//                        data_t *d_ = _dst + oc * M;
+//                        PRAGMA_OMP_SIMD()
+//                        for (int oS = 0; oS < m; ++oS) {
+//                            d_[oS] += b;
+//                        }
+//                    });
+//                }
+//            }
 
             return status::success;
         };

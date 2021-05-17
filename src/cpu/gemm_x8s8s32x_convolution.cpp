@@ -175,10 +175,6 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
 
     const float *scales = pd()->attr()->output_scales_.scales_;
 
-    const auto &post_ops = pd()->attr()->post_ops_;
-    const bool do_sum = post_ops.contain(primitive_kind::sum, 0);
-    const float sum_scale = do_sum ? post_ops.entry_[0].sum.scale : 0;
-
     uint8_t *__restrict col = scratchpad.get<uint8_t>(key_conv_gemm_col)
             + (ptrdiff_t)ithr * jcp.im2col_sz;
     src_data_t *__restrict imtr = scratchpad.get<src_data_t>(key_conv_gemm_imtr)
@@ -297,7 +293,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
                 size_t _start, _end;
                 balance211((size_t)N * jcp.oc, nthr, ithr, _start, _end);
 
-                (*pp_ker_)(dst, acc, bia_base, scales, sum_scale,
+                (*pp_ker_)(dst, acc, bia_base, scales,
                         1.f / wei_adj_scale, g, _start, _end, zp,
                         post_ops_binary_rhs_arg_vec, dst_base, ctx,
                         *pd()->dst_md(), chunk_desc);
@@ -336,8 +332,7 @@ status_t _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data(
 }
 
 template <data_type_t dst_type>
-status_t
-_gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data_thr(
+status_t _gemm_u8s8s32x_convolution_bwd_data_t<dst_type>::execute_backward_data_thr(
         const int ithr, const int nthr, const diff_dst_data_t *diff_dst_base,
         const wei_data_t *wei_base, const char *bia_base,
         diff_src_data_t *diff_src_base,

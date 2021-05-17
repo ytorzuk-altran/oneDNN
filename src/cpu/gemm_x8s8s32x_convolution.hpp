@@ -60,8 +60,7 @@ struct _gemm_x8s8s32x_convolution_fwd_t : public primitive_t {
                     && !has_zero_dim_memory()
                     && attr()->has_default_values(
                             primitive_attr_t::skip_mask_t::oscale
-                                    | primitive_attr_t::skip_mask_t::
-                                            zero_points_runtime
+                                    | primitive_attr_t::skip_mask_t::zero_points_runtime
                                     | primitive_attr_t::skip_mask_t::post_ops
                                     | primitive_attr_t::skip_mask_t::input_zero_points
                                     | primitive_attr_t::skip_mask_t::output_compensations,
