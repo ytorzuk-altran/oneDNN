@@ -111,6 +111,12 @@ public:
     void compute_vector_range(const injector_utils::vmm_index_set_t &vmm_idxs,
             const binary_injector::rhs_arg_dynamic_params_t &rhs_arg_params);
 
+    void compute_vector_range(
+            size_t start_idx, size_t end_idx,
+            const binary_injector::rhs_arg_dynamic_params_t &rhs_arg_params,
+            const depthwise_injector::dynamic_params_t &ddp,
+            const quantization_injector::dynamic_params_t &qdp);
+
     void compute_vector_range(const injector_utils::vmm_index_set_t &vmm_idxs);
 
     /*
