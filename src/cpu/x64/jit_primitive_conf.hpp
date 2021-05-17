@@ -474,6 +474,7 @@ struct jit_deconv_call_s {
     size_t kh_padding;
     size_t kd_padding;
     size_t oc_blocks;
+    size_t oc_off;
 };
 
 struct jit_dw_conv_call_s {

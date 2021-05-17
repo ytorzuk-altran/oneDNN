@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018-2021 Intel Corporation
+* Copyright 2020-2021 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 * limitations under the License.
 *******************************************************************************/
 
-#include "cpu/x64/jit_avx512_core_x8s8s32x_deconvolution.hpp"
+#include "cpu/x64/jit_uni_x8s8s32x_deconvolution.hpp"
 #include "common/dnnl_thread.hpp"
 
 #define GET_OFF(field) offsetof(jit_deconv_call_s, field)
@@ -32,10 +32,11 @@ using namespace Xbyak;
 using namespace nstl;
 
 #define wht_blk_off(d, g, ...) \
-    (pd()->with_groups() ? (d).blk_off((g), __VA_ARGS__) \
-                         : (d).blk_off(__VA_ARGS__))
+(pd()->with_groups() ? (d).blk_off((g), __VA_ARGS__) \
+         : (d).blk_off(__VA_ARGS__))
 
-status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
+template <cpu_isa_t isa>
+status_t jit_uni_x8s8s32x_deconv_fwd_kernel<isa>::init_conf(
         jit_conv_conf_t &jcp, const deconvolution_desc_t &cd,
         memory_desc_t &src_md, memory_desc_t &weights_md, memory_desc_t &dst_md,
         const bool with_bias, memory_desc_t &bias_md,
@@ -45,11 +46,11 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     const memory_desc_wrapper weights_d(&weights_md);
     const memory_desc_wrapper bias_d(&bias_md);
 
-    if (!(mayiuse(avx512_core)
-                && one_of(src_d.data_type(), data_type::u8, data_type::s8)
-                && weights_d.data_type() == data_type::s8
-                && one_of(dst_d.data_type(), data_type::f32, data_type::s32,
-                        data_type::s8, data_type::u8)))
+    if (!(mayiuse(isa)
+          && one_of(src_d.data_type(), data_type::u8, data_type::s8)
+          && weights_d.data_type() == data_type::s8
+          && one_of(dst_d.data_type(), data_type::f32, data_type::s32,
+                    data_type::s8, data_type::u8)))
         return status::unimplemented;
 
     jcp = zero<decltype(jcp)>();
@@ -59,7 +60,9 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     jcp.signed_input = src_d.data_type() == data_type::s8;
     const int ndims = jcp.ndims = dst_d.ndims();
     const bool is_1d = ndims == 3;
+    const bool is_2d = ndims == 4;
     const bool is_3d = ndims == 5;
+    const bool is_avx2 = isa == avx2;
 
     jcp.ngroups = with_groups ? weights_d.dims()[0] : 1;
     jcp.oc = dst_d.dims()[1] / jcp.ngroups;
@@ -68,8 +71,9 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     jcp.oc_without_padding = dst_d.dims()[1] / jcp.ngroups;
     jcp.ic_without_padding = src_d.dims()[1] / jcp.ngroups;
     jcp.is_depthwise = true && with_groups
-            && utils::everyone_is(
-                    1, jcp.ic_without_padding, jcp.oc_without_padding);
+                       && utils::everyone_is(
+            1, jcp.ic_without_padding, jcp.oc_without_padding);
+    jcp.ver = mayiuse(avx2_vnni) ? ver_vnni : ver_unused;
 
     /* TODO: future work, on hold until depthwise specialized kernel is
      * implemented. */
@@ -98,28 +102,43 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     auto set_or_check_wei_format = [&]() {
         using namespace format_tag;
         format_tag_t wei_tag;
-        if (is_3d) {
-            wei_tag = with_groups ? gOIdhw4i16o4i : OIdhw4i16o4i;
+        if (jcp.ic_block == 8 || jcp.ch_block == 8) {
+            if (is_1d) {
+                wei_tag = with_groups ? jcp.is_depthwise ? Goiw8g : gOIw2i8o4i
+                                      : OIw2i8o4i;
+            } else if (is_2d) {
+                wei_tag = with_groups ? jcp.is_depthwise ? Goihw8g : gOIhw2i8o4i
+                                      : OIhw2i8o4i;
+            } else {
+                wei_tag = with_groups ? gOIdhw2i8o4i : OIdhw2i8o4i;
+            }
         } else {
-            wei_tag = is_1d
-                    ? (jcp.is_depthwise
-                                    ? Goiw16g
-                                    : (with_groups ? gOIw4i16o4i : OIw4i16o4i))
-                    : (jcp.is_depthwise ? Goihw16g
-                                        : (with_groups ? gOIhw4i16o4i
-                                                       : OIhw4i16o4i));
+            if (is_avx2) {
+                assert(with_groups && jcp.ic_block == 4);
+                wei_tag = is_3d ? gOIdhw4o4i : is_2d ? gOIhw4o4i : gOIw4o4i;
+            } else {
+                if (is_1d) {
+                    wei_tag = with_groups ? jcp.is_depthwise ? Goiw4g : gOIw4o4i
+                                          : OIw4o4i;
+                } else if (is_2d) {
+                    wei_tag = with_groups
+                              ? jcp.is_depthwise ? Goihw4g : gOIhw4o4i
+                              : OIhw4o4i;
+                } else {
+                    wei_tag = with_groups ? gOIdhw4o4i : OIdhw4o4i;
+                }
+            }
         }
 
         memory_desc_t want_wei_md = weights_md;
         memory_desc_init_by_tag(want_wei_md, wei_tag);
         if (jcp.signed_input && !jcp.is_depthwise) {
             want_wei_md.extra.flags = 0
-                    | memory_extra_flags::compensation_conv_s8s8
-                    | memory_extra_flags::scale_adjust;
+                                      | memory_extra_flags::compensation_conv_s8s8
+                                      | memory_extra_flags::scale_adjust;
             want_wei_md.extra.compensation_mask = (1 << 0)
-                    + (with_groups && !jcp.is_depthwise ? (1 << 1) : 0);
-            want_wei_md.extra.scale_adjust
-                    = mayiuse(avx512_core_vnni) ? 1.f : 0.5f;
+                                                  + (with_groups && !jcp.is_depthwise ? (1 << 1) : 0);
+            want_wei_md.extra.scale_adjust = (jcp.ver == ver_vnni) ? 1.f : 0.5f;
         }
 
         if (weights_md.format_kind == format_kind::any) {
@@ -129,8 +148,6 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
 
         return weights_md == want_wei_md;
     };
-
-    if (!set_or_check_wei_format()) return status::unimplemented;
 
     jcp.with_bias = with_bias;
     if (jcp.with_bias) {
@@ -156,28 +173,39 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     jcp.stride_w = cd.strides[ndims - 3];
 
     if (jcp.is_depthwise) {
-        jcp.ch_block = 16;
+        jcp.ch_block = is_avx2 ? 8 : 4;
         jcp.oc_block = 1;
         jcp.ic_block = 1;
     } else {
         jcp.ch_block = 1;
-        jcp.oc_block = 16;
-        jcp.ic_block = 16;
+        jcp.oc_block = is_avx2 ? 8 : 4;
+        jcp.ic_block = is_avx2 ? 8 : 4;
 
         if (jcp.ngroups == 1) {
             jcp.oc = utils::rnd_up(jcp.oc_without_padding, jcp.oc_block);
             jcp.ic = utils::rnd_up(jcp.ic_without_padding, jcp.ic_block);
+        } else if (jcp.ngroups != 1
+                   && ((jcp.ic % jcp.ic_block != 0)
+                       || (jcp.oc % jcp.oc_block != 0))) {
+            /* For grouped convolution, oneDNN doesn't support padding.
+             * When channel per group is not multiple of 8 in avx2:
+             * - Use Xmm when channels per groups is multiple of 4.
+             * - Otherwise return unimplemented */
+            jcp.oc_block = jcp.ic_block = 4;
         }
-        if (jcp.ic % jcp.ic_block != 0) return status::unimplemented;
+        if (jcp.ic % jcp.ic_block != 0 || jcp.oc % jcp.oc_block != 0)
+            return status::unimplemented;
     }
+
+    if (!set_or_check_wei_format()) return status::unimplemented;
 
     jcp.dilate_d = is_3d ? cd.dilates[0] : 0;
     jcp.dilate_h = is_1d ? 0 : cd.dilates[ndims - 4];
     jcp.dilate_w = cd.dilates[ndims - 3];
 
     if (!IMPLICATION(jcp.dilate_d, jcp.stride_d == 1)
-            || !IMPLICATION(jcp.dilate_h, jcp.stride_h == 1)
-            || !IMPLICATION(jcp.dilate_w, jcp.stride_w == 1))
+        || !IMPLICATION(jcp.dilate_h, jcp.stride_h == 1)
+        || !IMPLICATION(jcp.dilate_w, jcp.stride_w == 1))
         return status::unimplemented;
 
     int ext_kw = calculate_extended_filter_size(jcp.kw, jcp.dilate_w);
@@ -190,20 +218,11 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
     jcp.back_pad = calculate_end_padding(
             jcp.f_pad, jcp.id, jcp.od, jcp.stride_d, ext_kd);
     bool kernel_outside_src = false || ext_kw <= jcp.l_pad
-            || ext_kw <= jcp.r_pad || ext_kh <= jcp.t_pad || ext_kh <= jcp.b_pad
-            || ext_kd <= jcp.f_pad || ext_kd <= jcp.back_pad;
+                              || ext_kw <= jcp.r_pad || ext_kh <= jcp.t_pad || ext_kh <= jcp.b_pad
+                              || ext_kd <= jcp.f_pad || ext_kd <= jcp.back_pad;
     if (kernel_outside_src) return status::unimplemented;
 
     if (!post_ops_ok(jcp, attr)) return status::unimplemented;
-
-    jcp.ver = ver_avx512_core;
-    if (mayiuse(avx512_core_vnni)) jcp.ver = ver_vnni;
-    int max_regs = jcp.ver == ver_vnni ? 30 : 28;
-
-    const auto &p = attr.post_ops_;
-    if (p.len() > 0 && !contain_only_eltwise_post_op(attr)) {
-        max_regs -= 2;
-    }
 
     const auto &oscales = attr.output_scales_;
     jcp.is_oc_scale = oscales.mask_ == 1 << 1;
@@ -221,16 +240,15 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
 
     jcp.nb_ch = div_up(jcp.ngroups, jcp.ch_block);
     jcp.nb_oc = jcp.oc / jcp.oc_block;
-    if (jcp.nb_oc == 0) return status::unimplemented;
     jcp.nb_ic = jcp.ic / jcp.ic_block;
 
     /* kernel blocking params */
-    const int regs = max_regs;
+    const int regs = jcp.ver == ver_vnni ? 14 : 12;
     jcp.nb_ch_blocking = 1;
     jcp.nb_oc_blocking = nstl::min(4, jcp.nb_oc);
     for (; jcp.nb_oc_blocking > 1; jcp.nb_oc_blocking--)
         if (jcp.nb_oc % jcp.nb_oc_blocking == 0
-                && jcp.l_pad <= regs / (jcp.nb_oc_blocking + 1))
+            && jcp.l_pad <= regs / (jcp.nb_oc_blocking + 1))
             break;
 
     jcp.ur_w = regs / (jcp.nb_oc_blocking + 1);
@@ -252,14 +270,14 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
             bool left_boundary_covered = jcp.ur_w >= l_overflow * jcp.stride_w;
             jcp.ur_w_tail = jcp.ow % jcp.ur_w;
             int r_overflow_no_tail = max(0,
-                    ((jcp.kw - 1) * (jcp.dilate_w + 1) - max(0, jcp.r_pad)
-                            - jcp.ur_w_tail)
-                            / jcp.stride_w);
+                                         ((jcp.kw - 1) * (jcp.dilate_w + 1) - max(0, jcp.r_pad)
+                                          - jcp.ur_w_tail)
+                                         / jcp.stride_w);
             bool right_boundary_covered
                     = jcp.ur_w >= r_overflow_no_tail * jcp.stride_w;
 
             if (is_multiple_of_stride && left_boundary_covered
-                    && right_boundary_covered)
+                && right_boundary_covered)
                 break;
             else if (jcp.ur_w == 1)
                 /* The boundary conditions above are also important
@@ -278,26 +296,25 @@ status_t jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_conf(
 
     jcp.wei_adj_scale
             = (weights_d.extra().flags & memory_extra_flags::scale_adjust)
-            ? weights_d.extra().scale_adjust
-            : 1.f;
+              ? weights_d.extra().scale_adjust
+              : 1.f;
 
     jcp.loop_order = jcp.ngroups > 1 ? loop_ngc : loop_cgn;
     return status::success;
 }
 
-bool jit_avx512_core_x8s8s32x_deconv_fwd_kernel::contain_only_eltwise_post_op(const primitive_attr_t &attr) {
-    const auto &p = attr.post_ops_;
-    for (int i = 0; i < p.len(); i++) {
-        auto &post_op = p.entry_[i];
-        if (!post_op.is_eltwise()) {
-            return false;
-        }
+template <cpu_isa_t isa>
+void jit_uni_x8s8s32x_deconv_fwd_kernel<isa>::init_scratchpad(
+        memory_tracking::registrar_t &scratchpad, const jit_conv_conf_t &jcp,
+        const primitive_attr_t &attr) {
+    if (jcp.signed_input && jcp.ver != ver_vnni) {
+        dim_t count = nstl::max<dim_t>(attr.output_scales_.count_, 8);
+        scratchpad.book<float>(key_conv_adjusted_scales, count);
     }
-    return true;
 }
 
-bool jit_avx512_core_x8s8s32x_deconv_fwd_kernel::post_ops_ok(
-        jit_conv_conf_t &jcp, const primitive_attr_t &attr) {
+template <cpu_isa_t isa>
+bool jit_uni_x8s8s32x_deconv_fwd_kernel<isa>::post_ops_ok(jit_conv_conf_t &jcp, const primitive_attr_t &attr) {
     using namespace primitive_kind;
     const auto &p = attr.post_ops_;
 
@@ -313,46 +330,39 @@ bool jit_avx512_core_x8s8s32x_deconv_fwd_kernel::post_ops_ok(
     return all_post_ops_supported();
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::init_scratchpad(
-        memory_tracking::registrar_t &scratchpad, const jit_conv_conf_t &jcp,
-        const primitive_attr_t &attr) {
-    if (jcp.signed_input && jcp.ver != ver_vnni) {
-        dim_t count = nstl::max<dim_t>(attr.output_scales_.count_, 16);
-        scratchpad.book<float>(key_conv_adjusted_scales, count);
-    }
-}
-
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::compute_ker(int ur_w,
-        int l_overflow, int r_overflow, ker_block_t last_ic_block_flag,
-        bool h_padded) {
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::compute_ker(int ur_w,
+                                                                int l_overflow, int r_overflow, ker_block_t last_ic_block_flag,
+                                                                bool h_padded) {
 
     const int ch_block_all = jcp.ch_block * jcp.ic_block * jcp.oc_block;
     const int ur_w_stride = jcp.signed_input ? 1 : jcp.stride_w;
 
     auto src_offset = [=](int oj, int icb, int ki) {
         return jcp.typesize_in
-                * (((oj + jcp.l_pad - ki * (jcp.dilate_w + 1)) / jcp.stride_w)
-                                * jcp.ngroups * jcp.ic_without_padding
-                        + icb * 4);
+               * (((oj + jcp.l_pad - ki * (jcp.dilate_w + 1)) / jcp.stride_w)
+                  * jcp.ngroups * jcp.ic_without_padding
+                  + icb * 4);
     };
 
     auto kernel_offset = [=](int ocb, int icb, int ki) {
         return jcp.typesize_in
-                * (ocb * jcp.nb_ic * jcp.kd * jcp.kh * jcp.kw * ch_block_all
-                        + icb * jcp.oc_block * jcp.ic_block / 4
-                        + ki * ch_block_all);
+               * ((ocb * jcp.nb_ic * jcp.kd * jcp.kh * jcp.kw + ki)
+                  * ch_block_all
+                  + icb * jcp.oc_block * ic_sub_step);
     };
 
-    auto compute = [=](zmm_t vreg_acc, zmm_t vreg_wei, zmm_t vreg_src) {
+    auto compute = [=](Vmm vreg_acc, Vmm vreg_wei, Vmm vreg_src) {
         if (jcp.ver == ver_vnni) {
-            vpdpbusd(vreg_acc, vreg_src, vreg_wei);
+            vpdpbusd(vreg_acc, vreg_src, vreg_wei, VexEncoding);
         } else if (jcp.is_depthwise) {
-            vpmulld(zmm_tmp, vreg_src, vreg_wei);
-            vpaddd(vreg_acc, vreg_acc, zmm_tmp);
+            uni_vmovups(vmm_tmp, vreg_src);
+            uni_vpmulld(vmm_tmp, vmm_tmp, vreg_wei);
+            uni_vpaddd(vreg_acc, vreg_acc, vmm_tmp);
         } else {
-            vpmaddubsw(zmm_tmp, vreg_src, vreg_wei);
-            vpmaddwd(zmm_tmp, zmm_tmp, zmm_one);
-            vpaddd(vreg_acc, vreg_acc, zmm_tmp);
+            uni_vpmaddubsw(vmm_tmp, vreg_src, vreg_wei);
+            uni_vpmaddwd(vmm_tmp, vmm_tmp, vmm_one);
+            uni_vpaddd(vreg_acc, vreg_acc, vmm_tmp);
         }
     };
 
@@ -367,17 +377,18 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::compute_ker(int ur_w,
         int tail_size = jcp.is_depthwise ? jcp.ngroups % jcp.ch_block
                                          : jcp.ic_without_padding % 4;
         int n_ic_blocks = jcp.is_depthwise
-                ? 1
-                : (last_ic_block_flag & ~no_last_block ? div_up(
-                           jcp.ic_without_padding % jcp.ic_block, 4)
-                                                       : jcp.ic_block / 4);
+                          ? 1
+                          : (last_ic_block_flag != no_last_block ? div_up(
+                        jcp.ic_without_padding % jcp.ic_block, 4)
+                                                                 : jcp.ic_block / 4);
 
         for (int icb1 = 0; icb1 < n_ic_blocks; icb1++) {
+
             if (h_padded == true) {
                 /* fill padded area with shifted values */
-                Zmm inp = zmm_inp(0, jcp.nb_oc_blocking);
-                vpxord(inp, inp, inp);
-                vpsubb(inp, inp, zmm_shift);
+                Vmm inp = vmm_inp(0, jcp.nb_oc_blocking);
+                uni_vpxor(inp, inp, inp);
+                uni_vpsubb(inp, inp, vmm_shift);
             } else {
 
                 for (int jj = _start; jj < _end; jj += ur_w_stride) {
@@ -385,39 +396,38 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::compute_ker(int ur_w,
                     int aux_src_off = src_offset(jj, icb1, ki);
 
                     if (jj >= jj_start && jj < jj_end
-                            && ((jj + jcp.l_pad - ki) % jcp.stride_w == 0)) {
+                        && ((jj + jcp.l_pad - ki) % jcp.stride_w == 0)) {
                         if (jcp.is_depthwise) {
-                            auto zmm_src = zmm_inp(jj, jcp.nb_oc_blocking);
-                            if (tail_size != 0) {
-                                assert(jcp.nb_oc_blocking == 1);
-                                zmm_src = zmm_src | ktail_mask | T_z;
-                            }
-                            vpmovzxbd(zmm_src,
-                                    EVEX_compress_addr(
-                                            aux_reg_src, aux_src_off));
-                        } else if ((last_ic_block_flag & last_sp_block)
-                                && tail_size != 0 && icb1 == n_ic_blocks - 1) {
-                            xmm_t xmm_tmp = xmm_t(
-                                    zmm_inp(jj, jcp.nb_oc_blocking).getIdx());
-                            for (int r = 0; r < tail_size; ++r)
-                                vpinsrb(xmm_tmp, xmm_tmp,
-                                        ptr[aux_reg_src + aux_src_off + r], r);
-                            vpbroadcastd(
-                                    zmm_inp(jj, jcp.nb_oc_blocking), xmm_tmp);
+                            auto vmm_src = vmm_inp(jj, jcp.nb_oc_blocking);
+                            if (tail_size != 0) assert(jcp.nb_oc_blocking == 1);
+                            uni_vpxor(vmm_src, vmm_src, vmm_src);
+                            const bool mask_flag
+                                    = last_ic_block_flag != no_last_block
+                                      && tail_size;
+                            load_data(data_type::u8, vmm_src, aux_reg_src,
+                                      aux_src_off,
+                                      mask_flag ? tail_size : jcp.ch_block);
+                        } else if ((last_ic_block_flag == last_sp_block)
+                                   && tail_size != 0 && icb1 == n_ic_blocks - 1) {
+                            auto vmm_inp_tmp = Xmm(
+                                    vmm_inp(jj, jcp.nb_oc_blocking).getIdx());
+                            load_bytes(vmm_inp_tmp, aux_reg_src, aux_src_off,
+                                       tail_size);
+                            uni_vpbroadcastd(vmm_inp(jj, jcp.nb_oc_blocking),
+                                             vmm_inp_tmp);
                         } else {
-                            vpbroadcastd(zmm_inp(jj, jcp.nb_oc_blocking),
-                                    EVEX_compress_addr(
-                                            aux_reg_src, aux_src_off));
+                            uni_vpbroadcastd(vmm_inp(jj, jcp.nb_oc_blocking),
+                                             ptr[aux_reg_src + aux_src_off]);
                         }
                         if (jcp.signed_input)
-                            vpsubb(zmm_inp(jj, jcp.nb_oc_blocking),
-                                    zmm_inp(jj, jcp.nb_oc_blocking), zmm_shift);
+                            uni_vpsubb(vmm_inp(jj, jcp.nb_oc_blocking),
+                                       vmm_inp(jj, jcp.nb_oc_blocking), vmm_shift);
                     } else {
                         /* fill padded area with shifted values */
                         if (jcp.signed_input) {
-                            Zmm inp = zmm_inp(jj, jcp.nb_oc_blocking);
-                            vpxord(inp, inp, inp);
-                            vpsubb(inp, inp, zmm_shift);
+                            Vmm inp = vmm_inp(jj, jcp.nb_oc_blocking);
+                            uni_vpxor(inp, inp, inp);
+                            uni_vpsubb(inp, inp, vmm_shift);
                         }
                     }
                 }
@@ -426,32 +436,30 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::compute_ker(int ur_w,
                 int aux_filt_off = kernel_offset(ocb, icb1, ki);
 
                 if (_end - _start > 0) {
-                    if (jcp.is_depthwise)
-                        vpmovsxbd(zmm_wei,
-                                EVEX_compress_addr(aux_reg_filt, aux_filt_off));
-                    else
-                        vmovups(zmm_wei,
-                                EVEX_compress_addr(aux_reg_filt, aux_filt_off));
+                    if (jcp.is_depthwise) {
+                        uni_vpmovsxbd(
+                                vmm_wei, ptr[aux_reg_filt + aux_filt_off]);
+                    } else
+                        uni_vmovups(vmm_wei, ptr[aux_reg_filt + aux_filt_off]);
                 }
                 for (int jj = _start; jj < _end; jj += ur_w_stride) {
-                    Zmm inp = (h_padded == true)
-                            ? zmm_inp(0, jcp.nb_oc_blocking)
-                            : zmm_inp(jj, jcp.nb_oc_blocking);
-                    compute(zmm_out(jj, ocb), zmm_wei, inp);
+                    Vmm inp = vmm_inp(h_padded ? 0 : jj, jcp.nb_oc_blocking);
+                    compute(vmm_out(jj, ocb), vmm_wei, inp);
                 }
             }
         }
     }
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::kh_loop(int ur_w,
-        int l_overflow, int r_overflow, ker_block_t last_ic_block_flag) {
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::kh_loop(int ur_w,
+                                                            int l_overflow, int r_overflow, ker_block_t last_ic_block_flag) {
 
     int ch_block_all = jcp.ch_block * jcp.ic_block * jcp.oc_block;
     int shift_src_ih = jcp.typesize_in * (jcp.dilate_h + 1) * jcp.iw
-            * jcp.ngroups * jcp.ic_without_padding;
+                       * jcp.ngroups * jcp.ic_without_padding;
     int shift_src_id = jcp.typesize_in * (jcp.dilate_d + 1) * jcp.ih * jcp.iw
-            * jcp.ngroups * jcp.ic_without_padding;
+                       * jcp.ngroups * jcp.ic_without_padding;
     const int stride_h = jcp.signed_input ? 1 : jcp.stride_h;
     int shift_filt_kh = jcp.typesize_in * jcp.kw * ch_block_all * stride_h;
     const int stride_d = jcp.signed_input ? 1 : jcp.stride_d;
@@ -493,11 +501,11 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::kh_loop(int ur_w,
         mov(reg_ki, ptr[param1 + GET_OFF(kd_padding)]);
 
         if ((jcp.signed_input) || (jcp.dilate_d >= jcp.id)
-                || ((!jcp.signed_input)
-                        && ((min(jcp.f_pad, jcp.back_pad) < 0)
-                                || ((jcp.kd - 1) * (jcp.dilate_d + 1)
-                                        < nstl::max(
-                                                jcp.f_pad, jcp.back_pad))))) {
+            || ((!jcp.signed_input)
+                && ((min(jcp.f_pad, jcp.back_pad) < 0)
+                    || ((jcp.kd - 1) * (jcp.dilate_d + 1)
+                        < nstl::max(
+                jcp.f_pad, jcp.back_pad))))) {
             cmp(reg_ki, 0);
             je(skip_kd_loop, T_NEAR);
         }
@@ -530,10 +538,10 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::kh_loop(int ur_w,
     mov(reg_kh, ptr[param1 + GET_OFF(kh_padding)]);
 
     if ((jcp.signed_input) || (jcp.dilate_h >= jcp.ih)
-            || ((!jcp.signed_input)
-                    && ((min(jcp.t_pad, jcp.b_pad) < 0)
-                            || ((jcp.kh - 1) * (jcp.dilate_h + 1)
-                                    < nstl::max(jcp.t_pad, jcp.b_pad))))) {
+        || ((!jcp.signed_input)
+            && ((min(jcp.t_pad, jcp.b_pad) < 0)
+                || ((jcp.kh - 1) * (jcp.dilate_h + 1)
+                    < nstl::max(jcp.t_pad, jcp.b_pad))))) {
         cmp(reg_kh, 0);
         je(skip_kh_loop, T_NEAR);
     }
@@ -634,35 +642,32 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::kh_loop(int ur_w,
     }
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::prepare_output(int ur_w) {
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::prepare_output(int ur_w) {
     for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
         for (int ur = 0; ur < ur_w; ur++) {
-            zmm_t zmm = zmm_out(ur, ocb);
-            vpxord(zmm, zmm, zmm);
+            Vmm vmm = vmm_out(ur, ocb);
+            uni_vpxor(vmm, vmm, vmm);
         }
     }
     if (jcp.signed_input) {
-        xor_(reg_scratch, reg_scratch);
-        Reg8 _t8 = reg_scratch.cvt8();
-        mov(_t8, (int8_t)-128);
-        vpbroadcastb(zmm_shift, _t8);
+        auto xmm_shift = Xbyak::Xmm(vmm_shift.getIdx());
+        mov(reg_scratch, 0x80808080);
+        uni_vmovq(xmm_shift, reg_scratch);
+        uni_vpbroadcastd(vmm_shift, xmm_shift);
     }
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::cvt2ps(
-        data_type_t type_in, zmm_t zmm_in, const Operand &op, bool mask_flag) {
-    zmm_t zmm = mask_flag ? zmm_in | ktail_mask | T_z : zmm_in;
-    switch (type_in) {
-        case data_type::f32:
-        case data_type::s32: vmovups(zmm, op); break;
-        case data_type::s8: vpmovsxbd(zmm, op); break;
-        case data_type::u8: vpmovzxbd(zmm, op); break;
-        default: assert(!"unsupported data type");
-    }
-    if (type_in != data_type::f32) vcvtdq2ps(zmm_in, zmm_in);
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::cvt2ps(data_type_t type_in,
+                                                           const Vmm &vmm_in, const Reg64 &reg, int offset, int load_size) {
+
+    load_data(type_in, vmm_in, reg, offset, load_size);
+    if (type_in != data_type::f32) uni_vcvtdq2ps(vmm_in, vmm_in);
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::store_output(
         int ur_w, bool last_oc_block) {
     mov(reg_bias, ptr[param1 + GET_OFF(bias)]);
     mov(reg_ptr_scales, ptr[param1 + GET_OFF(scales)]);
@@ -679,8 +684,8 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
 
     if (jcp.with_bias && jcp.signed_input && jcp.ver != ver_vnni) {
         mov(reg_bias_alpha, float2int(jcp.wei_adj_scale));
-        vmovq(xmm_bias_alpha(), reg_bias_alpha);
-        vbroadcastss(zmm_bias_alpha(), xmm_bias_alpha());
+        uni_vmovq(xmm_bias_alpha(), reg_bias_alpha);
+        uni_vbroadcastss(vmm_bias_alpha(), xmm_bias_alpha());
     }
 
     for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
@@ -688,28 +693,28 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
         int scale_offset
                 = jcp.is_oc_scale * (sizeof(float) * ocb * jcp.oc_block);
 
-        auto zmm_bias = zmm_tmp;
+        auto vmm_bias = vmm_tmp;
         if (jcp.with_bias) {
             int bias_offset = jcp.typesize_bia * ocb * jcp.oc_block;
-            auto bias_addr = EVEX_compress_addr(reg_bias, bias_offset);
-            cvt2ps(jcp.bia_dt, zmm_bias, bias_addr, mask_flag);
+            cvt2ps(jcp.bia_dt, vmm_bias, reg_bias, bias_offset,
+                   mask_flag ? get_tail_size() : get_blocking_size());
             if (jcp.signed_input && jcp.ver != ver_vnni)
-                vmulps(zmm_bias, zmm_bias, zmm_bias_alpha());
+                uni_vmulps(vmm_bias, vmm_bias, vmm_bias_alpha());
         }
         if (jcp.signed_input) {
             int comp_offset = sizeof(int32_t) * ocb * jcp.oc_block;
-            auto comp_addr = EVEX_compress_addr(reg_compensation, comp_offset);
-            cvt2ps(data_type::s32, zmm_comp, comp_addr, mask_flag);
+            cvt2ps(data_type::s32, vmm_comp, reg_compensation, comp_offset,
+                   mask_flag ? get_tail_size() : get_blocking_size());
         }
 
+        /* add to ymm_accum: compensation, bias */
+        uni_vmovups(vmm_scale, ptr[reg_ptr_scales + scale_offset]);
         for (int ur = 0; ur < ur_w; ur++) {
-            zmm_t zmm = zmm_out(ur, ocb);
-            vcvtdq2ps(zmm, zmm);
-            if (jcp.signed_input) vaddps(zmm, zmm, zmm_comp);
-            if (jcp.with_bias) vaddps(zmm, zmm, zmm_bias);
-            zmm_t mask_zmm = mask_flag ? zmm | ktail_mask | T_z : zmm;
-            vmulps(mask_zmm, zmm,
-                    EVEX_compress_addr(reg_ptr_scales, scale_offset));
+            Vmm vmm = vmm_out(ur, ocb);
+            uni_vcvtdq2ps(vmm, vmm);
+            if (jcp.signed_input) uni_vaddps(vmm, vmm, vmm_comp);
+            if (jcp.with_bias) uni_vaddps(vmm, vmm, vmm_bias);
+            uni_vmulps(vmm, vmm, vmm_scale);
         }
     }
 
@@ -724,45 +729,51 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
     for (int i = 0; i < p.len(); i++) {
         auto& post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
-            eltwise_injectors[eltwise_inj_idx]->compute_vector_range(0, nb_oc_block * ur_w);
+            size_t s_idx = vmm_out(ur_w - 1, nb_oc_block - 1).getIdx();
+            size_t e_idx = vmm_out(0, 0).getIdx() + 1;
+            eltwise_injectors[eltwise_inj_idx]->compute_vector_range(s_idx, e_idx);
             eltwise_inj_idx++;
         } else if (post_op.is_depthwise()) {
-            for (int ur = 0; ur < ur_w; ur++) {
-                mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
-                mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
+            mov(reg_d_weights, reinterpret_cast<size_t>(post_op.depthwise.weights_data));
+            mov(reg_d_bias, reinterpret_cast<size_t>(post_op.depthwise.biases_data));
 
-                add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
-                add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
+            add(reg_d_weights, ptr[param1 + GET_OFF(oc_off)]);
+            add(reg_d_bias, ptr[param1 + GET_OFF(oc_off)]);
 
-                for (int k = 0; k < nb_oc_block; k++) {
-                    int s_idx = zmm_out(ur, k).getIdx();
-                    depthwise_injectors[depthwise_inj_idx]->compute_vector_range(s_idx, s_idx + 1, reg_d_weights, reg_d_bias);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(ur_w - 1, k).getIdx();
+                int e_idx = vmm_out(0, k).getIdx() + 1;
+                depthwise_injectors[depthwise_inj_idx]->compute_vector_range(s_idx, e_idx, reg_d_weights, reg_d_bias);
 
-                    add(reg_d_weights, oc_block * sizeof(float));
-                    add(reg_d_bias, oc_block * sizeof(float));
-                }
+                add(reg_d_weights, oc_block * sizeof(float));
+                add(reg_d_bias, oc_block * sizeof(float));
             }
             depthwise_inj_idx++;
         } else if (post_op.is_quantization()) {
-            for (int ur = 0; ur < ur_w; ur++) {
-                bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
-                bool do_rounding = do_dequantization || jcp.dst_dt == dnnl_f32 || i != p.len() - 1;
-                quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[param1 + GET_OFF(oc_off)]);
-                for (int k = 0; k < nb_oc_block; k++) {
-                    int s_idx = zmm_out(ur, k).getIdx();
-                    quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, s_idx + 1, k * oc_block * sizeof(float));
-                }
-                quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[param1 + GET_OFF(oc_off)]);
-                for (int k = 0; k < nb_oc_block; k++) {
-                    int s_idx = zmm_out(ur, k).getIdx();
-                    quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, s_idx + 1, k * oc_block * sizeof(float), do_rounding);
-                }
-                quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[param1 + GET_OFF(oc_off)]);
-                for (int k = 0; k < nb_oc_block; k++) {
-                    int s_idx = zmm_out(ur, k).getIdx();
-                    quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, s_idx + 1, k * oc_block * sizeof(float));
-                }
+            bool do_dequantization = post_op.quantization.alg == alg_kind::quantization_quantize_dequantize;
+            bool do_rounding = do_dequantization || jcp.dst_dt == dnnl_f32 || i != p.len() - 1;
+
+            quantization_injectors[quantization_inj_idx]->init_crop_ptrs(ptr[param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(ur_w - 1, k).getIdx();
+                int e_idx = vmm_out(0, k).getIdx() + 1;
+                quantization_injectors[quantization_inj_idx]->compute_crop(s_idx, e_idx, k * oc_block * sizeof(float));
             }
+
+            quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(ptr[param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(ur_w - 1, k).getIdx();
+                int e_idx = vmm_out(0, k).getIdx() + 1;
+                quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(s_idx, e_idx, k * oc_block * sizeof(float), do_rounding);
+            }
+
+            quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(ptr[param1 + GET_OFF(oc_off)]);
+            for (int k = 0; k < nb_oc_block; k++) {
+                int s_idx = vmm_out(ur_w - 1, k).getIdx();
+                int e_idx = vmm_out(0, k).getIdx() + 1;
+                quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(s_idx, e_idx, k * oc_block * sizeof(float));
+            }
+
             quantization_inj_idx++;
         }
     }
@@ -773,26 +784,26 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
     // the conversion to int would return INT_MIN, and then proper
     // saturation will happen when storing data
     if (jcp.dst_dt == data_type::u8) {
-        vpxord(zmm_zero, zmm_zero, zmm_zero);
+        uni_vpxor(vmm_zero, vmm_zero, vmm_zero);
         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
             for (int ur = 0; ur < ur_w; ur++) {
-                zmm_t zmm = zmm_out(ur, ocb);
-                vmaxps(zmm, zmm_zero, zmm);
+                Vmm vmm = vmm_out(ur, ocb);
+                uni_vmaxps(vmm, vmm, vmm_zero);
             }
         }
     }
 
     if (one_of(jcp.dst_dt, data_type::u8, data_type::s8, data_type::s32)) {
         float saturation_ubound = types::max_value<float>(jcp.dst_dt);
-        Xmm xmm_saturation(zmm_saturation.getIdx());
+        Xmm xmm_saturation(vmm_saturation.getIdx());
         mov(reg_ptr_saturation_ubound, float2int(saturation_ubound));
-        vmovq(xmm_saturation, reg_ptr_saturation_ubound);
-        vbroadcastss(zmm_saturation, xmm_saturation);
+        uni_vmovq(xmm_saturation, reg_ptr_saturation_ubound);
+        uni_vbroadcastss(vmm_saturation, xmm_saturation);
 
         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
             for (int ur = 0; ur < ur_w; ur++) {
-                zmm_t zmm = zmm_out(ur, ocb);
-                vminps(zmm, zmm, zmm_saturation);
+                Vmm vmm = vmm_out(ur, ocb);
+                uni_vminps(vmm, vmm, vmm_saturation);
             }
         }
     }
@@ -800,8 +811,8 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
     if (one_of(jcp.dst_dt, data_type::u8, data_type::s8, data_type::s32)) {
         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
             for (int ur = 0; ur < ur_w; ur++) {
-                zmm_t zmm = zmm_out(ur, ocb);
-                vcvtps2dq(zmm, zmm);
+                Vmm vmm = vmm_out(ur, ocb);
+                uni_vcvtps2dq(vmm, vmm);
             }
         }
     }
@@ -811,45 +822,43 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::store_output(
         const bool mask_flag = last_oc_block && ocb == jcp.nb_oc_blocking - 1;
         for (int ur = 0; ur < ur_w; ur++) {
             int aux_dst_off = jcp.typesize_out
-                    * (ur * jcp.ngroups * jcp.oc_without_padding
-                            + ocb * jcp.oc_block);
-            auto addr = EVEX_compress_addr(reg_dst, aux_dst_off);
-
-            zmm_t zmm = zmm_out(ur, ocb);
-            zmm_t r_zmm = mask_flag ? zmm | ktail_mask : zmm;
-            switch (jcp.dst_dt) {
-                case data_type::f32:
-                case data_type::s32: vmovups(addr, r_zmm); break;
-                case data_type::s8: vpmovsdb(addr, r_zmm); break;
-                case data_type::u8: vpmovusdb(addr, r_zmm); break;
-                default: assert(!"unknown dst_dt");
-            }
+                              * (ur * jcp.ngroups * jcp.oc_without_padding
+                                 + ocb * jcp.oc_block);
+            Vmm r_vmm = vmm_out(ur, ocb);
+            store_data(jcp.dst_dt, r_vmm, reg_dst, aux_dst_off,
+                       mask_flag ? get_tail_size() : get_blocking_size());
         }
     }
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::icb_loop(
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::icb_loop(
         int ur_w, int l_overflow, int r_overflow, bool is_last_sp_block) {
 
     int shift_src_icb = jcp.typesize_in * jcp.ic_block;
-    int shift_filt_icb = jcp.typesize_in * jcp.kd * jcp.kh * jcp.kw
-            * jcp.ic_block * jcp.oc_block;
+    const size_t shift_filt_icb = (size_t)jcp.typesize_in * jcp.kd * jcp.kh
+                                  * jcp.kw * jcp.ic_block * jcp.oc_block;
 
     prepare_output(ur_w);
 
     Label skip_icb_loop, icb_loop_label;
 
     mov(reg_icb, jcp.nb_ic);
+    mov(reg_oc_blocks, ptr[param1 + GET_OFF(oc_blocks)]);
     L(icb_loop_label);
     {
-
-        if (jcp.ic_without_padding != jcp.ic) {
+        if (jcp.ngroups % jcp.ch_block != 0
+            || jcp.ic_without_padding != jcp.ic) {
             Label common_ker, end_ker;
-            cmp(reg_icb, 1);
-            jg(common_ker, T_NEAR);
+            if (jcp.is_depthwise) {
+                cmp(reg_oc_blocks, jcp.nb_ch - 1);
+                jne(common_ker, T_NEAR);
+            } else {
+                cmp(reg_icb, 1);
+                jg(common_ker, T_NEAR);
+            }
 
-            kh_loop(ur_w, l_overflow, r_overflow,
-                    is_last_sp_block ? last_sp_block : last_ic_block);
+            kh_loop(ur_w, l_overflow, r_overflow, last_sp_block);
             jmp(end_ker, T_NEAR);
 
             L(common_ker);
@@ -861,7 +870,7 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::icb_loop(
         }
 
         add(reg_src, shift_src_icb);
-        add(reg_filt, shift_filt_icb);
+        safe_add(reg_filt, shift_filt_icb, reg_ker_long_offt);
         dec(reg_icb);
         cmp(reg_icb, 0);
         jg(icb_loop_label, T_NEAR);
@@ -869,12 +878,11 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::icb_loop(
 
     /* come-back pointers */
     sub(reg_src, jcp.nb_ic * shift_src_icb);
-    sub(reg_filt, jcp.nb_ic * shift_filt_icb);
+    safe_sub(reg_filt, jcp.nb_ic * shift_filt_icb, reg_ker_long_offt);
     L(skip_icb_loop);
 
     if (jcp.ngroups % jcp.ch_block != 0 || jcp.oc_without_padding != jcp.oc) {
         Label common_store, end_store;
-        mov(reg_oc_blocks, ptr[param1 + GET_OFF(oc_blocks)]);
         if (jcp.is_depthwise)
             cmp(reg_oc_blocks, jcp.nb_ch - 1);
         else
@@ -894,27 +902,21 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::icb_loop(
     }
 }
 
-void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::generate() {
+template <cpu_isa_t isa, typename Vmm>
+void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::generate() {
     const auto &p = attr_.post_ops_;
-    if (jcp.ver == ver_vnni) {
-        vmm_d_weights = zmm_t(28);
-        vmm_d_bias = zmm_t(29);
-    } else {
-        vmm_d_weights = zmm_t(26);
-        vmm_d_bias = zmm_t(27);
-    }
     for (int i = 0; i < p.len(); i++) {
         auto &post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
-            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_core>(
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<isa>(
                     this, post_op.eltwise, true, eltwise_reserved
             ));
         } else if (post_op.is_depthwise()) {
-            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<isa>(
                     this, post_op.depthwise.alg
             ));
         } else if (post_op.is_quantization()) {
-            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_core>(
+            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<isa, Vmm>(
                     this,
                     post_op,
                     vmm_d_weights, vmm_d_bias, reg_d_weights, reg_d_bias
@@ -924,47 +926,30 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::generate() {
 
     preamble();
 
-    xor_(reg_scratch, reg_scratch);
-    Reg16 _t = reg_scratch.cvt16();
-    mov(_t, 0x1);
-    vpbroadcastw(zmm_one, _t);
-
-    if (jcp.ngroups % jcp.ch_block != 0 || jcp.oc_without_padding != jcp.oc) {
-        int tail_size = jcp.is_depthwise
-                ? jcp.ngroups % jcp.ch_block
-                : jcp.oc_without_padding % jcp.oc_block;
-        int mask = (1 << tail_size) - 1;
-        Reg32 regw_tmp = reg_nur_w.cvt32();
-        Label skip_tail_mask;
-        if (jcp.is_depthwise) {
-            kxnorw(ktail_mask, ktail_mask, ktail_mask);
-            cmp(dword[param1 + GET_OFF(oc_blocks)], jcp.nb_ch - 1);
-            jne(skip_tail_mask, T_NEAR);
-        }
-        mov(regw_tmp, mask);
-        kmovw(ktail_mask, regw_tmp);
-        L(skip_tail_mask);
-    }
+    auto vmm_one_128 = Xbyak::Xmm(vmm_one.getIdx());
+    mov(reg_scratch, 0x10001);
+    uni_vmovq(vmm_one_128, reg_scratch);
+    uni_vpbroadcastd(vmm_one, vmm_one_128);
 
     mov(reg_src, ptr[param1 + GET_OFF(src)]);
     mov(reg_filt, ptr[param1 + GET_OFF(filt)]);
     mov(reg_dst, ptr[param1 + GET_OFF(dst)]);
 
     int dst_shift = jcp.typesize_out * jcp.ur_w * jcp.ngroups
-            * jcp.oc_without_padding;
+                    * jcp.oc_without_padding;
     int src_shift = jcp.typesize_in * (jcp.ur_w / jcp.stride_w) * jcp.ngroups
-            * jcp.ic_without_padding;
+                    * jcp.ic_without_padding;
 
     int l_overflow = max(
             0, ((jcp.kw - 1) * (jcp.dilate_w + 1) - jcp.l_pad) / jcp.stride_w);
     int r_overflow = max(0,
-            ((jcp.kw - 1) * (jcp.dilate_w + 1) - max(0, jcp.r_pad))
-                    / jcp.stride_w);
+                         ((jcp.kw - 1) * (jcp.dilate_w + 1) - max(0, jcp.r_pad))
+                         / jcp.stride_w);
 
     int r_overflow1 = nstl::max(0,
-            ((jcp.kw - 1) * (jcp.dilate_w + 1) - nstl::max(0, jcp.r_pad)
-                    - jcp.ur_w_tail)
-                    / jcp.stride_w);
+                                ((jcp.kw - 1) * (jcp.dilate_w + 1) - nstl::max(0, jcp.r_pad)
+                                 - jcp.ur_w_tail)
+                                / jcp.stride_w);
     int nur_w = jcp.ow / jcp.ur_w;
     if (r_overflow1 > 0) nur_w--;
 
@@ -1010,8 +995,8 @@ void jit_avx512_core_x8s8s32x_deconv_fwd_kernel::generate() {
         inj->prepare_table();
 }
 
-template <data_type_t src_type, data_type_t dst_type>
-void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
+template <cpu_isa_t isa, data_type_t src_type, data_type_t dst_type>
+void _jit_uni_x8s8s32x_deconvolution_fwd_t<isa, src_type,
         dst_type>::execute_forward_1d(const exec_ctx_t &ctx) const {
     auto src = CTX_IN_MEM(const src_data_t *, DNNL_ARG_SRC);
     auto weights = CTX_IN_MEM(const wei_data_t *, DNNL_ARG_WEIGHTS);
@@ -1023,7 +1008,7 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     const memory_desc_wrapper weights_d(pd()->weights_md(0));
     const memory_desc_wrapper bias_d(pd()->weights_md(1));
 
-    auto &jcp = kernel_->jcp;
+    auto &jcp = pd()->jcp_;
 
     int oc_chunks = jcp.nb_oc / jcp.nb_oc_blocking;
     int nb_groups = jcp.nb_ch;
@@ -1035,7 +1020,7 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
         size_t count = pd()->attr()->output_scales_.count_;
         float factor = 1.f / pd()->jcp_.wei_adj_scale;
         if (count == 1) {
-            utils::array_set(local_scales, oscales[0] * factor, 16);
+            utils::array_set(local_scales, oscales[0] * factor, 8);
         } else {
             for (size_t c = 0; c < count; c++)
                 local_scales[c] = oscales[c] * factor;
@@ -1045,8 +1030,8 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     size_t offset = (size_t)jcp.ngroups * jcp.oc * jcp.ic * jcp.kh * jcp.kw;
     auto w = const_cast<wei_data_t *>(weights);
     int32_t *compensation = (jcp.signed_input)
-            ? reinterpret_cast<int32_t *>(&w[offset])
-            : nullptr;
+                            ? reinterpret_cast<int32_t *>(&w[offset])
+                            : nullptr;
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
         int start {0}, end {0};
@@ -1072,8 +1057,8 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
             p.src = src + src_d.blk_off(n, g_ic);
             p.filt = weights + wht_blk_off(weights_d, g, ocb, 0);
             p.bias = jcp.with_bias
-                    ? bias + (bias_d.blk_off(g_oc) * jcp.typesize_bia)
-                    : nullptr;
+                     ? bias + (bias_d.blk_off(g_oc) * jcp.typesize_bia)
+                     : nullptr;
             p.compensation = (jcp.signed_input) ? compensation + g_oc : nullptr;
             p.scales = &oscales[jcp.is_oc_scale * g_oc];
             p.t_overflow = 0;
@@ -1082,7 +1067,6 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
             p.oc_blocks = jcp.is_depthwise ? g : ocb;
 
             p.oc_off = g_oc * sizeof(float);
-
             (*kernel_)(&p);
 
             ++start;
@@ -1096,8 +1080,8 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     });
 }
 
-template <data_type_t src_type, data_type_t dst_type>
-void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
+template <cpu_isa_t isa, data_type_t src_type, data_type_t dst_type>
+void _jit_uni_x8s8s32x_deconvolution_fwd_t<isa, src_type,
         dst_type>::execute_forward_2d(const exec_ctx_t &ctx) const {
     auto src = CTX_IN_MEM(const src_data_t *, DNNL_ARG_SRC);
     auto weights = CTX_IN_MEM(const wei_data_t *, DNNL_ARG_WEIGHTS);
@@ -1109,7 +1093,7 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     const memory_desc_wrapper weights_d(pd()->weights_md(0));
     const memory_desc_wrapper bias_d(pd()->weights_md(1));
 
-    auto &jcp = kernel_->jcp;
+    auto &jcp = pd()->jcp_;
 
     int oc_chunks = jcp.nb_oc / jcp.nb_oc_blocking;
     int nb_groups = jcp.nb_ch;
@@ -1125,7 +1109,7 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
         size_t count = pd()->attr()->output_scales_.count_;
         float factor = 1.f / pd()->jcp_.wei_adj_scale;
         if (count == 1) {
-            utils::array_set(local_scales, oscales[0] * factor, 16);
+            utils::array_set(local_scales, oscales[0] * factor, 8);
         } else {
             for (size_t c = 0; c < count; c++)
                 local_scales[c] = oscales[c] * factor;
@@ -1135,8 +1119,8 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     size_t offset = (size_t)jcp.ngroups * jcp.oc * jcp.ic * jcp.kh * jcp.kw;
     auto w = const_cast<wei_data_t *>(weights);
     int32_t *compensation = (jcp.signed_input)
-            ? reinterpret_cast<int32_t *>(&w[offset])
-            : nullptr;
+                            ? reinterpret_cast<int32_t *>(&w[offset])
+                            : nullptr;
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
         int start {0}, end {0};
@@ -1149,10 +1133,10 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
         int n {0}, g {0}, occ {0}, oh_s {0};
         if (jcp.loop_order == loop_ngc)
             nd_iterator_init(start, n, jcp.mb, g, nb_groups, occ, oc_chunks,
-                    oh_s, jcp.oh);
+                             oh_s, jcp.oh);
         else if (jcp.loop_order == loop_cgn)
             nd_iterator_init(start, occ, oc_chunks, g, nb_groups, n, jcp.mb,
-                    oh_s, jcp.oh);
+                             oh_s, jcp.oh);
         else
             assert(!"unsupported loop order");
         while (start < end) {
@@ -1167,8 +1151,8 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
             auto src_w = src + src_d.blk_off(n, g_ic);
             auto wht_w = weights + wht_blk_off(weights_d, g, ocb, 0);
             auto bias_w = jcp.with_bias
-                    ? bias + (bias_d.blk_off(g_oc) * jcp.typesize_bia)
-                    : nullptr;
+                          ? bias + (bias_d.blk_off(g_oc) * jcp.typesize_bia)
+                          : nullptr;
             int32_t *compensation_w
                     = (jcp.signed_input) ? compensation + g_oc : nullptr;
 
@@ -1184,9 +1168,9 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                             dilate_h);
                     int o_b_overflow
                             = div_up(max(0,
-                                             (jcp.kh - 1) * dilate_h + 1
-                                                     - jcp.oh + oj - jcp.b_pad),
-                                    dilate_h);
+                                         (jcp.kh - 1) * dilate_h + 1
+                                         - jcp.oh + oj - jcp.b_pad),
+                                     dilate_h);
                     kh_len = jcp.kh - o_t_overflow - o_b_overflow;
                     kh_lo = o_b_overflow;
                     ih_max = oj + jcp.t_pad - o_b_overflow * dilate_h;
@@ -1194,15 +1178,15 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                     int o_t_overflow = max(
                             0, (jcp.kh - (oj + 1 + jcp.t_pad)) / jcp.stride_h);
                     int o_b_overflow = max(0,
-                            ((oj + jcp.kh) - (jcp.oh + jcp.b_pad))
-                                    / jcp.stride_h);
+                                           ((oj + jcp.kh) - (jcp.oh + jcp.b_pad))
+                                           / jcp.stride_h);
                     int overflow_kh_hi = jcp.kh - 1
-                            - modulo(jcp.oh + jcp.b_pad - (oj + 1),
-                                    jcp.stride_h);
+                                         - modulo(jcp.oh + jcp.b_pad - (oj + 1),
+                                                  jcp.stride_h);
                     int overflow_kh_lo = (oj + jcp.t_pad) % jcp.stride_h;
 
                     kh_len = (overflow_kh_hi - overflow_kh_lo) / jcp.stride_h
-                            + 1 - o_t_overflow - o_b_overflow;
+                             + 1 - o_t_overflow - o_b_overflow;
                     kh_lo = overflow_kh_lo + o_b_overflow * jcp.stride_h;
                     ih_max = (oj + jcp.t_pad - kh_lo) / jcp.stride_h;
                 }
@@ -1215,36 +1199,35 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                 p.bias = bias_w;
                 p.compensation = compensation_w;
                 p.t_overflow = jcp.dilate_h > 0
-                        ? jcp.kh - kh_len - kh_lo
-                        : max(0,
-                                jcp.kh
-                                        - (kh_lo
-                                                + max(0, kh_len - 1)
-                                                        * jcp.stride_h
-                                                + 1));
+                               ? jcp.kh - kh_len - kh_lo
+                               : max(0,
+                                     jcp.kh
+                                     - (kh_lo
+                                        + max(0, kh_len - 1)
+                                          * jcp.stride_h
+                                        + 1));
                 p.b_overflow = kh_lo;
                 p.kh_padding = kh_len;
                 p.scales = scales;
                 p.oc_blocks = jcp.is_depthwise ? g : ocb;
-
                 p.oc_off = g_oc * sizeof(float);
 
                 (*kernel_)(&p);
             }
             if (jcp.loop_order == loop_ngc)
                 nd_iterator_jump(start, end, n, jcp.mb, g, nb_groups, occ,
-                        oc_chunks, oh_s, jcp.oh);
+                                 oc_chunks, oh_s, jcp.oh);
             else if (jcp.loop_order == loop_cgn)
                 nd_iterator_jump(start, end, occ, oc_chunks, g, nb_groups, n,
-                        jcp.mb, oh_s, jcp.oh);
+                                 jcp.mb, oh_s, jcp.oh);
             else
                 assert(!"unsupported loop order");
         }
     });
 }
 
-template <data_type_t src_type, data_type_t dst_type>
-void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
+template <cpu_isa_t isa, data_type_t src_type, data_type_t dst_type>
+void _jit_uni_x8s8s32x_deconvolution_fwd_t<isa, src_type,
         dst_type>::execute_forward_3d(const exec_ctx_t &ctx) const {
     auto src = CTX_IN_MEM(const src_data_t *, DNNL_ARG_SRC);
     auto weights = CTX_IN_MEM(const wei_data_t *, DNNL_ARG_WEIGHTS);
@@ -1256,7 +1239,7 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     const memory_desc_wrapper weights_d(pd()->weights_md(0));
     const memory_desc_wrapper bias_d(pd()->weights_md(1));
 
-    auto &jcp = kernel_->jcp;
+    auto &jcp = pd()->jcp_;
 
     int oc_chunks = jcp.nb_oc / jcp.nb_oc_blocking;
     int nb_groups = jcp.nb_ch;
@@ -1275,7 +1258,7 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
         size_t count = pd()->attr()->output_scales_.count_;
         float factor = 1.f / pd()->jcp_.wei_adj_scale;
         if (count == 1) {
-            utils::array_set(local_scales, oscales[0] * factor, 16);
+            utils::array_set(local_scales, oscales[0] * factor, 8);
         } else {
             for (size_t c = 0; c < count; c++)
                 local_scales[c] = oscales[c] * factor;
@@ -1285,8 +1268,8 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
     size_t offset = weights_d.size() - weights_d.additional_buffer_size();
     auto w = const_cast<wei_data_t *>(weights);
     int32_t *compensation = (jcp.signed_input)
-            ? reinterpret_cast<int32_t *>(&w[offset])
-            : nullptr;
+                            ? reinterpret_cast<int32_t *>(&w[offset])
+                            : nullptr;
 
     parallel(jcp.nthr, [&](const int ithr, const int nthr) {
         int start {0}, end {0};
@@ -1299,10 +1282,10 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
         int n {0}, g {0}, occ {0}, od_s {0}, oh_s {0};
         if (jcp.loop_order == loop_ngc)
             nd_iterator_init(start, n, jcp.mb, g, nb_groups, occ, oc_chunks,
-                    od_s, jcp.od, oh_s, jcp.oh);
+                             od_s, jcp.od, oh_s, jcp.oh);
         else if (jcp.loop_order == loop_cgn)
             nd_iterator_init(start, occ, oc_chunks, g, nb_groups, n, jcp.mb,
-                    od_s, jcp.od, oh_s, jcp.oh);
+                             od_s, jcp.od, oh_s, jcp.oh);
         else
             assert(!"unsupported loop order");
         while (start < end) {
@@ -1324,9 +1307,9 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                         dilate_d);
                 d_back_overflow
                         = div_up(max(0,
-                                         (jcp.kd - 1) * dilate_d + 1 - jcp.od
-                                                 + od_s - jcp.back_pad),
-                                dilate_d);
+                                     (jcp.kd - 1) * dilate_d + 1 - jcp.od
+                                     + od_s - jcp.back_pad),
+                                 dilate_d);
                 kd_len = jcp.kd - d_t_overflow - d_back_overflow;
                 kd_lo = d_back_overflow;
                 input_d_s = od_s + jcp.f_pad - d_back_overflow * dilate_d;
@@ -1334,15 +1317,15 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                 int d_t_overflow = max(
                         0, (jcp.kd - (od_s + 1 + jcp.f_pad)) / jcp.stride_d);
                 int d_back_overflow = max(0,
-                        ((od_s + jcp.kd) - (jcp.od + jcp.back_pad))
-                                / jcp.stride_d);
+                                          ((od_s + jcp.kd) - (jcp.od + jcp.back_pad))
+                                          / jcp.stride_d);
                 int overflow_kd_hi = jcp.kd - 1
-                        - modulo(jcp.od + jcp.back_pad - (od_s + 1),
-                                jcp.stride_d);
+                                     - modulo(jcp.od + jcp.back_pad - (od_s + 1),
+                                              jcp.stride_d);
                 int overflow_kd_lo = (od_s + jcp.f_pad) % jcp.stride_d;
 
                 kd_len = (overflow_kd_hi - overflow_kd_lo) / jcp.stride_d + 1
-                        - d_t_overflow - d_back_overflow;
+                         - d_t_overflow - d_back_overflow;
                 kd_lo = overflow_kd_lo + d_back_overflow * jcp.stride_d;
                 input_d_s = (od_s + jcp.f_pad - kd_lo) / jcp.stride_d;
             }
@@ -1351,10 +1334,10 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
             auto src_w
                     = src + src_d.blk_off(n, g_ic) + input_d_s * src_d_stride;
             auto wht_w = weights + wht_blk_off(weights_d, g, ocb, 0)
-                    + (jcp.signed_input ? 0 : kd_lo) * wht_kd_stride;
+                         + (jcp.signed_input ? 0 : kd_lo) * wht_kd_stride;
             auto bias_w = jcp.with_bias
-                    ? bias + (bias_d.blk_off(g_oc) * jcp.typesize_bia)
-                    : nullptr;
+                          ? bias + (bias_d.blk_off(g_oc) * jcp.typesize_bia)
+                          : nullptr;
             int32_t *compensation_w
                     = (jcp.signed_input) ? compensation + g_oc : nullptr;
 
@@ -1371,9 +1354,9 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                             dilate_h);
                     int o_b_overflow
                             = div_up(max(0,
-                                             (jcp.kh - 1) * dilate_h + 1
-                                                     - jcp.oh + oj - jcp.b_pad),
-                                    dilate_h);
+                                         (jcp.kh - 1) * dilate_h + 1
+                                         - jcp.oh + oj - jcp.b_pad),
+                                     dilate_h);
                     kh_len = jcp.kh - o_t_overflow - o_b_overflow;
                     kh_lo = o_b_overflow;
                     ih_max = oj + jcp.t_pad - o_b_overflow * dilate_h;
@@ -1381,15 +1364,15 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                     int o_t_overflow = max(
                             0, (jcp.kh - (oj + 1 + jcp.t_pad)) / jcp.stride_h);
                     int o_b_overflow = max(0,
-                            ((oj + jcp.kh) - (jcp.oh + jcp.b_pad))
-                                    / jcp.stride_h);
+                                           ((oj + jcp.kh) - (jcp.oh + jcp.b_pad))
+                                           / jcp.stride_h);
                     int overflow_kh_hi = jcp.kh - 1
-                            - modulo(jcp.oh + jcp.b_pad - (oj + 1),
-                                    jcp.stride_h);
+                                         - modulo(jcp.oh + jcp.b_pad - (oj + 1),
+                                                  jcp.stride_h);
                     int overflow_kh_lo = (oj + jcp.t_pad) % jcp.stride_h;
 
                     kh_len = (overflow_kh_hi - overflow_kh_lo) / jcp.stride_h
-                            + 1 - o_t_overflow - o_b_overflow;
+                             + 1 - o_t_overflow - o_b_overflow;
                     kh_lo = overflow_kh_lo + o_b_overflow * jcp.stride_h;
                     ih_max = (oj + jcp.t_pad - kh_lo) / jcp.stride_h;
                 }
@@ -1404,60 +1387,79 @@ void _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<src_type,
                 /* Note: Currently this kernel doesn't support dilations and
                 strides together */
                 p.t_overflow = jcp.dilate_h > 0
-                        ? jcp.kh - kh_len - kh_lo
-                        : max(0,
-                                jcp.kh
-                                        - (kh_lo
-                                                + max(0, kh_len - 1)
-                                                        * jcp.stride_h
-                                                + 1));
+                               ? jcp.kh - kh_len - kh_lo
+                               : max(0,
+                                     jcp.kh
+                                     - (kh_lo
+                                        + max(0, kh_len - 1)
+                                          * jcp.stride_h
+                                        + 1));
                 p.b_overflow = kh_lo;
                 p.f_overflow = jcp.dilate_d > 0
-                        ? jcp.kd - kd_len - kd_lo
-                        : max(0,
-                                jcp.kd
-                                        - (kd_lo
-                                                + max(0, kd_len - 1)
-                                                        * jcp.stride_d
-                                                + 1));
+                               ? jcp.kd - kd_len - kd_lo
+                               : max(0,
+                                     jcp.kd
+                                     - (kd_lo
+                                        + max(0, kd_len - 1)
+                                          * jcp.stride_d
+                                        + 1));
                 p.back_overflow = kd_lo;
                 p.kh_padding = kh_len;
                 p.kd_padding = kd_len;
                 p.scales = scales;
                 p.oc_blocks = jcp.is_depthwise ? g : ocb;
-
                 p.oc_off = g_oc * sizeof(float);
-
                 (*kernel_)(&p);
             }
             if (jcp.loop_order == loop_ngc)
                 nd_iterator_jump(start, end, n, jcp.mb, g, nb_groups, occ,
-                        oc_chunks, od_s, jcp.od, oh_s, jcp.oh);
+                                 oc_chunks, od_s, jcp.od, oh_s, jcp.oh);
             else if (jcp.loop_order == loop_cgn)
                 nd_iterator_jump(start, end, occ, oc_chunks, g, nb_groups, n,
-                        jcp.mb, od_s, jcp.od, oh_s, jcp.oh);
+                                 jcp.mb, od_s, jcp.od, oh_s, jcp.oh);
             else
                 assert(!"unsupported loop order");
         }
     });
 }
 
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::u8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::u8,
         data_type::u8>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::u8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::u8,
         data_type::s8>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::u8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::u8,
         data_type::f32>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::u8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::u8,
         data_type::s32>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::s8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::s8,
         data_type::u8>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::s8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::s8,
         data_type::s8>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::s8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::s8,
         data_type::f32>;
-template struct _jit_avx512_core_x8s8s32x_deconvolution_fwd_t<data_type::s8,
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<avx2, data_type::s8,
         data_type::s32>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::u8,
+        data_type::u8>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::u8,
+        data_type::s8>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::u8,
+        data_type::f32>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::u8,
+        data_type::s32>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::s8,
+        data_type::u8>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::s8,
+        data_type::s8>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::s8,
+        data_type::f32>;
+template struct _jit_uni_x8s8s32x_deconvolution_fwd_t<sse41, data_type::s8,
+        data_type::s32>;
+template struct jit_uni_x8s8s32x_deconv_fwd_kernel<avx2>;
+template struct jit_uni_x8s8s32x_deconv_fwd_kernel<sse41>;
+template struct _jit_uni_x8s8s32x_deconv_fwd_kernel<avx2, Xbyak::Ymm>;
+template struct _jit_uni_x8s8s32x_deconv_fwd_kernel<avx2, Xbyak::Xmm>;
+template struct _jit_uni_x8s8s32x_deconv_fwd_kernel<sse41, Xbyak::Xmm>;
 } // namespace x64
 } // namespace cpu
 } // namespace impl

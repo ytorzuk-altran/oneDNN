@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2018-2020 Intel Corporation
+* Copyright 2018-2021 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@
 #include "cpu/x64/jit_generator.hpp"
 #include "cpu/x64/jit_primitive_conf.hpp"
 #include "cpu/x64/jit_uni_eltwise_injector.hpp"
+#include "cpu/x64/jit_uni_depthwise_injector.hpp"
+#include "cpu/x64/jit_uni_quantization_injector.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -42,19 +44,28 @@ typedef enum {
 } ker_block_t;
 
 struct jit_avx512_core_x8s8s32x_deconv_fwd_kernel : public jit_generator {
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_x8s8s32x_deconv_fwd_ker_t);
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_x8s8s32x_deconv_fwd_kernel);
 
     jit_avx512_core_x8s8s32x_deconv_fwd_kernel(
             const jit_conv_conf_t &ajcp, const primitive_attr_t &attr)
-        : jcp(ajcp), attr_(attr), eltwise_injector_(nullptr) {
-        if (jcp.with_eltwise)
-            eltwise_injector_ = new jit_uni_eltwise_injector_f32<avx512_core>(
-                    this, jcp.eltwise);
+        : jcp(ajcp), attr_(attr) {}
+
+    ~jit_avx512_core_x8s8s32x_deconv_fwd_kernel() {
+        for (auto inj : eltwise_injectors)
+            delete inj;
+        eltwise_injectors.clear();
+
+        for (auto inj : depthwise_injectors)
+            delete inj;
+        depthwise_injectors.clear();
+
+        for (auto inj : quantization_injectors)
+            delete inj;
+        quantization_injectors.clear();
     }
 
-    ~jit_avx512_core_x8s8s32x_deconv_fwd_kernel() { delete eltwise_injector_; }
-
     static bool post_ops_ok(jit_conv_conf_t &jcp, const primitive_attr_t &attr);
+    static bool contain_only_eltwise_post_op(const primitive_attr_t &attr);
 
     static status_t init_conf(jit_conv_conf_t &jcp,
             const deconvolution_desc_t &cd, memory_desc_t &src_md,
@@ -69,10 +80,13 @@ struct jit_avx512_core_x8s8s32x_deconv_fwd_kernel : public jit_generator {
     const primitive_attr_t &attr_;
 
 private:
-    jit_uni_eltwise_injector_f32<avx512_core> *eltwise_injector_;
     using reg64_t = const Xbyak::Reg64;
     using zmm_t = const Xbyak::Zmm;
     using xmm_t = const Xbyak::Xmm;
+
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_core>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<avx512_core>*> quantization_injectors;
 
     /* data regs */
     reg64_t reg_src = r8;
@@ -116,6 +130,13 @@ private:
     zmm_t zmm_bias = zmm_t(31);
     zmm_t zmm_prev_dst = zmm_t(31);
 
+    /* post ops */
+    const Xbyak::Reg64 reg_d_weights = r15;
+    const Xbyak::Reg64 reg_d_bias = r13;
+    Xbyak::Zmm vmm_d_weights;
+    Xbyak::Zmm vmm_d_bias;
+    Xbyak::Reg64 eltwise_reserved = rax;
+
     zmm_t zmm_out(int i_ur, int i_oc) {
         int idx = i_ur * jcp.nb_oc_blocking + i_oc;
         assert(idx < 31);
@@ -147,8 +168,6 @@ private:
             res += jcp.stride_w;
         return ur_w - res;
     }
-    bool maybe_eltwise(int position);
-    void compute_eltwise(int ur_w);
     void prepare_output(int ur_w);
     void store_output(int ur_w, bool last_oc_block);
     void compute_ker(int ur_w, int l_overflow, int r_overflow,
