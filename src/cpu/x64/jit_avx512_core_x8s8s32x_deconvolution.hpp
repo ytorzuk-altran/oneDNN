@@ -69,7 +69,7 @@ struct ur_w_blks_params_t {
 
 template <typename Vmm>
 struct jit_avx512_core_x8s8s32x_deconv_fwd_kernel : public jit_generator {
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_x8s8s32x_deconv_fwd_ker_t);
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_x8s8s32x_deconv_fwd_kernel);
 
     jit_avx512_core_x8s8s32x_deconv_fwd_kernel(const jit_conv_conf_t &ajcp,
             const primitive_attr_t &attr, const memory_desc_t &dst_md);
@@ -126,6 +126,12 @@ private:
     const Vmm vmm_comp = Vmm(30);
     const Vmm vmm_bias = Vmm(31);
     const Vmm vmm_prev_dst = Vmm(31);
+
+    /* depthwise and quantization post ops */
+    const Xbyak::Reg64 reg_d_weights = r15;
+    const Xbyak::Reg64 reg_d_bias = r13;
+    Vmm vmm_d_weights;
+    Vmm vmm_d_bias;
 
     Vmm vmm_out(int i_ur, int i_oc) {
         int idx = i_ur * jcp.nb_oc_blocking + i_oc;

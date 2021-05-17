@@ -247,6 +247,12 @@ status_t jit_uni_x8s8s32x_deconv_fwd_kernel<isa>::init_conf(
     const int sum_ind = p.find(primitive_kind::sum);
     jcp.with_sum = sum_ind != -1;
 
+    const int depthwise_ind = p.find(primitive_kind::depthwise);
+    jcp.with_depthwise = depthwise_ind != -1;
+
+    const int quantization_ind = p.find(primitive_kind::quantization);
+    jcp.with_quantization = quantization_ind != -1;
+
     const auto &oscales = attr.output_scales_;
     jcp.is_oc_scale = oscales.mask_ == 1 << 1;
 
@@ -380,7 +386,7 @@ bool jit_uni_x8s8s32x_deconv_fwd_kernel<isa>::post_ops_ok(jit_conv_conf_t &jcp,
         const memory_desc_wrapper &dst_d, const primitive_attr_t &attr) {
     using namespace injector;
 
-    return injector::post_ops_ok(post_ops_ok_args_t(isa, {sum, eltwise, binary},
+    return injector::post_ops_ok(post_ops_ok_args_t(isa, {sum, eltwise, binary, depthwise, quantization},
             attr.post_ops_, &dst_d, false /*sum_at_pos_0_only*/,
             false /*sum_requires_scale_one*/,
             {broadcasting_strategy_t::per_oc,
@@ -396,7 +402,7 @@ _jit_uni_x8s8s32x_deconv_fwd_kernel<isa,
     , attr_(attr)
     , postops_injector_(nullptr) {
 
-    if (jcp_.with_eltwise || jcp_.with_binary || jcp_.with_sum) {
+    if (jcp_.with_eltwise || jcp_.with_binary || jcp_.with_sum || jcp_.with_depthwise || jcp_.with_quantization) {
         const std::size_t tail_size = get_tail_size();
 
         static constexpr bool preserve_gpr = true;
@@ -409,6 +415,8 @@ _jit_uni_x8s8s32x_deconv_fwd_kernel<isa,
                 GET_OFF(post_ops_binary_rhs_arg_vec), dst_d, tail_size,
                 Xbyak::Opmask(2), use_exact_tail_scalar_bcast};
         const binary_injector::static_params_t bsp {this->param1_, rhs_sp};
+
+        const quantization_injector::static_params_t qsp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias};
 
         postops_injector_ = utils::make_unique<
                 injector::jit_uni_postops_injector_t<isa, Vmm>>(
@@ -1031,10 +1039,21 @@ void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::apply_postops(
             }
         }
     }
+
+    std::map<size_t, int> vmm_idx_off;
+    for (int ocb = 0; ocb < jcp_.nb_oc_blocking; ocb++) {
+        for (int ur = 0; ur < ur_w; ur++) {
+            vmm_idx_off.insert({vmm_out(ur, ocb).getIdx(), ocb * jcp_.oc_block * sizeof(float)});
+        }
+    }
+    depthwise_injector::dynamic_params_t ddp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias,
+                                              ptr[this->param1 + GET_OFF(oc_off)], vmm_idx_off};
+    quantization_injector::dynamic_params_t qdp {ptr[this->param1 + GET_OFF(oc_off)], vmm_idx_off};
+
     const int nb_oc_block
             = jcp_.is_depthwise ? jcp_.nb_ch_blocking : jcp_.nb_oc_blocking;
     postops_injector_->compute_vector_range(
-            16 - nb_oc_block * ur_w, 16, rhs_arg_params);
+            16 - nb_oc_block * ur_w, 16, rhs_arg_params, ddp, qdp);
 }
 
 template <cpu_isa_t isa, typename Vmm>
@@ -1117,7 +1136,7 @@ void _jit_uni_x8s8s32x_deconv_fwd_kernel<isa, Vmm>::store_output(
     if (p_sum_scale && *p_sum_scale != 1.f)
         mov(reg_ptr_sum_scale_, (size_t)p_sum_scale);
 
-    if (jcp_.with_eltwise || jcp_.with_binary || jcp_.with_sum)
+    if (jcp_.with_eltwise || jcp_.with_binary || jcp_.with_sum || jcp_.with_depthwise || jcp_.with_quantization)
         apply_postops(ur_w, last_oc_block, p_sum_scale);
 
     if (jcp_.dst_zero_point) {
@@ -1517,6 +1536,8 @@ status_t _jit_uni_x8s8s32x_deconvolution_fwd_t<isa, src_type,
             p.src_zero_point = zp_src;
             p.dst_zero_point = zp_dst;
 
+            p.oc_off = g_oc * sizeof(float);
+
             (*kernel_)(&p);
 
             ++start;
@@ -1692,6 +1713,8 @@ status_t _jit_uni_x8s8s32x_deconvolution_fwd_t<isa, src_type,
                         : nullptr;
                 p.src_zero_point = zp_src;
                 p.dst_zero_point = zp_dst;
+
+                p.oc_off = g_oc * sizeof(float);
 
                 (*kernel_)(&p);
             }
@@ -1922,6 +1945,8 @@ status_t _jit_uni_x8s8s32x_deconvolution_fwd_t<isa, src_type,
                         : nullptr;
                 p.src_zero_point = zp_src;
                 p.dst_zero_point = zp_dst;
+
+                p.oc_off = g_oc * sizeof(float);
 
                 (*kernel_)(&p);
             }
