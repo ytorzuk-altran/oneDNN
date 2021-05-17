@@ -146,6 +146,19 @@ void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
 
 template <cpu_isa_t isa, typename Vmm>
 void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
+        size_t start_idx, size_t end_idx,
+        const binary_injector::rhs_arg_dynamic_params_t &rhs_arg_params,
+        const depthwise_injector::dynamic_params_t &ddp,
+        const quantization_injector::dynamic_params_t &qdp) {
+
+    injector_utils::vmm_index_set_t vmm_idxs;
+    for (size_t i = start_idx; i < end_idx; i++)
+        vmm_idxs.emplace(i);
+    compute_vector_range(vmm_idxs, rhs_arg_params, ddp, qdp);
+}
+
+template <cpu_isa_t isa, typename Vmm>
+void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
         size_t start_idx, size_t end_idx) {
     compute_vector_range(
             start_idx, end_idx, binary_injector::rhs_arg_dynamic_params_t());
