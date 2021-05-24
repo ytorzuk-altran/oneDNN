@@ -414,8 +414,8 @@ int doit(const prb_t *prb, res_t *res) {
     args.set(DNNL_ARG_ATTR_ZERO_POINTS | DNNL_ARG_DST, dst_zero_points_m);
     SAFE(execute_and_wait(prim, args), WARN);
     //show_memory(dst_dt_out_fmt_out);
-    printf("------dst_dt_out_fmt_out----\n");
-    show_memory(dst_dt_out_fmt_out);
+    // printf("------dst_dt_out_fmt_out----\n");
+    // show_memory(dst_dt_out_fmt_out);
 
     /* Step 6: check correctness */
     if (bench_mode & CORR) {

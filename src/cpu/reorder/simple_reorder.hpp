@@ -321,6 +321,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                           bitmask_ptr[bitmask_idx] |= (1UL << bit);
                       }
 
+                      printf("%d, ", plain_off);
                       plain_off += plain_i_stride;
                       bit++;
                       count++;

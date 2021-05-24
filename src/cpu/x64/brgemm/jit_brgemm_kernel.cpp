@@ -141,18 +141,6 @@ private:
     const reg64_t reg_D = reg_aux_A;
     const reg64_t reg_aux_D = reg_BS_loop;
 
-    // Compression
-    const Xbyak::Reg64 reg_ptr_decomp_src = r9;
-    const Xbyak::Reg64 reg_ptr_decomp_dst = rdx;
-    const Xbyak::Reg64 reg_ptr_decomp_mask = r11; // rax;
-    const Xbyak::Reg64 reg_popcnt = rsi;
-    const Xbyak::Reg64 reg_comp_mask_tmp = rsi;
-    
-    Xbyak::Opmask reg_comp_mask1 = k1;
-    Xbyak::Opmask reg_comp_mask2 = k2;
-    Xbyak::Zmm zmm_comp2 = Xbyak::Zmm(10);
-    Xbyak::Zmm zmm_comp1 = Xbyak::Zmm(11);
-
     constexpr static int origin_offs_batch_offs_ = 0;
     constexpr static int origin_strd_batch_offs_ = 0;
     constexpr static int reg_bias_offs_ = 8;
@@ -176,11 +164,7 @@ private:
     constexpr static int reg_aux_zp_comp_b_offs_ = 144;
     constexpr static int reg_zp_c_values_offs_ = 152;
     constexpr static int reg_aux_zp_c_values_offs_ = 160;
-    constexpr static int reg_decomp_src_offset_ = 168;
-    constexpr static int reg_decomp_dst_offset_ = 176;
-    constexpr static int reg_decomp_mask_offset_ = 184;
-    constexpr static int reg_decomp_popcount_offset_ = 192;
-    constexpr static int stack_space_needed_ = 200; //
+    constexpr static int stack_space_needed_ = 168;
 
     bool is_ldb_loop;
     bool with_binary_per_oc_bcast_ = false;
@@ -1112,68 +1096,15 @@ void jit_brgemm_kernel_base_t::gemm_microkernel_amx(int bd_block2,
             tileloaddt1(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
     };
 
-    if (brg.weights_compressed) {
-        mov(ptr[rsp+reg_decomp_src_offset_], reg_ptr_decomp_src);
-        mov(ptr[rsp+reg_decomp_dst_offset_], reg_ptr_decomp_dst);
-        mov(ptr[rsp+reg_decomp_mask_offset_], reg_ptr_decomp_mask);
-        mov(ptr[rsp+reg_decomp_popcount_offset_], reg_popcnt);
-
-	    mov(reg_ptr_decomp_mask,
-                ptr[reg_addr_batch + GET_OFF_BATCH_ELEMENT(bitmask_ptr)]);
-
-        for (int ldb = 0; ldb < ld_block2; ldb++) {
-            const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
-            // db(0xcc);
-            mov(reg_ptr_decomp_dst,
-                    ptr[reg_addr_batch + GET_OFF_BATCH_ELEMENT(scratch_buf)]);
-            const int bitmask_off = B_offset(ldb, 0, true) / (1 * 8);
-            lea(reg_ptr_decomp_src, ptr[reg_aux_B + B_offset(ldb, 0, true)]);
-            for (int cl = 0; cl < 16; cl = cl + 2) {
-                vmovdqu8(zmm_comp1, ptr[reg_ptr_decomp_src]);
-                mov(reg_comp_mask_tmp,
-                        ptr[reg_ptr_decomp_mask + cl * 8 + bitmask_off
-                                + B_offset(ldb, 0, true) / (8 * 1)]);
-                kmovq(reg_comp_mask1, reg_comp_mask_tmp);
-                popcnt(reg_popcnt, reg_comp_mask_tmp);
-                add(reg_ptr_decomp_src, reg_popcnt);
-
-                vmovdqu8(zmm_comp2, ptr[reg_ptr_decomp_src]);
-                mov(reg_comp_mask_tmp,
-                        ptr[reg_ptr_decomp_mask + (cl + 1) * 8 + bitmask_off
-                                + B_offset(ldb, 0, true) / (8 * 1)]);
-                kmovq(reg_comp_mask2, reg_comp_mask_tmp);
-
-                vpexpandb(zmm_comp1 | reg_comp_mask1 | T_z, zmm_comp1);
-                vmovdqu8(ptr[reg_ptr_decomp_dst + cl * 64], zmm_comp1);
-
-                vpexpandb(zmm_comp2 | reg_comp_mask2 | T_z, zmm_comp2);
-                vmovdqu8(ptr[reg_ptr_decomp_dst + (cl + 1) * 64], zmm_comp2);
-
-                popcnt(reg_popcnt, reg_comp_mask_tmp);
-                add(reg_ptr_decomp_src, reg_popcnt);
-            }
-
-            tileloadd(Tmm(brgemm_amx::get_B_tensor(idx)),
-                    ptr[reg_ptr_decomp_dst + reg_stride_ldb]);
-        }
-        mov(reg_popcnt, ptr[rsp+reg_decomp_popcount_offset_]);
-        mov(reg_ptr_decomp_mask, ptr[rsp+reg_decomp_mask_offset_]);
-        mov(reg_ptr_decomp_dst, ptr[rsp+reg_decomp_dst_offset_]);
-	    mov(reg_ptr_decomp_src, ptr[rsp+reg_decomp_src_offset_]);
-    } else {
-        for (int ldb = 0; ldb < ld_block2; ldb++) {
-            const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
-            maybe_tileloadd_nt(
-                    Tmm(brgemm_amx::get_B_tensor(idx)), B_offset(ldb, 0, true));
-        }
-    }
-
     for (int bdb = 0; bdb < bd_block2; bdb++) {
         tileloadd(Tmm(brgemm_amx::get_A_tensor(bdb)),
                 ptr[reg_aux_A + A_offset(bdb, 0, true) + reg_stride_lda]);
-
-        for (int ldb = 0; ldb < ld_block2; ldb++) {
-            const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
+    }
+    for (int ldb = 0; ldb < ld_block2; ldb++) {
+        const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
+        maybe_tileloadd_nt(
+                Tmm(brgemm_amx::get_B_tensor(idx)), B_offset(ldb, 0, true));
+        for (int bdb = 0; bdb < bd_block2; bdb++) {
             tdpbxxd(Tmm(brgemm_amx::get_C_tensor(bdb, idx)),
                     Tmm(brgemm_amx::get_A_tensor(bdb)),
                     Tmm(brgemm_amx::get_B_tensor(idx)));

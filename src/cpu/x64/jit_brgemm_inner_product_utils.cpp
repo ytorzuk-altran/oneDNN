@@ -631,17 +631,9 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
         return status::unimplemented;
     if (!IMPLICATION(is_f32, isa == avx512_core)) return status::unimplemented;
 
-    jbgp.weights_compressed = false;
     if (is_int8) {
         jbgp.acc_dt = s32;
         jbgp.with_scales = true;
-        jbgp.weights_compressed 
-            = (weights_d.extra().flags & memory_extra_flags::compression) != 0;
-        if (jbgp.weights_compressed) {
-            // printf("jbgp.weights_compressed = true\n");
-            jbgp.weights_compressed = true;
-            jbgp.weight_comp_bitmask_off = jbgp.ic * jbgp.oc;
-        }
     } else if (is_bf16) {
         jbgp.acc_dt = f32;
     } else if (is_f32) {
@@ -692,9 +684,8 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
             weights_md = want_wei_md;
             return status::success;
         }
-        // return (want_wei_md == weights_md) ? status::success
-        //                                    : status::unimplemented;
-        return status::success;  
+        return (want_wei_md == weights_md) ? status::success
+                                           : status::unimplemented;
     };
 
     CHECK(set_or_check_tags());
@@ -719,10 +710,6 @@ void init_scratchpad(memory_tracking::registrar_t &scratchpad,
     if (jbgp.brg_type == brgemm_addr) {
         scratchpad.book(key_brgemm_primitive_batch, n_elems, sc_size, 64);
     }
-    if (jbgp.weights_compressed) { 
-        scratchpad.book(key_brgemm_primitive_decomp_buffer, jbgp.nthr * 1024, 1);        
-    }
-
     if (jbgp.use_buffer) {
         size_t nelements = (size_t)jbgp.nthr * jbgp.LDC * jbgp.M;
         if (jbgp.prop_kind == dnnl_backward_weights

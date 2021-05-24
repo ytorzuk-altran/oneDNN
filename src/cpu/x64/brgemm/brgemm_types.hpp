@@ -88,7 +88,6 @@ struct brgemm_batch_element_t {
     brgemm_batch_element_t() {
         ptr.A = ptr.B = nullptr;
         vvpad.top = vvpad.bottom = 0;
-        scratch_buf = bitmask_ptr = nullptr;
     }
     union {
         struct {
@@ -110,9 +109,6 @@ struct brgemm_batch_element_t {
             dim_t right;
         } hvpad;
     };
-    const void *scratch_buf;
-    const void *bitmask_ptr;
-    bool weights_compressed = false;
 };
 
 struct brgemm_t {
@@ -150,7 +146,6 @@ struct brgemm_t {
     bool is_bf16 = false, is_bf16_amx = false;
     bool is_f32 = false;
     bool is_amx = false;
-    bool weights_compressed = false;
 
     dim_t stride_a = 0; // Offset in bytes
     dim_t stride_b = 0;
@@ -206,10 +201,6 @@ struct brgemm_kernel_params_t {
     const void *a_zp_compensations = nullptr;
     const void *b_zp_compensations = nullptr;
     const void *c_zp_values = nullptr;
-
-    const void *scratch_buf = nullptr;
-    const void *bitmask_ptr = nullptr;
-    bool weights_compressed = false;
 };
 
 struct jit_brgemm_kernel_base_t;

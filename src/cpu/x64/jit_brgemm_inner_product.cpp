@@ -84,14 +84,10 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
 
     size_t offset = types::data_type_size(jbgp.wei_dt)
             * (weights_d.size() - weights_d.additional_buffer_size());
-    // printf("offset %zd\n", offset);
     auto compensation = (jbgp.signed_input)
             ? reinterpret_cast<const int32_t *>(&weights[offset])
             : nullptr;
-    char *b_decomp_buf = jbgp.weights_compressed
-            ? scratchpad.template get<char>(key_brgemm_primitive_decomp_buffer)
-            : nullptr;
-    
+
     bool is_os_tail = (jbgp.mb < jbgp.os_block);
     bool is_oc_tail = (jbgp.oc < jbgp.oc_block);
     int base_brg_ker_idx
@@ -110,10 +106,6 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
         int oc = ocb * jbgp.oc_block;
         int icb = icc * jbgp.nb_ic_blocking;
         int ic = icb * jbgp.ic_block;
-
-        // printf("jbgp.oc_block %d, jbgp.nb_ic_blocking %d, jbgp.ic_block %d\n",
-        //         jbgp.oc_block, jbgp.nb_ic_blocking, jbgp.ic_block);
-        // printf("oc %d, icb %d, ic %d \n", oc, icb, ic);
 
         bool kernel_init = (icc == 0);
 
@@ -138,13 +130,6 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                                 src_d, jbgp.src_dt, n, ic + b * jbgp.ic_block);
                 addr_batch[b].ptr.B = weights
                         + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b);
-                addr_batch[b].scratch_buf = b_decomp_buf + ithr * 1024;
-                addr_batch[b].bitmask_ptr = weights
-                        + jbgp.weight_comp_bitmask_off
-                        + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b) / 8;
-
-                //printf("  gemm_batch %d, weight offset %zd \n",
-                //        gemm_batch, get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b));                        
             }
 
             auto ptr_D = dst + get_blk_off(dst_d, jbgp.dst_dt, n, oc);
@@ -162,10 +147,9 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                         post_ops_binary_rhs_arg_vec.data(),
                         static_cast<size_t>(oc)};
 
-                // printf("brgemm_kernel_execute_postops\n");
                 brgemm_kernel_execute_postops(brg_kernel, gemm_batch,
                         addr_batch, (void *)ptr_C, (void *)ptr_D, post_ops_data,
-                        scratch, jbgp.weights_compressed);
+                        scratch);
             } else {
                 brgemm_kernel_execute(brg_kernel, gemm_batch, addr_batch,
                         (void *)ptr_C, is_amx ? (void *)wsp_tile : nullptr);
