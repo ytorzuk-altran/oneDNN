@@ -210,12 +210,10 @@ struct jit_uni_x8s8s32x_1x1_convolution_fwd_t : public primitive_t {
             memory_desc_init_by_tag(want_wei_md, wei_tag);
             if (is_src_s8) {
                 want_wei_md.extra.flags = 0
-                        | memory_extra_flags::compensation_conv_s8s8
-                        | memory_extra_flags::scale_adjust;
+                        | memory_extra_flags::compensation_conv_s8s8;
                 want_wei_md.extra.compensation_mask
                         = (1 << 0) + (with_groups() ? (1 << 1) : 0);
-                want_wei_md.extra.scale_adjust
-                        = mayiuse(avx2_vnni) ? 1.0f : 0.5f;
+                want_wei_md.extra.scale_adjust = 1.0f;
             }
 
             if (weights_md_.format_kind == format_kind::any) {
