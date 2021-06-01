@@ -18,6 +18,7 @@
 #define CPU_X64_JIT_UNI_FORK_SOFTMAX_HPP
 
 #include <assert.h>
+#include <memory>
 
 #include "common/c_types_map.hpp"
 #include "common/primitive.hpp"
@@ -85,7 +86,7 @@ struct jit_uni_fork_softmax_fwd_t : public primitive_t {
 
 private:
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
-    jit_uni_fork_softmax_kernel_f32<isa> *kernel_;
+    std::unique_ptr<jit_uni_fork_softmax_kernel_f32<isa>> kernel_;
 };
 
 }
