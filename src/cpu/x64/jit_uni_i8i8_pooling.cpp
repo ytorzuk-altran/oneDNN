@@ -132,6 +132,9 @@ struct jit_uni_i8i8_pooling_fwd_ker_t : public jit_generator {
             1); // "avg" - Mmx reg for full mask (all 8 bytes) - used until not in tail
     Mmx mmx_tmp = Mmx(2);
 
+    Vmm vmm_d_weights = vreg(3);
+    Vmm vmm_d_bias = vreg(4);
+
     enum : int { max_vidx_base = utils::one_of(isa, sse41, avx2) ? 7 : 2 };
     //"avg" pool uses more registers for unrolling.
     enum : int { avg_vidx_base = utils::one_of(isa, sse41, avx2) ? 4 : 2 };
@@ -174,9 +177,6 @@ struct jit_uni_i8i8_pooling_fwd_ker_t : public jit_generator {
     Mmx mmx_mask(int ll) {
         return Mmx(mmx_msk_base_reg + ll);
     }; // ll: 0..4 [Mmx(2)...Mmx(5)]
-
-    Vmm vmm_d_weights = Vmm(avg_vidx_base + 0);
-    Vmm vmm_d_bias = Vmm(avg_vidx_base + 1);
 
     nstl::vector<jit_uni_quantization_injector_f32<isa>*> quantization_injectors;
 
