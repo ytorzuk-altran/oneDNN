@@ -141,6 +141,11 @@ struct jit_uni_i8i8_pooling_fwd_ker_t : public jit_generator {
     std::unique_ptr<injector::jit_uni_postops_injector_t<isa>>
             postops_injector_;
 
+    Vmm vmm_d_weights = vreg(3);
+    Vmm vmm_d_bias = vreg(4);
+
+    nstl::vector<jit_uni_quantization_injector_f32<isa>*> quantization_injectors;
+
     enum : int { max_vidx_base = utils::one_of(isa, sse41, avx2) ? 7 : 2 };
     //"avg" pool uses more registers for unrolling.
     enum : int { avg_vidx_base = utils::one_of(isa, sse41, avx2) ? 4 : 2 };
@@ -167,9 +172,6 @@ struct jit_uni_i8i8_pooling_fwd_ker_t : public jit_generator {
         max_num_ll = s32_to_i8_ratio,
         mmx_msk_base_reg = 3
     };
-
-    Vmm vmm_d_weights = Vmm(avg_vidx_base + 0);
-    Vmm vmm_d_bias = Vmm(avg_vidx_base + 1);
 
     Vmm vreg_src_s32(int jj, int ll) {
         return avg_base_vr(3 * max_num_ll * jj + ll + 0 * max_num_ll);
