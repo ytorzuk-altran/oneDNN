@@ -24,6 +24,8 @@
 #include "cpu/x64/brgemm/brgemm_types.hpp"
 #include "cpu/x64/cpu_barrier.hpp"
 #include "cpu/x64/injectors/jit_uni_postops_injector.hpp"
+#include "cpu/x64/jit_brgemm_decompress_kernel.hpp"
+
 namespace dnnl {
 namespace impl {
 namespace cpu {
@@ -34,6 +36,18 @@ using namespace dnnl::impl::utils;
 
 using namespace prop_kind;
 using namespace data_type;
+
+void brgemm_decompress_kernel_execute(const std::unique_ptr<dnnl::impl::cpu::x64::jit_brgemm_decompress_kernel> kernel,
+        const void *addr_B, const void *scratch_buf, const void *bitmask_ptr){
+    auto dcomp_params = brgemm_decomp_kernel_params_t();
+    dcomp_params.ptr_B = addr_B;
+    dcomp_params.scratch_buf = scratch_buf;
+    dcomp_params.bitmask_ptr = bitmask_ptr;
+    printf("calling decompress\n");
+    if(kernel == nullptr) 
+            printf(" decompress is null\n");
+    (*kernel)(&dcomp_params);        
+}
 
 void brgemm_kernel_execute(const brgemm_kernel_t *brg_kernel, int bs,
         const brgemm_batch_element_t *batch, void *ptr_C, void *scratch) {

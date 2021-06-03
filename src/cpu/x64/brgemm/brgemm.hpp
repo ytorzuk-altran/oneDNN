@@ -20,11 +20,15 @@
 #include "cpu/x64/brgemm/brgemm_amx.hpp"
 #include "cpu/x64/brgemm/brgemm_types.hpp"
 #include "cpu/x64/cpu_isa_traits.hpp"
+#include "cpu/x64/jit_brgemm_decompress_kernel.hpp"
 
 namespace dnnl {
 namespace impl {
 namespace cpu {
 namespace x64 {
+void brgemm_decompress_kernel_execute(const std::unique_ptr<dnnl::impl::cpu::x64::jit_brgemm_decompress_kernel> kernel,
+        const void *addr_B, const void *scratch_buf, const void *bitmask_ptr);
+
 /// Initializes a BRGEMM descriptor
 ///
 /// @param brg Output BRGEMM descriptor
@@ -143,7 +147,7 @@ void brgemm_kernel_execute(const brgemm_kernel_t *brg_kernel, int bs,
 /// @param scratch Scratchpad needed for AMX version, can be nullptr for
 ///     avx512 version
 ///
-void brgemm_kernel_execute(const brgemm_kernel_t *brg_kernel, int bs,
+void brgemm_kernel_execute(brgemm_kernel_t *brg_kernel, int bs,
         const void *addr_A, const void *addr_B,
         const brgemm_batch_element_t *batch, void *ptr_C,
         void *scratch = nullptr);

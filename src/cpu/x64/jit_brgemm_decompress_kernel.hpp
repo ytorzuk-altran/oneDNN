@@ -14,8 +14,8 @@
 * limitations under the License.
 *******************************************************************************/
 
-#ifndef CPU_X64_JIT_AVX512_CORE_AMX_DECOMPRESS_KERNEL_HPP
-#define CPU_X64_JIT_AVX512_CORE_AMX_DECOMPRESS_KERNEL_HPP
+#ifndef CPU_X64_JIT_BRGEMM_DECOMPRESS_KERNEL_HPP
+#define CPU_X64_JIT_BRGEMM_DECOMPRESS_KERNEL_HPP
 
 #include "common/c_types_map.hpp"
 #include "common/memory_tracking.hpp"
@@ -29,21 +29,22 @@ namespace impl {
 namespace cpu {
 namespace x64 {
 
-struct jit_brgemm_inner_product_kernel : public jit_generator {
-    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_brgemm_inner_product_kernel)
-    jit_brgemm_inner_product_kernel() {}
+struct jit_brgemm_decompress_kernel : public jit_generator {
+    DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_brgemm_decompress_kernel)
 
-    ~jit_brgemm_inner_product_kernel() {}
-
-    status_t create_kernel() override {
-        CHECK(jit_generator::create_kernel());
-        return status::success;
+    // TODO: Need to check status
+    jit_brgemm_decompress_kernel()
+        : jit_generator(nullptr, MAX_CODE_SIZE, true, avx512_core_amx) {
+        create_kernel();
+        printf("jit_brgemm_decompress_kernel created\n");
     }
-           
-private:
 
-    /* compression */
+    void tile_configure(const char *palette) const { (*this)(palette); }
+
+private:
     Xbyak::Reg64 wei_ptr = r14;
+    Xbyak::Reg64 dst_ptr = r13;
+
     const Xbyak::Zmm zmm_comp = Xbyak::Zmm(28);
 
     const Xbyak::Reg64 reg_bias = r11;
@@ -53,9 +54,10 @@ private:
     const Xbyak::Reg64 reg_popcnt = reg_bias;
     const Xbyak::Reg64 reg_comp_mask_tmp = reg_bias;
     const Xbyak::Opmask reg_comp_mask = k1;
-
+    
     void generate() override;
 };
+
 
 } // namespace x64
 } // namespace cpu

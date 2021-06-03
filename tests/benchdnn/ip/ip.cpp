@@ -261,6 +261,17 @@ void check_known_skipped_case(const prb_t *prb, res_t *res) {
     }
 }
 
+int show_memory(dnn_mem_t &mem) {
+    const auto nelems = mem.nelems(true);
+
+    for (int64_t idx = 0; idx < nelems; ++idx) {
+        std::cout << mem.get_elem(idx) << ",";
+    }
+
+    std::cout << std::endl;
+    return OK;
+}
+
 int doit(const prb_t *prb, res_t *res) {
     if (bench_mode == LIST) return res->state = LISTED, OK;
 
@@ -326,9 +337,9 @@ int doit(const prb_t *prb, res_t *res) {
 
     SAFE(fill_src(prb, src_dt, src_fp, res), WARN);
     SAFE(fill_wei(prb, wei_dt, wei_fp, res), WARN);
+    show_memory(wei_dt);
     SAFE(fill_bia(prb, bia_dt, bia_fp, res), WARN);
     SAFE(fill_dst(prb, dst_dt, dst_fp, res), WARN);
-
     args_t args;
 
     if (prb->dir & FLAG_FWD) {

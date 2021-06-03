@@ -283,7 +283,6 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
       const int OC = input_dims[0];
       const int NB_OC = padded_dims[0] / o_blksize;
       const int IC = input_dims[1];
-      printf("DEBUG:custom-reorder: OC %d, IC %d\n",OC, IC);
       const int NB_IC = padded_dims[1] / i_blksize;
       const int plain_o_stride = input_d.blocking_desc().strides[0];
       const int plain_i_stride = input_d.blocking_desc().strides[1];
@@ -295,46 +294,56 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
       size_t offset = padded_dims[0] * padded_dims[1];
 
       uint64_t *bitmask_ptr = reinterpret_cast<uint64_t *>(output + offset);
-      int count = 0;
 
       parallel_nd(NB_IC, NB_OC, [&](int I, int O) {
           auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I)];
-          auto outp = &output[output_d.blk_off(O, I)];
+          printf("output_d.blk_off(O, I) %d\n", output_d.blk_off(O, I, 0, 0));
+          auto outp = &output[output_d.blk_off(O, I, 0, 0)];
           const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
           const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
-          int bitmask_idx = (O * NB_IC + I) * i_outer_blksize;
+          int bitmask_idx = (O * NB_IC + I) * i_blksize;
           //printf("-----bitmask_idx---O-NB_IC-I-i_outer_blksize %d %d %d %d %d --\n",bitmask_idx,O,NB_IC,I,i_outer_blksize);
           auto max_outp = &outp[o_blksize * i_blksize];
           const float *scales_here
                   = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
-          for (int ic_base = 0; ic_base < ic_block; ic_base += 4) {
+          for (int ic_base = 0; ic_base < ic_block; ic_base += 4) { // 64, steps of 4
              bitmask_ptr[bitmask_idx] = 0;
               int bit = 0;
-              for (int oc = 0; oc < oc_block; oc++) {
+             int count = 0;
+              for (int oc = 0; oc < oc_block; oc++) { // 64
                   int plain_off
                           = oc * plain_o_stride + ic_base * plain_i_stride;
                   int ic_block_here = nstl::min(4, ic_block - ic_base);
-                  for (int ic = 0; ic < ic_block_here; ic++) {
+                  for (int ic = 0; ic < ic_block_here; ic++) { // 4
                       data_t<type_o> o = inp[plain_off];
+                      printf("%d, ", o);
                       if (o != 0) {
                           *outp++ = o;
                           bitmask_ptr[bitmask_idx] |= (1UL << bit);
                       }
-
-                      printf("%d, ", plain_off);
+                      
                       plain_off += plain_i_stride;
                       bit++;
                       count++;
                   }
+                  if (count % 64 == 0) { 
+                      uint64_t val = bitmask_ptr[bitmask_idx];
+                      printf("\nbitmask[%d] = 0x%" PRIx64 "\n", bitmask_idx,
+                              val);
+                      bitmask_idx++; 
+                      bitmask_ptr[bitmask_idx] = 0;
+                      bit = 0;
+                  }
               }
-              bitmask_idx++;
           }
          while (outp < max_outp) {
-             *outp++ = 0;
+              *outp++ = 0;
          }
       });
+      printf("\n\n");
       return status::success;
   }
+
 };
 
 template <SIMPLE_REORDER_TEMPL_DECL>

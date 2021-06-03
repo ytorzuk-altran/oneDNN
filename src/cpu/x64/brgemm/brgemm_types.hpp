@@ -175,6 +175,13 @@ struct brgemm_t {
     static constexpr int MAX_VPAD = 100;
 };
 
+struct brgemm_decomp_kernel_params_t {
+    const void *ptr_B;
+    const void *scratch_buf;
+    const void *bitmask_ptr;
+    size_t offset;
+};
+
 struct brgemm_kernel_params_t {
     const void *ptr_A;
     const void *ptr_B;
