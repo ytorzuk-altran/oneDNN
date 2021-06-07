@@ -125,13 +125,16 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
             if (is_amx && (is_os_tail || is_oc_tail))
                 amx_tile_configure(&brg_kernel_palettes_[brg_ker_idx][0]);
             
-            int8_t decomp_buf[4096];
+            auto wei_offset = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb);          
+            const size_t decomp_buffer_size = (size_t) jbgp.ic * 64;
+            int8_t decomp_buf[decomp_buffer_size];
+            // printf("wei_offset %d, decomp_buffer_size %d\n", wei_offset, decomp_buffer_size);
+            std::memset((void *)decomp_buf, -8, decomp_buffer_size);
 
             for (int b = 0; b < gemm_batch; b++) {
                 addr_batch[b].ptr.A = src
                         + get_blk_off(
                                 src_d, jbgp.src_dt, n, ic + b * jbgp.ic_block);
-                printf("jbgp.oc_block %d, jbgp.ic_block %d \n", jbgp.oc_block, jbgp.ic_block);
 
                 auto wei_offset = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b);
                 if(jbgp.weights_compressed){
@@ -139,15 +142,14 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                         dcomp_params.ptr_B = weights + wei_offset;
                         dcomp_params.scratch_buf = &decomp_buf;
                         dcomp_params.bitmask_ptr = weights + (jbgp.oc * jbgp.ic) + wei_offset / 8;
-                        printf("decompress: wei_offset %d, bitmask %d \n", wei_offset, (jbgp.oc * jbgp.ic) + wei_offset / 8);
                         if(brg_decomp_kernel_ == nullptr) 
                                 printf(" decompress is null\n");
                         (*brg_decomp_kernel_)(&dcomp_params);
-                        addr_batch[b].ptr.B = decomp_buf + wei_offset;      
+                        addr_batch[b].ptr.B = decomp_buf;      
 
-                        for(int i=0; i < 4096; i++)
-                           printf("%d, ", decomp_buf[i]);
-                        printf("\n");
+                        // for(int i=0; i < decomp_buffer_size; i++)
+                        //     printf("%d,", decomp_buf[i]);
+                        // printf("\n");
 
                 }else{
                         addr_batch[b].ptr.B = weights + wei_offset;                       

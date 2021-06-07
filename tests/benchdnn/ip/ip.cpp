@@ -337,7 +337,7 @@ int doit(const prb_t *prb, res_t *res) {
 
     SAFE(fill_src(prb, src_dt, src_fp, res), WARN);
     SAFE(fill_wei(prb, wei_dt, wei_fp, res), WARN);
-    show_memory(wei_dt);
+    // show_memory(wei_dt);
     SAFE(fill_bia(prb, bia_dt, bia_fp, res), WARN);
     SAFE(fill_dst(prb, dst_dt, dst_fp, res), WARN);
     args_t args;

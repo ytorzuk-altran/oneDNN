@@ -297,7 +297,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
       parallel_nd(NB_IC, NB_OC, [&](int I, int O) {
           auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I)];
-          printf("output_d.blk_off(O, I) %d\n", output_d.blk_off(O, I, 0, 0));
+          // printf("output_d.blk_off(O, I) %d\n", output_d.blk_off(O, I, 0, 0));
           auto outp = &output[output_d.blk_off(O, I, 0, 0)];
           const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
           const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
@@ -316,7 +316,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                   int ic_block_here = nstl::min(4, ic_block - ic_base);
                   for (int ic = 0; ic < ic_block_here; ic++) { // 4
                       data_t<type_o> o = inp[plain_off];
-                      printf("%d, ", o);
+                      // printf("%d, ", o);
                       if (o != 0) {
                           *outp++ = o;
                           bitmask_ptr[bitmask_idx] |= (1UL << bit);
@@ -328,8 +328,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                   }
                   if (count % 64 == 0) { 
                       uint64_t val = bitmask_ptr[bitmask_idx];
-                      printf("\nbitmask[%d] = 0x%" PRIx64 "\n", bitmask_idx,
-                              val);
+                      // printf("\nbitmask[%d] = 0x%" PRIx64 "\n", bitmask_idx, val);
                       bitmask_idx++; 
                       bitmask_ptr[bitmask_idx] = 0;
                       bit = 0;
@@ -340,7 +339,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
               *outp++ = 0;
          }
       });
-      printf("\n\n");
+      // printf("\n\n");
       return status::success;
   }
 

@@ -184,7 +184,8 @@ struct brgemm_inner_product_fwd_t : public primitive_t {
                 CHECK(brgemm_init_tiles(
                         pd()->brg_descs_[idx], &brg_kernel_palettes_[idx][0]));
         }
-        CHECK(safe_ptr_assign(brg_decomp_kernel_, new jit_brgemm_decompress_kernel()));
+        CHECK(safe_ptr_assign(brg_decomp_kernel_,
+                new jit_brgemm_decompress_kernel(&pd()->jbgp_)));        
         return status::success;
     }
 

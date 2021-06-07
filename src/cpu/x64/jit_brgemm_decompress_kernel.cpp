@@ -36,13 +36,12 @@ void jit_brgemm_decompress_kernel::generate() {
     mov(wei_ptr, ptr[param1 + GET_OFF(ptr_B)]);
     mov(reg_ptr_decomp_mask, ptr[param1 + GET_OFF(bitmask_ptr)]);
     mov(reg_ptr_decomp_dst, ptr[param1 + GET_OFF(scratch_buf)]);
-    int blocks = 1;
+    mov(reg_blocks, ptr[param1 + GET_OFF(blocks)]);
 
-    for(int block=0; block < blocks; block++){
-        const int wei_offset =  block * 4096;
+    for(int block = 0; block < blocks_; block++){
+        int wei_offset =  block * 4096;
         lea(reg_ptr_decomp_src, ptr[wei_ptr +wei_offset]);
-        const int bitmask_off = wei_offset / (1 * 8);
-        // db(0xcc);
+        int bitmask_off = wei_offset / (1 * 8);
         for (int cl = 0; cl < 64; cl++) {           
             vmovdqu8(zmm_comp, ptr[reg_ptr_decomp_src]);
             mov(reg_comp_mask_tmp, ptr[reg_ptr_decomp_mask + cl * 8 + bitmask_off]);

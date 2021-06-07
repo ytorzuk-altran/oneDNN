@@ -23,6 +23,7 @@
 
 #include "cpu/x64/jit_generator.hpp"
 #include "cpu/x64/jit_primitive_conf.hpp"
+#include "cpu/x64/jit_brgemm_primitive_conf.hpp"
 
 namespace dnnl {
 namespace impl {
@@ -32,16 +33,21 @@ namespace x64 {
 struct jit_brgemm_decompress_kernel : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_brgemm_decompress_kernel)
 
-    // TODO: Need to check status
-    jit_brgemm_decompress_kernel()
+    jit_brgemm_decompress_kernel(const jit_brgemm_primitive_conf_t *jbgp)
         : jit_generator(nullptr, MAX_CODE_SIZE, true, avx512_core_amx) {
+        blocks_ = jbgp->ic * 64 / 4096;
+        
         create_kernel();
-        printf("jit_brgemm_decompress_kernel created\n");
+        // printf("jit_brgemm_decompress_kernel created\n");
     }
+
 
     void tile_configure(const char *palette) const { (*this)(palette); }
 
 private:
+    int blocks_;
+
+    Xbyak::Reg64 reg_blocks = r12;
     Xbyak::Reg64 wei_ptr = r14;
     Xbyak::Reg64 dst_ptr = r13;
 
