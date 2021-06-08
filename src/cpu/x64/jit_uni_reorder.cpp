@@ -1627,6 +1627,19 @@ struct jit_blk_reorder_t : public primitive_t {
             status_t prb_init_status = prb_init(prb, *src_md, *dst_md, attr);
             if (prb_init_status != status::success) return prb_init_status;
 
+            // NB! Fall back to ref, if input and output both batch-strided
+            bool batch_strided_input = false;
+            bool batch_strided_output = false;
+            if (prb.ndims > 1) {
+                int batch_idx = prb.nodes[0].is > prb.nodes[1].is ? 0 : 1;
+                int channel_idx = batch_idx == 0 ? 1 : 0;
+                batch_strided_input =
+                        (ptrdiff_t) prb.nodes[channel_idx].n * prb.nodes[channel_idx].is < prb.nodes[batch_idx].is;
+                batch_idx = prb.nodes[0].os > prb.nodes[1].os ? 0 : 1;
+                channel_idx = batch_idx == 0 ? 1 : 0;
+                batch_strided_output =
+                        (ptrdiff_t) prb.nodes[channel_idx].n * prb.nodes[channel_idx].is < prb.nodes[batch_idx].is;
+            }
             DEBUG({
                 printf("init : ");
                 prb_dump(prb);
@@ -1649,6 +1662,9 @@ struct jit_blk_reorder_t : public primitive_t {
                 printf("tile : ");
                 prb_dump(prb);
             });
+            // NB! Fall back to ref, if input and output both batch-strided
+            if (batch_strided_input && batch_strided_output)
+                return status::unimplemented;
 
             if (!tr::jit_single_blk_kernel_t::applicable(prb)) {
                 return status::unimplemented;
