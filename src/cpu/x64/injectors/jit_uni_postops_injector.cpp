@@ -71,12 +71,12 @@ jit_uni_postops_injector_t<isa, Vmm>::jit_uni_postops_injector_t(
         } else if (post_op.is_binary()) {
             is_binary = true;
         } else if (post_op.is_depthwise()) {
-            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<isa>(
+            depthwise_injectors.emplace_back(new jit_uni_depthwise_injector_f32<isa>(
                     host,
                     post_op
             ));
         } else if (post_op.is_quantization()) {
-            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<isa, Vmm>(
+            quantization_injectors.emplace_back(new jit_uni_quantization_injector_f32<isa, Vmm>(
                     host,
                     post_op,
                     Vmm(qsp.vmm_d_weights_idx), Vmm(qsp.vmm_d_bias_idx), qsp.reg_d_weights, qsp.reg_d_bias
