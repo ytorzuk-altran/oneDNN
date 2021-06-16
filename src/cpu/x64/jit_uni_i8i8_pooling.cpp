@@ -178,7 +178,7 @@ struct jit_uni_i8i8_pooling_fwd_ker_t : public jit_generator {
         return Mmx(mmx_msk_base_reg + ll);
     }; // ll: 0..4 [Mmx(2)...Mmx(5)]
 
-    nstl::vector<jit_uni_quantization_injector_f32<isa>*> quantization_injectors;
+    nstl::vector<std::unique_ptr<jit_uni_quantization_injector_f32<isa>>> quantization_injectors;
 
     jit_pool_conf_t jpp;
     const primitive_attr_t &attr;
@@ -1251,7 +1251,7 @@ void jit_uni_i8i8_pooling_fwd_ker_t<isa>::generate() {
     for (int i = 0; i < p.len(); i++) {
         auto &post_op = p.entry_[i];
         if (post_op.is_quantization()) {
-            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<isa>(
+            quantization_injectors.emplace_back(new jit_uni_quantization_injector_f32<isa>(
                     this,
                     post_op,
                     vmm_d_weights, vmm_d_bias, reg_d_weights, reg_d_bias
