@@ -144,8 +144,6 @@ struct jit_uni_i8i8_pooling_fwd_ker_t : public jit_generator {
     Vmm vmm_d_weights = vreg(3);
     Vmm vmm_d_bias = vreg(4);
 
-    nstl::vector<jit_uni_quantization_injector_f32<isa>*> quantization_injectors;
-
     enum : int { max_vidx_base = utils::one_of(isa, sse41, avx2) ? 7 : 2 };
     //"avg" pool uses more registers for unrolling.
     enum : int { avg_vidx_base = utils::one_of(isa, sse41, avx2) ? 4 : 2 };
