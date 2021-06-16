@@ -149,8 +149,8 @@ private:
     reg64_t reg_d_weights = r15;
     reg64_t reg_d_bias = reg_kj;
 
-    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
-    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common, Vmm>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common, Vmm>*> depthwise_injectors;
 
     bf16_emulation_t *bf16_emu_;
 

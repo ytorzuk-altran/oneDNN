@@ -483,12 +483,12 @@ void _jit_avx512_core_bf16_fwd_kernel<Vmm>::generate() {
     for (int i = 0; i < p.len(); i++) {
         auto &post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
-            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common>(
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common, Vmm>(
                     this,
                     post_op.eltwise
             ));
         } else if (post_op.is_depthwise()) {
-            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common, Vmm>(
                     this,
                     post_op.depthwise.alg
             ));

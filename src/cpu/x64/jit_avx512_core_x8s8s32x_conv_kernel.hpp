@@ -59,9 +59,9 @@ struct _jit_avx512_core_x8s8s32x_fwd_kernel : public jit_generator {
     const primitive_attr_t &attr_;
 
 private:
-    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
-    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
-    nstl::vector<jit_uni_quantization_injector_f32<avx512_common>*> quantization_injectors;
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common, Vmm>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common, Vmm>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<avx512_common, Vmm>*> quantization_injectors;
 
     const int ic_sub_step = 4;
     enum {
