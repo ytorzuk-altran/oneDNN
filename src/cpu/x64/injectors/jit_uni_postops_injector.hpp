@@ -142,8 +142,8 @@ private:
     std::unique_ptr<binary_injector::jit_uni_binary_injector_t<isa, Vmm>>
             binary_injector_;
     lambda_jit_injectors_t lambda_jit_injectors_;
-    nstl::vector<jit_uni_depthwise_injector_f32<isa>*> depthwise_injectors;
-    nstl::vector<jit_uni_quantization_injector_f32<isa, Vmm>*> quantization_injectors;
+    nstl::vector<std::unique_ptr<jit_uni_depthwise_injector_f32<isa>>> depthwise_injectors;
+    nstl::vector<std::unique_ptr<jit_uni_quantization_injector_f32<isa, Vmm>>> quantization_injectors;
 };
 
 enum post_op_type { sum = 0, eltwise, binary, depthwise, quantization };

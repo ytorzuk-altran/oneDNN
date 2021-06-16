@@ -1574,7 +1574,7 @@ status_t jit_uni_reorder_t::pd_t::create(reorder_pd_t **reorder_pd,
     // NB! Fall back to ref, if input and output both batch-strided
     if (batch_strided_input && batch_strided_output)
         return status::unimplemented;
-    
+
     int ndims_ker_max;
     int nthr = dnnl_get_max_threads();
     prb_thread_kernel_balance(prb, ndims_ker_max, nthr);
