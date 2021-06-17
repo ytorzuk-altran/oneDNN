@@ -79,11 +79,11 @@ dnnl_status_t dnnl_gemm_s8s8s32(char transa, char transb, char offsetc, dim_t M,
 
 dnnl_status_t dnnl_gemm_bf16bf16f32(char transa,
         char transb, dim_t M, dim_t N, dim_t K, float alpha,
-        const bfloat16_t *A, dim_t lda, const bfloat16_t *B, dim_t ldb,
+        const uint16_t *A, dim_t lda, const uint16_t *B, dim_t ldb,
         float beta, float *C, dim_t ldc) {
 #if DNNL_CPU_RUNTIME != DNNL_RUNTIME_NONE
-    return cpu::gemm_bf16bf16f32(&transb, &transa, &N, &M, &K, &alpha, B, &ldb,
-            A, &lda, &beta, C, &ldc);
+    return cpu::gemm_bf16bf16f32(&transb, &transa, &N, &M, &K, &alpha, (bfloat16_t*)B, &ldb,
+                                 (bfloat16_t*)A, &lda, &beta, C, &ldc);
 #else
     return dnnl::impl::status::unimplemented;
 #endif
