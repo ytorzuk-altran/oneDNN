@@ -124,7 +124,7 @@ enum cpu_isa_t : unsigned {
     avx512_vpopcnt = avx512_vpopcnt_bit,
     // NOTES: 1. Intel AMX is under initial support and turned off by default
     //        2. isa_all by default has no isa specific hints
-    isa_all = ~0u & ~amx_bf16_bit
+    isa_all = ~0u
             & ~cpu_isa_hints_utils::hints_mask,
 };
 
