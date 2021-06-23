@@ -43,7 +43,9 @@ static int check_simple_enums() {
 
     CHECK_EQ(str2alg("wino"), alg_t::WINO);
     CHECK_EQ(str2alg("WINO"), alg_t::WINO);
-
+    
+    CHECK_EQ(str2alg("compress"), alg_t::COMPRESS);
+    CHECK_EQ(str2alg("COMPRESS"), alg_t::COMPRESS);
     return OK;
 }
 

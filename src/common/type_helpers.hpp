@@ -183,6 +183,8 @@ inline bool memory_extra_desc_is_equal(
                     lhs.compensation_mask == rhs.compensation_mask)
             && IMPLICATION(lhs.flags & rnn_u8s8_compensation,
                     lhs.compensation_mask == rhs.compensation_mask)
+            && IMPLICATION(lhs.flags & memory_extra_flags::compression,
+                    lhs.compensation_mask == rhs.compensation_mask)
             && IMPLICATION(lhs.flags & scale_adjust,
                     lhs.scale_adjust == rhs.scale_adjust)
             && IMPLICATION(lhs.flags & compensation_conv_asymmetric_src,

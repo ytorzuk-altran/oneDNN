@@ -107,6 +107,8 @@ struct jit_conv_conf_t {
     bool with_bias;
     bool with_sum;
     bool with_eltwise;
+    bool weight_compressed;
+    size_t weight_comp_bitmask_off;
     bool with_binary;
 
     bool is_fused_conv;
@@ -406,7 +408,12 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
 
     winograd_sched_t sched_policy;
 };
-
+struct jit_decompress_call_s {
+    const void *filt; /* hack, non-const for backward_weights */
+    const void *filt_prf;
+    const void *scratch_buf;
+    const void *bitmask_ptr;
+};
 struct jit_conv_call_s {
     const void *src; /* hack, non-const for backward_data */
     const void *dst; /* hack, non-const for forward */
@@ -425,6 +432,8 @@ struct jit_conv_call_s {
     const int32_t *dst_zero_point;
     const void *tile_cfg;
     const void *tile_cfg_tail;
+    const void *scratch_buf;
+    const void *bitmask_ptr;
 
     // ptr to table of void * elements that are pointers to
     // post_op binary src1 tensors

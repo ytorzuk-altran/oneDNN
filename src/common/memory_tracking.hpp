@@ -159,6 +159,8 @@ enum {
     key_bnorm_tmp_diff_ss,
     key_bnorm_tmp_stats,
     key_bnorm_reduction,
+    key_compression,
+    key_compression_flags,
     key_brgemm_primitive_batch,
     key_brgemm_primitive_buffer,
     key_brgemm_primitive_buffer_a,

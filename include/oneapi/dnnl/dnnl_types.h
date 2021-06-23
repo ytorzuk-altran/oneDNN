@@ -1171,6 +1171,7 @@ typedef enum {
 typedef enum {
     dnnl_alg_kind_undef,
     /// Direct convolution
+    dnnl_convolution_compress = 0x4,
     dnnl_convolution_direct = 0x1,
     /// Winograd convolution
     dnnl_convolution_winograd = 0x2,

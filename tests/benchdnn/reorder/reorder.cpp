@@ -124,6 +124,10 @@ int fill_memory_extra(const prb_t *prb, dnnl_memory_extra_desc_t &extra) {
         extra.flags = dnnl_memory_extra_flag_compression;
         extra.compensation_mask = 13;
     }
+    else if (prb->is_reorder_with_conv_compression()) {
+        extra.flags = dnnl_memory_extra_flag_compression;
+        extra.compensation_mask = 13;
+    }
     return OK;
 }
 
@@ -453,7 +457,46 @@ int doit(const prb_t *prb, res_t *res) {
 
             // TO DO
             // decompress and compare
-        } else {
+        } 
+        else if (prb->is_reorder_with_conv_compression()) {
+            /* "bootstrap" algorithm: 
+             * reorder compressed output to decompressed and compare 
+             * decompressed output to regular reorder outout
+             * compare reorder:compress to dst-fmt -> decompress to dst_fmt 
+                   == reorder src-fmt to dst-fmt  */
+
+            /* Step 5a: oneDNN reorder from ref format to output format */
+            /* Step 5b: oneDNN reorder from ref format to output format */
+	    const auto &rc = prb->reorder;
+            dnnl_memory_extra_desc_t dst_extra {};
+            fill_memory_extra(prb, dst_extra);
+            dnn_mem_t ref_dst_dt_decompress_ref(dst_md, dst_dt,
+                    rc.tag_out, dst_engine);
+
+            dnn_mem_t ref_dst_dt_direct_fmt_out_ref(dst_md, dst_dt,
+                    rc.tag_out, dst_engine);
+            
+            // decompress the last reorder
+            // (oihw =(compress)==> OIhw16i16o4i:compress =(decompress)==> OIhw16i16o4i)
+            
+            SAFE(ref_dst_dt_decompress_ref.reorder(dst_dt_out_fmt_out), WARN);
+            //std::cout << "\nblocked memory (de-compressed)\n";
+            //std::cout << show_memory(ref_dst_dt_decompress_ref);
+
+
+            // reorder input to memory block, directly (ex: oihw to OIhw16i16o4i)
+            SAFE(ref_dst_dt_direct_fmt_out_ref.reorder(src_dt_in_fmt_ref), WARN);
+            //std::cout << "\n\nDirect reorder(blocked memory)\n";
+            //std::cout << show_memory(ref_dst_dt_direct_fmt_out_ref);
+
+
+            /* Step 5b: compare results. decompressed output to direct reorder
+            | (expect bit-wise exactness) */
+            SAFE(compare_bootstrap(ref_dst_dt_decompress_ref,
+                         ref_dst_dt_direct_fmt_out_ref, res),
+                    WARN);
+        }
+        else {
                printf("else \n");
             /* (default) "reference" algorithm: compare to benchdnn reorder */
 

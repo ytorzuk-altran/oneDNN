@@ -211,7 +211,7 @@ protected:
 
     bool set_default_alg_kind(alg_kind_t alg_kind) {
         assert(utils::one_of(alg_kind, alg_kind::convolution_direct,
-                alg_kind::convolution_winograd));
+                alg_kind::convolution_winograd, alg_kind::convolution_compress));
         if (desc_.alg_kind == alg_kind::convolution_auto)
             desc_.alg_kind = alg_kind;
         return desc_.alg_kind == alg_kind;

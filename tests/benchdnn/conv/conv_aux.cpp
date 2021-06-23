@@ -35,6 +35,7 @@ alg_t str2alg(const char *str) {
     CASE(AUTO);
     CASE(DIRECT);
     CASE(WINO);
+    CASE(COMPRESS);
 #undef CASE
     assert(!"unknown algorithm");
     return DIRECT;
@@ -44,6 +45,7 @@ const char *alg2str(alg_t alg) {
     if (alg == AUTO) return "auto";
     if (alg == DIRECT) return "direct";
     if (alg == WINO) return "wino";
+    if (alg == COMPRESS) return "compress";
     assert(!"unknown algorithm");
     return "unknown algorithm";
 }
@@ -52,6 +54,7 @@ alg_t alg_kind2alg(dnnl_alg_kind_t alg) {
     if (alg == dnnl_convolution_auto) return AUTO;
     if (alg == dnnl_convolution_direct) return DIRECT;
     if (alg == dnnl_convolution_winograd) return WINO;
+    if (alg == dnnl_convolution_compress) return COMPRESS;
     assert(!"unknown algorithm");
     return DIRECT;
 }

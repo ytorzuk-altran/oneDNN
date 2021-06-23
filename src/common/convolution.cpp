@@ -39,7 +39,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
             && !any_null(conv_desc, src_desc, weights_desc, dst_desc, strides,
                     padding_l)
             && one_of(alg_kind, convolution_auto, convolution_direct,
-                    convolution_winograd);
+                    convolution_winograd, dnnl_convolution_compress);
     if (!args_ok) return invalid_arguments;
 
     if (padding_r == nullptr) padding_r = padding_l;

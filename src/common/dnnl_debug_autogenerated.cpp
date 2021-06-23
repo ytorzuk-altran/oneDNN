@@ -861,6 +861,7 @@ const char *dnnl_alg_kind2str(dnnl_alg_kind_t v) {
     if (v == dnnl_alg_kind_undef) return "undef";
     if (v == dnnl_convolution_direct) return "convolution_direct";
     if (v == dnnl_convolution_winograd) return "convolution_winograd";
+    if (v == dnnl_convolution_compress) return  "convolution_compress";
     if (v == dnnl_convolution_auto) return "convolution_auto";
     if (v == dnnl_deconvolution_direct) return "deconvolution_direct";
     if (v == dnnl_deconvolution_winograd) return "deconvolution_winograd";

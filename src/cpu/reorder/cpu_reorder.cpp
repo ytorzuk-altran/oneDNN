@@ -46,7 +46,44 @@ std::map<reorder_impl_key_t, const void *> comp_s8s8_impl_list_map {
 /* conv reorders w/ compensation */
 std::map<reorder_impl_key_t, const void *> compression_s8s8_impl_list_map {
         {{s8, s8, 0}, &compression_s8_s8_impl_list_map},
-        {{f32, s8, 0}, &compression_f32_s8_impl_list_map},		
+        {{f32, s8, 0}, &compression_f32_s8_impl_list_map},
+        {{f32,s8,4}, &compression_impl_conv_list_map},
+        {{s8, s8, 4}, &compression_impl_conv_list_map},
+		
+};
+/* conv reorders w/ compensation for compression */
+static const impl_list_map_t compression_impl_conv_list_map {
+    // f32 -> s8
+    {{f32, s8, 4}, {
+        REG_SR(f32, oihw, s8, OIhw4i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(f32, hwio, s8, OIhw4i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(f32, oihw, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(f32, hwio, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
+        nullptr,
+    }},
+    // s8 -> s8
+    {{s8, s8, 4}, {
+        REG_SR(s8, oihw, s8, OIhw4i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(s8, hwio, s8, OIhw4i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(s8, oihw, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(s8, hwio, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
+        nullptr,
+    }},
+};
+
+/* conv reorders w/ compensation for decompression */
+static const impl_list_map_t decompression_impl_list_conv_map {
+    // s8 -> s8
+    {{s8, s8, 4}, {
+        REG_SR(s8, OIhw4i16o4i, s8, OIhw4i16o4i, fmt_order::keep, spec::decompression),
+        REG_SR(s8, OIhw16i16o4i, s8, OIhw16i16o4i, fmt_order::keep, spec::decompression),
+        nullptr,
+    }},
+};
+
+std::map<reorder_impl_key_t, const void *> decompression_conv_impl_list_map {
+        {{s8, s8, 4}, &decompression_impl_list_conv_map},
+		
 };
 
 const impl_list_item_t *cpu_engine_impl_list_t::get_reorder_implementation_list(
@@ -54,6 +91,8 @@ const impl_list_item_t *cpu_engine_impl_list_t::get_reorder_implementation_list(
     reorder_impl_key_t dt_pair {src_md->data_type, dst_md->data_type, 0};
     const bool do_compression
             = dst_md->extra.flags & memory_extra_flags::compression;
+    const bool do_decompression
+            = src_md->extra.flags & memory_extra_flags::compression;
 
     const bool do_comp_s8s8 = dst_md->extra.flags
             & (memory_extra_flags::compensation_conv_s8s8
@@ -61,7 +100,7 @@ const impl_list_item_t *cpu_engine_impl_list_t::get_reorder_implementation_list(
             & !memory_extra_flags::compression;
 
     auto &map = do_comp_s8s8 ? comp_s8s8_impl_list_map : 
-        (do_compression ? compression_s8s8_impl_list_map :regular_impl_list_map);
+        (do_compression ? compression_s8s8_impl_list_map : do_decompression ? decompression_conv_impl_list_map : regular_impl_list_map);
 
     const impl_list_map_t *p_impl_list = (const impl_list_map_t *)map[dt_pair];
 

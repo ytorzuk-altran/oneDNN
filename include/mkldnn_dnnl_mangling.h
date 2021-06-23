@@ -339,6 +339,7 @@
     dnnl_convolution_backward_weights_desc_init
 #define mkldnn_convolution_desc_t dnnl_convolution_desc_t
 #define mkldnn_convolution_direct dnnl_convolution_direct
+#define mkldnn_convolution_compress dnnl_convolution_compress
 #define mkldnn_convolution_forward_desc_init dnnl_convolution_forward_desc_init
 #define mkldnn_convolution_winograd dnnl_convolution_winograd
 #define mkldnn_cpu dnnl_cpu

@@ -471,6 +471,8 @@ enum class algorithm {
     /// Undefined algorithm
     undef = dnnl_alg_kind_undef,
     /// Convolution algorithm that is chosen to be either direct or Winograd
+    /// Convolution compress
+    convolution_compress = dnnl_convolution_compress,
     /// automatically
     convolution_auto = dnnl_convolution_auto,
     /// Direct convolution

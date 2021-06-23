@@ -146,6 +146,7 @@ const impl_list_map_t comp_f32_s8_impl_list_map {
     }},
 };
 
+
 // clang-format on
 
 } // namespace cpu

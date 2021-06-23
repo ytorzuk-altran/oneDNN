@@ -114,8 +114,10 @@ struct memory_desc_wrapper : public c_compatible {
     bool is_additional_buffer() const {
         using namespace memory_extra_flags;
         return (extra().flags
-                & (compensation_conv_s8s8 | rnn_u8s8_compensation | compression
-                        | compensation_conv_asymmetric_src));
+                & (memory_extra_flags::compensation_conv_s8s8
+                        | memory_extra_flags::compression
+                        | memory_extra_flags::rnn_u8s8_compensation
+                        | memory_extra_flags::compensation_conv_asymmetric_src));
     }
 
     /** returns the size of the appended buffer when the memory descriptor
