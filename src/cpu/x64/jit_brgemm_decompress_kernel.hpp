@@ -47,20 +47,30 @@ struct jit_brgemm_decompress_kernel : public jit_generator {
 private:
     int blocks_;
 
-    Xbyak::Reg64 reg_blocks = r12;
     Xbyak::Reg64 wei_ptr = r14;
     Xbyak::Reg64 dst_ptr = r13;
 
-    const Xbyak::Zmm zmm_comp = Xbyak::Zmm(28);
+    Xbyak::Zmm zmm_comp2 = Xbyak::Zmm(28);
+    Xbyak::Zmm zmm_comp1 = Xbyak::Zmm(27);
+    Xbyak::Zmm zmm_comp4 = Xbyak::Zmm(26);
+    Xbyak::Zmm zmm_comp3 = Xbyak::Zmm(25);
 
-    const Xbyak::Reg64 reg_bias = r11;
     const Xbyak::Reg64 reg_ptr_decomp_src = r9;
     const Xbyak::Reg64 reg_ptr_decomp_dst = r8; //r10;
     const Xbyak::Reg64 reg_ptr_decomp_mask = rax; //rsi;
-    const Xbyak::Reg64 reg_popcnt = reg_bias;
-    const Xbyak::Reg64 reg_comp_mask_tmp = reg_bias;
-    const Xbyak::Opmask reg_comp_mask = k1;
-    
+    const Xbyak::Reg64 reg_popcnt = rsi;
+
+    const Xbyak::Reg64 reg_comp_mask_tmp1 = r10;
+    const Xbyak::Reg64 reg_comp_mask_tmp2 = r12;
+    const Xbyak::Reg64 reg_comp_mask_tmp3 = rbx;
+    const Xbyak::Reg64 reg_comp_mask_tmp4 = rdx;
+
+
+    const Xbyak::Opmask reg_comp_mask1 = k1;
+    const Xbyak::Opmask reg_comp_mask2 = k2;
+    const Xbyak::Opmask reg_comp_mask3 = k3;
+    const Xbyak::Opmask reg_comp_mask4 = k4;
+
     void generate() override;
 };
 
