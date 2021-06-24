@@ -261,10 +261,10 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const size_t D_mask = utils::array_product(input_d.dims(),
                 math::ilog2q(attr->output_scales_.mask_ + 1));
         const size_t oc = (input_d.dims()[0]);
-        const bool compensation_mask_ok = output_d.extra().compensation_mask == 13;
+        const bool compensation_mask_ok = output_d.extra().compensation_mask == 219;
         return /* simple_attr_check(attr, true, false)
                 && */ output_d.matches_tag(tag_o) && input_d.is_plain()
-                && (output_d.extra().flags & memory_extra_flags::compression)
+                && (output_d.extra().flags & memory_extra_flags::conv_compression)
                 && compensation_mask_ok
                 && (input_d.data_type() == f32 || input_d.data_type() == s8)
                 && output_d.data_type() == s8
@@ -357,7 +357,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
         if (input_d.has_runtime_dims_or_strides()) return false;
 
-        const bool compensation_mask_ok = input_d.extra().compensation_mask == 13
+        const bool compensation_mask_ok = input_d.extra().compensation_mask == 219
                                             && output_d.extra().compensation_mask == 0;
 
         return /* simple_attr_check(attr, true, false)
@@ -409,19 +409,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
     }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-/* specific reorders: compression */
+/* specific reorders: IP BRGEMM compression */
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         typename utils::enable_if<((tag_i == format_tag::io) || (tag_i == format_tag::oi))
@@ -441,7 +429,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         return /* simple_attr_check(attr, true, false)
                 && */
                 input_d.is_plain()
-                && (output_d.extra().flags & memory_extra_flags::compression)
+                && (output_d.extra().flags & memory_extra_flags::ip_compression)
                 && compensation_mask_ok
                 && one_of(input_d.data_type(), f32, s8)
                 && output_d.data_type() == s8 && (D_mask == 1 || D_mask == oc);

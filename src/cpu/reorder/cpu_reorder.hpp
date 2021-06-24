@@ -84,8 +84,8 @@ extern const impl_list_map_t comp_bf16_s8_impl_list_map;
 extern const impl_list_map_t comp_s8_s8_impl_list_map;
 extern const impl_list_map_t compression_s8_s8_impl_list_map;
 extern const impl_list_map_t compression_f32_s8_impl_list_map;
-extern const impl_list_map_t compression_impl_conv_list_map;
-extern const impl_list_map_t decompression_impl_list_conv_map;
+extern const impl_list_map_t conv_compression_s8_s8_impl_list_map;
+extern const impl_list_map_t conv_compression_f32_s8_impl_list_map;
 #define REG_SR(idt, ifmt, odt, ofmt, ...) \
     impl_list_item_t(impl_list_item_t::reorder_type_deduction_helper_t< \
             simple_reorder_t<idt, ifmt, odt, ofmt, __VA_ARGS__>::pd_t>())

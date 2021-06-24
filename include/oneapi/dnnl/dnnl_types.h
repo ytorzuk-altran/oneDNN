@@ -1503,7 +1503,8 @@ typedef enum {
     dnnl_memory_extra_flag_gpu_rnn_u8s8_compensation
     = dnnl_memory_extra_flag_rnn_u8s8_compensation,
     dnnl_memory_extra_flag_compensation_conv_asymmetric_src = 0x8U,
-    dnnl_memory_extra_flag_compression = 0x16U,
+    dnnl_memory_extra_flag_ip_compression = 0x16U,
+    dnnl_memory_extra_flag_conv_compression = 0x32U,
 } dnnl_memory_extra_flags_t;
 
 /// Description of extra information stored in memory

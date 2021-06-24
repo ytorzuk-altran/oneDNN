@@ -120,13 +120,12 @@ int fill_memory_extra(const prb_t *prb, dnnl_memory_extra_desc_t &extra) {
                     |= dnnl_memory_extra_flag_compensation_conv_asymmetric_src;
             extra.asymm_compensation_mask = (1 << 0) + with_groups * (1 << 1);
         }
-    } else if (prb->is_reorder_with_compression()) {
-        extra.flags = dnnl_memory_extra_flag_compression;
+    } else if (prb->is_reorder_with_ip_compression()) {
+        extra.flags = dnnl_memory_extra_flag_ip_compression;
         extra.compensation_mask = 13;
-    }
-    else if (prb->is_reorder_with_conv_compression()) {
-        extra.flags = dnnl_memory_extra_flag_compression;
-        extra.compensation_mask = 13;
+    } else if (prb->is_reorder_with_conv_compression()) {
+        extra.flags = dnnl_memory_extra_flag_conv_compression;
+        extra.compensation_mask = 219;
     }
     return OK;
 }
@@ -166,12 +165,9 @@ int compare_bootstrap(dnn_mem_t &mem_ref, dnn_mem_t &mem_got, res_t *res) {
     bool ok = false;
     // demand bit-wise identical results
     const auto size_ref = mem_ref.size();
-    printf("size_ref %d \n",size_ref);
-
     if (size_ref == 0) return res->state = PASSED, OK;
     if (size_ref == mem_got.size())
         ok = !std::memcmp((void *)mem_ref, (void *)mem_got, size_ref);
-    printf("mem_got.size() %d \n",mem_got.size());
     res->errors = !ok;
     res->state = ok ? PASSED : FAILED;
     res->total = 1;
@@ -440,7 +436,7 @@ int doit(const prb_t *prb, res_t *res) {
             SAFE(compare_bootstrap(
                          ref_dst_dt_out_fmt_out, dst_dt_out_fmt_out, res),
                     WARN);
-        } else if (prb->is_reorder_with_compression()) {
+        } else if (prb->is_reorder_with_ip_compression()) {
             const auto &rc = prb->reorder;
             dnn_mem_t ref_dst_dt_direct_ref(
                     dst_md, dst_dt, rc.tag_out, dst_engine);

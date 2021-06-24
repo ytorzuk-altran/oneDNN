@@ -127,7 +127,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
             
             auto wei_offset = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb);          
             const size_t decomp_buffer_size = (size_t) jbgp.ic * 64;
-            int8_t decomp_buf[decomp_buffer_size];
+            int8_t decomp_buf[4096];
             // printf("wei_offset %d, decomp_buffer_size %d\n", wei_offset, decomp_buffer_size);
             std::memset((void *)decomp_buf, -8, decomp_buffer_size);
 

@@ -67,6 +67,7 @@ const alg_kind_t undef = dnnl_alg_kind_undef;
 const alg_kind_t convolution_auto = dnnl_convolution_auto;
 const alg_kind_t convolution_direct = dnnl_convolution_direct;
 const alg_kind_t convolution_winograd = dnnl_convolution_winograd;
+const alg_kind_t convolution_compress = dnnl_convolution_compress;
 const alg_kind_t deconvolution_direct = dnnl_deconvolution_direct;
 const alg_kind_t deconvolution_winograd = dnnl_deconvolution_winograd;
 const alg_kind_t eltwise_relu = dnnl_eltwise_relu;
@@ -940,8 +941,10 @@ const memory_extra_flags_t rnn_u8s8_compensation
         = dnnl_memory_extra_flag_rnn_u8s8_compensation;
 const memory_extra_flags_t compensation_conv_asymmetric_src
         = dnnl_memory_extra_flag_compensation_conv_asymmetric_src;
-const memory_extra_flags_t compression
-        = dnnl_memory_extra_flag_compression;
+const memory_extra_flags_t ip_compression
+        = dnnl_memory_extra_flag_ip_compression;
+const memory_extra_flags_t conv_compression
+        = dnnl_memory_extra_flag_conv_compression;
 } // namespace memory_extra_flags
 
 using engine_kind_t = dnnl_engine_kind_t;

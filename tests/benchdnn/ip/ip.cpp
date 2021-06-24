@@ -70,7 +70,7 @@ static int init_pd(dnnl_engine_t engine, const prb_t *prb,
     if (prb->alg == alg_t::COMPRESS) {
         alg = dnnl_ip_compress;
         dnnl_memory_extra_desc_t wei_md_extra {};
-        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
+        wei_md_extra.flags = dnnl_memory_extra_flag_ip_compression;
         wei_md_extra.compensation_mask = 13;
         wei_d.extra = wei_md_extra;
     }
@@ -314,7 +314,7 @@ int doit(const prb_t *prb, res_t *res) {
     if (prb->alg == alg_t::COMPRESS) {
         alg = dnnl_ip_compress;
         dnnl_memory_extra_desc_t wei_md_extra {};
-        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
+        wei_md_extra.flags = dnnl_memory_extra_flag_ip_compression;
         wei_md_extra.compensation_mask = 13;
         wei_md.extra = wei_md_extra;
     }

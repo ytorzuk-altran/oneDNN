@@ -636,7 +636,7 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
         jbgp.acc_dt = s32;
         jbgp.with_scales = true;
         jbgp.weights_compressed 
-            = (weights_d.extra().flags & memory_extra_flags::compression) != 0;
+            = (weights_d.extra().flags & memory_extra_flags::ip_compression) != 0;
 
         if (jbgp.weights_compressed) {
             // printf("jbgp.weights_compressed = true\n");

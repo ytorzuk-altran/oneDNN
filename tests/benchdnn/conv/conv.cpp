@@ -609,8 +609,8 @@ inline int init_pd_custom(dnnl_engine_t engine, const prb_t *prb,
     if (prb->ic >= 64 && prb->alg == alg_t::COMPRESS) {
         alg = dnnl_convolution_compress;
         dnnl_memory_extra_desc_t wei_md_extra {};
-        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
-        wei_md_extra.compensation_mask = 13;
+        wei_md_extra.flags = dnnl_memory_extra_flag_conv_compression;
+        wei_md_extra.compensation_mask = 219;
         wei_d.extra = wei_md_extra;
     }
     switch (prb->dir) {
@@ -901,8 +901,8 @@ int doit(const prb_t *prb, res_t *res) {
      if (prb->ic >= 64 && prb->alg == alg_t::COMPRESS) {
         //alg = dnnl_convolution_compress;
         dnnl_memory_extra_desc_t wei_md_extra {};
-        wei_md_extra.flags = dnnl_memory_extra_flag_compression;
-        wei_md_extra.compensation_mask = 13;
+        wei_md_extra.flags = dnnl_memory_extra_flag_conv_compression;
+        wei_md_extra.compensation_mask = 219;
         wei_md.extra = wei_md_extra;
     }
     auto prim_ref = make_benchdnn_dnnl_wrapper(prim_ref_);

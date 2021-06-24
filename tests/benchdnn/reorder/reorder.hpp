@@ -39,7 +39,7 @@ enum flag_t {
     FLAG_GCONV_S8S8 = 0x2U,
     FLAG_CONV_ZP_COMP = 0x4U,
     FLAG_GCONV_ZP_COMP = 0x8U,
-    FLAG_SPARSE_COMPRESS = 0x16U,
+    FLAG_IP_COMPRESS = 0x16U,
     FLAG_CONV_COMPRESS = 0x32U
 };
 
@@ -145,11 +145,11 @@ struct prb_t {
 
     bool is_reorder_with_compensation() const {
         return alg == ALG_BOOT && oflag != FLAG_NONE
-                && oflag != FLAG_SPARSE_COMPRESS && oflag != FLAG_CONV_COMPRESS;
+                && oflag != FLAG_IP_COMPRESS && oflag != FLAG_CONV_COMPRESS;
     }
 
-    bool is_reorder_with_compression() const {
-        return alg == ALG_BOOT && oflag == FLAG_SPARSE_COMPRESS;
+    bool is_reorder_with_ip_compression() const {
+        return alg == ALG_BOOT && oflag == FLAG_IP_COMPRESS;
     }
     bool is_reorder_with_conv_compression() const {
         return alg == ALG_BOOT && oflag == FLAG_CONV_COMPRESS;

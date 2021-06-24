@@ -2219,7 +2219,9 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
             weights_d.data_type() == data_type::s8,
             one_of(dst_d.data_type(), data_type::f32, data_type::s32,
                     data_type::s8, data_type::u8));
-     const bool weight_compressed = (weights_d.extra().flags & memory_extra_flags::compression) != 0;
+    const bool weight_compressed
+            = (weights_d.extra().flags & memory_extra_flags::conv_compression)
+            != 0;
     bool supported = false
             || (is_bf16_convolution && mayiuse(avx512_core_bf16_amx_bf16))
             || (is_int8_convolution && mayiuse(avx512_core_bf16_amx_int8));
