@@ -266,6 +266,7 @@ int show_memory(dnn_mem_t &mem) {
 
     for (int64_t idx = 0; idx < nelems; ++idx) {
         std::cout << mem.get_elem(idx) << ",";
+        if( idx != 0 && idx % 4096 == 0) std::cout << std::endl;
     }
 
     std::cout << std::endl;

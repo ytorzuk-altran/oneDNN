@@ -179,7 +179,6 @@ struct brgemm_decomp_kernel_params_t {
     const void *ptr_B;
     const void *scratch_buf;
     const void *bitmask_ptr;
-    size_t blocks;
 };
 
 struct brgemm_kernel_params_t {

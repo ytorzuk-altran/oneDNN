@@ -116,11 +116,8 @@ struct memory_desc_wrapper : public c_compatible {
     bool is_additional_buffer() const {
         using namespace memory_extra_flags;
         return (extra().flags
-                & (memory_extra_flags::compensation_conv_s8s8
-                        | memory_extra_flags::ip_compression
-                        | memory_extra_flags::conv_compression
-                        | memory_extra_flags::rnn_u8s8_compensation
-                        | memory_extra_flags::compensation_conv_asymmetric_src));
+                & (compensation_conv_s8s8 | rnn_u8s8_compensation | ip_compression
+                        | conv_compression | compensation_conv_asymmetric_src));
     }
 
     /** returns the size of the appended buffer when the memory descriptor
@@ -133,8 +130,8 @@ struct memory_desc_wrapper : public c_compatible {
                 || cmask == 13 || cmask == 27 || cmask == 219);
             dim_t prod = 1;
             if (cmask == 13) {
-                prod = padded_dims()[0] * padded_dims()[1]; }
-            if (cmask == 219) {
+                prod = padded_dims()[0] * padded_dims()[1]; 
+			}else if (cmask == 219) {
                 prod = padded_dims()[0] * padded_dims()[1] 
                     * padded_dims()[2] * padded_dims()[3];
             } else {
@@ -146,7 +143,9 @@ struct memory_desc_wrapper : public c_compatible {
 
         size_t buff_size = 0;
         const uint64_t comp_flags = compensation_conv_s8s8
-                | rnn_u8s8_compensation | dnnl_memory_extra_flag_ip_compression;
+                | rnn_u8s8_compensation 
+				| dnnl_memory_extra_flag_ip_compression
+				| dnnl_memory_extra_flag_conv_compression;
         if (extra().flags & comp_flags) {
             buff_size += calculate_size(extra().compensation_mask,
                     additional_buffer_data_size(comp_flags));
