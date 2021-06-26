@@ -2225,7 +2225,8 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
     bool supported = false
             || (is_bf16_convolution && mayiuse(avx512_core_bf16_amx_bf16))
             || (is_int8_convolution && mayiuse(avx512_core_bf16_amx_int8));
-        if (weight_compressed) supported &= is_int8_convolution;
+    
+    if (weight_compressed) supported &= is_int8_convolution;
     if (!supported) return status::unimplemented;
 
     jcp = zero<decltype(jcp)>();

@@ -35,13 +35,13 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
         const memory_desc_t *weights_desc, const memory_desc_t *bias_desc,
         const memory_desc_t *dst_desc, const dims_t strides,
         const dims_t dilates, const dims_t padding_l, const dims_t padding_r) {
+    printf("conv_desc_init\n");
     bool args_ok = true
             && !any_null(conv_desc, src_desc, weights_desc, dst_desc, strides,
                     padding_l)
             && one_of(alg_kind, convolution_auto, convolution_direct,
                     convolution_winograd, dnnl_convolution_compress);
     if (!args_ok) return invalid_arguments;
-
     if (padding_r == nullptr) padding_r = padding_l;
 
     auto cd = convolution_desc_t();
@@ -124,6 +124,7 @@ status_t conv_desc_init(convolution_desc_t *conv_desc, prop_kind_t prop_kind,
     if (!consistency) return invalid_arguments;
 
     *conv_desc = cd;
+    printf("conv_desc_init::end\n");
     return success;
 }
 } // namespace impl

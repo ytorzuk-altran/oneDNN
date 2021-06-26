@@ -678,6 +678,16 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
             p.kd_padding
                     = nstl::max(0, jcp.kd - d_f_overflow - d_back_overflow);
 
+            int8_t decomp_buf[wei_buff_size];
+            if(jcp.weight_compressed){
+                s.filt = weights
+                        + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift;
+                s.scratch_buf = &decomp_buf;
+                s.bitmask_ptr = weights + wei_dt_size * jcp.weight_comp_bitmask_off
+                        + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift / 8;
+                (*decomp_kernel_)(&s);
+            }
+
             int oh_step = jcp.nb_oh_blocking * jcp.oh_per_tile;
             for (int oh = oh_s; oh < oh_e; oh += oh_step) {
                 const int gen_kh = ((jcp.kh - 1) * (jcp.dilate_h + 1) + 1);
