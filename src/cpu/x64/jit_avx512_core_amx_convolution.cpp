@@ -760,10 +760,7 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
                         ? &local_zp_pbuff[pbuff_offset]
                         : nullptr;
 
-                p.filt = weights
-                        + ((g * oc_chunks + occ) * wei_oc_shift
-                                  + d_f_overflow * wei_d_shift)
-                                * wei_dt_size;
+                p.filt = &decomp_buf;
                 p.bias = bias_w;
                 p.scales = &oscales[jcp.is_oc_scale * oc];
 

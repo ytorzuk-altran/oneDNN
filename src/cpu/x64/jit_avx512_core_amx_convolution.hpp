@@ -48,7 +48,6 @@ struct jit_avx512_core_amx_convolution_fwd_t : public primitive_t {
                 jit_avx512_core_amx_convolution_fwd_t);
 
         status_t init(engine_t *engine) {
-            printf("jit_avx512_core_amx_convolution_fwd_t:init\n");
             using smask_t = primitive_attr_t::skip_mask_t;
             bool is_bf16_convolution = true
                     && (src_md_.data_type == data_type::bf16
@@ -113,7 +112,6 @@ struct jit_avx512_core_amx_convolution_fwd_t : public primitive_t {
     typedef typename prec_traits<dst_type>::type dst_data_t;
 
     status_t init(engine_t *engine) override {
-        printf("jit_avx512_core_amx_convolution_fwd_t:init2\n");
         CHECK(safe_ptr_assign(kernel_,
                 new jit_avx512_core_amx_fwd_kernel_t(
                         pd()->jcp_, *pd()->attr(), *pd()->dst_md(0))));

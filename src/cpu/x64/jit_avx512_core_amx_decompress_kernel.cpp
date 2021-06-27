@@ -61,85 +61,52 @@ void jit_avx512_core_amx_decompress_kernel_t::generate() {
     mov(reg_ptr_decomp_dst, ptr[param1 + GET_OFF(scratch_buf)]);
     mov(reg_ptr_decomp_mask, ptr[param1 + GET_OFF(bitmask_ptr)]);
 
-   auto wei_offset_buff = [&](int icb, int ocb, int kh, int kw) {
-        return ocb * jcp.nb_ic_int * jcp.kh * jcp.kw * jcp.ic_block_int_np
-                * jcp.oc_block
-                + icb * jcp.kh * jcp.kw * jcp.ic_block_int_np * jcp.oc_block
-                + kh * jcp.kw * jcp.ic_block_int_np * jcp.oc_block
-                + kw * jcp.ic_block_int_np * jcp.oc_block;
-    };
-    auto wei_offset = [&](int icb, int ocb, int kh, int kw) {
-        return icb * get_wei_icb_step() + kh * get_wei_h_step()
-                + get_wei_offset(ocb, kw);
-    };
+    int wei_buff_size = jcp.nb_oc_blocking * jcp.nb_ic_int * jcp.kh
+            * jcp.kw * jcp.ic_block_int_np * jcp.oc_block;
 
-    int bitmask_base = 0;
-    for (int icb = 0; icb < jcp.nb_ic_int; icb++) {
-        int bitmask_off = bitmask_base;
-        for (int kh = 0; kh < jcp.kh; kh++) {
-            // TODO_COMPRESSION: params for sw pipelining
-            int total_wei_load = jcp.kw * jcp.nb_oc_blocking;
-            int load_count = 0, use_count = 0, load_pipeline = 2;
+    for(int block = 0; block < wei_buff_size/1024; block++){
+        int wei_offset =  block * 1024;
+        int bitmask_off = wei_offset / (1 * 8);
+        lea(reg_ptr_decomp_src, ptr[wei_ptr + wei_offset]);
+        for (int cl = 0; cl < 16; cl = cl + 4) {
+            mov(reg_comp_mask_tmp1, ptr[reg_ptr_decomp_mask + cl * 8 + bitmask_off]);
+            kmovq(reg_comp_mask1, reg_comp_mask_tmp1);
+            mov(reg_comp_mask_tmp2, ptr[reg_ptr_decomp_mask + (cl+1) * 8 + bitmask_off]);
+            kmovq(reg_comp_mask2, reg_comp_mask_tmp2);
+            mov(reg_comp_mask_tmp3, ptr[reg_ptr_decomp_mask + (cl+2) * 8 + bitmask_off]);
+            kmovq(reg_comp_mask3, reg_comp_mask_tmp3);
+            mov(reg_comp_mask_tmp4, ptr[reg_ptr_decomp_mask + (cl+3) * 8 + bitmask_off]);
+            kmovq(reg_comp_mask4, reg_comp_mask_tmp4);
 
-            for (int kw = 0; kw < jcp.kw; kw += jcp.kw_step) {
-                for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
-                    int n_loads = (load_count == 0) ? load_pipeline : 1;
+            vmovdqu8(zmm_comp1, ptr[reg_ptr_decomp_src]);
+            popcnt(reg_popcnt, reg_comp_mask_tmp1);
+            add(reg_ptr_decomp_src, reg_popcnt);
 
-                    for (int i = 0; i < n_loads && load_count < total_wei_load; i++) {
-                        int kw_l = load_count / jcp.nb_oc_blocking;
-                        int ocb_l = load_count % jcp.nb_oc_blocking;
-                        lea(reg_ptr_decomp_src, ptr[wei_ptr + wei_offset(icb, ocb_l, kh, kw_l)]);
-                        for (int cl = 0; cl < 16; cl = cl + 4) {
-                            mov(reg_comp_mask_tmp1, ptr[reg_ptr_decomp_mask + cl * 8 + bitmask_off + get_wei_offset(ocb_l, kw_l) / (8 * jcp.typesize_in)]);
-                            kmovq(reg_comp_mask1, reg_comp_mask_tmp1);
-                            mov(reg_comp_mask_tmp2, ptr[reg_ptr_decomp_mask + (cl+1) * 8 + bitmask_off + get_wei_offset(ocb_l, kw_l) / (8 * jcp.typesize_in)]);
-                            kmovq(reg_comp_mask2, reg_comp_mask_tmp2);
-                            mov(reg_comp_mask_tmp3, ptr[reg_ptr_decomp_mask + (cl+2) * 8 + bitmask_off + get_wei_offset(ocb_l, kw_l) / (8 * jcp.typesize_in)]);
-                            kmovq(reg_comp_mask3, reg_comp_mask_tmp3);
-                            mov(reg_comp_mask_tmp4, ptr[reg_ptr_decomp_mask + (cl+3) * 8 + bitmask_off + get_wei_offset(ocb_l, kw_l) / (8 * jcp.typesize_in)]);
-                            kmovq(reg_comp_mask4, reg_comp_mask_tmp4);
+            vmovdqu8(zmm_comp2, ptr[reg_ptr_decomp_src]);
+            popcnt(reg_popcnt, reg_comp_mask_tmp2);
+            add(reg_ptr_decomp_src, reg_popcnt);
 
-                            vmovdqu8(zmm_comp1, ptr[reg_ptr_decomp_src]);
-                            popcnt(reg_popcnt, reg_comp_mask_tmp1);
-                            add(reg_ptr_decomp_src, reg_popcnt);
+            vmovdqu8(zmm_comp3, ptr[reg_ptr_decomp_src]);
+            popcnt(reg_popcnt, reg_comp_mask_tmp3);
+            add(reg_ptr_decomp_src, reg_popcnt);
 
-                            vmovdqu8(zmm_comp2, ptr[reg_ptr_decomp_src]);
-                            popcnt(reg_popcnt, reg_comp_mask_tmp2);
-                            add(reg_ptr_decomp_src, reg_popcnt);
+            vmovdqu8(zmm_comp4, ptr[reg_ptr_decomp_src]);
+            popcnt(reg_popcnt, reg_comp_mask_tmp4);
+            add(reg_ptr_decomp_src, reg_popcnt);
 
-                            vmovdqu8(zmm_comp3, ptr[reg_ptr_decomp_src]);
-                            popcnt(reg_popcnt, reg_comp_mask_tmp3);
-                            add(reg_ptr_decomp_src, reg_popcnt);
-
-                            vmovdqu8(zmm_comp4, ptr[reg_ptr_decomp_src]);
-                            popcnt(reg_popcnt, reg_comp_mask_tmp4);
-                            add(reg_ptr_decomp_src, reg_popcnt);
-
-                          
-                            vpexpandb(zmm_comp1 | reg_comp_mask1 | T_z, zmm_comp1);
-                            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset_buff( icb, ocb_l, kh, kw_l) + cl * 64], zmm_comp1);                                
             
-                            vpexpandb(zmm_comp2 | reg_comp_mask2 | T_z, zmm_comp2);
-                            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset_buff( icb, ocb_l, kh, kw_l) + (cl+1) * 64], zmm_comp2);
+            vpexpandb(zmm_comp1 | reg_comp_mask1 | T_z, zmm_comp1);
+            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + cl * 64], zmm_comp1);                                
 
-                            vpexpandb(zmm_comp3 | reg_comp_mask3 | T_z, zmm_comp3);
-                            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset_buff( icb, ocb_l, kh, kw_l) + (cl+2) * 64], zmm_comp3);                                
-            
-                            vpexpandb(zmm_comp4 | reg_comp_mask4 | T_z, zmm_comp4);
-                            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset_buff( icb, ocb_l, kh, kw_l) + (cl+3) * 64], zmm_comp4);
+            vpexpandb(zmm_comp2 | reg_comp_mask2 | T_z, zmm_comp2);
+            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+1) * 64], zmm_comp2);
 
-                        }
-                        load_count++;
-                    }
-                    int kw_u = use_count / jcp.nb_oc_blocking;
-                    int ocb_u = use_count % jcp.nb_oc_blocking;
+            vpexpandb(zmm_comp3 | reg_comp_mask3 | T_z, zmm_comp3);
+            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+2) * 64], zmm_comp3);                                
 
-                    use_count++;
-                }
-            }
-            bitmask_off += get_wei_h_step() / (8 * jcp.typesize_in);
-        }
-        bitmask_base += get_wei_icb_step() / (8 * jcp.typesize_in);
+            vpexpandb(zmm_comp4 | reg_comp_mask4 | T_z, zmm_comp4);
+            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+3) * 64], zmm_comp4);
+        }        
     }
     postamble();
 }
