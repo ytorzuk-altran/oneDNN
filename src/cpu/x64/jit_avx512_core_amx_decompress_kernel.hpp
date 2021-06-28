@@ -32,7 +32,11 @@ namespace x64 {
 struct jit_avx512_core_amx_decompress_kernel_t : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_core_amx_decompress_kernel_t)
     jit_avx512_core_amx_decompress_kernel_t(jit_conv_conf_t ajsp)
-        : jcp(ajsp) {}
+        : jcp(ajsp) {
+        int wei_buff_size = jcp.nb_oc_blocking * jcp.nb_ic_int * jcp.kh
+            * jcp.kw * jcp.ic_block_int_np * jcp.oc_block;
+        blocks_ = wei_buff_size/1024;
+        }
 
     ~jit_avx512_core_amx_decompress_kernel_t() {}
 
@@ -48,6 +52,7 @@ struct jit_avx512_core_amx_decompress_kernel_t : public jit_generator {
     jit_conv_conf_t jcp;
 
 private:
+    int blocks_;
     /* compression */
     Xbyak::Reg64 wei_ptr = r14;
     Xbyak::Reg64 dst_ptr = r13;
