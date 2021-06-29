@@ -94,7 +94,6 @@ status_t jit_avx512_core_amx_1x1_convolution_fwd_t<src_type, wei_type,
 
     const auto &jcp = pd()->jcp_;
     assert(jcp.nb_oc % jcp.nb_oc_blocking == 0);
-    auto s = jit_decompress_call_s();
     const size_t offset = weights_d.size() - weights_d.additional_buffer_size();
     const int32_t *zp_compensation = jcp.src_zero_point
             ? reinterpret_cast<const int32_t *>(&weights[offset])
@@ -153,6 +152,7 @@ status_t jit_avx512_core_amx_1x1_convolution_fwd_t<src_type, wei_type,
             int8_t decomp_buf[wei_oc_shift];
 
             if (jcp.weight_compressed) {
+                auto s = jit_decompress_call_s();
                 s.filt = weights + wei_dt_size * _ocb * wei_oc_shift;
                 s.scratch_buf = &decomp_buf;
                 s.bitmask_ptr = weights

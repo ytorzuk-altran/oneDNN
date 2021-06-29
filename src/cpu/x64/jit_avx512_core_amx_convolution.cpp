@@ -576,7 +576,6 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
 
         auto p = jit_conv_call_s();
         amx_tile_configure(tcfg);
-        auto s = jit_decompress_call_s();
         int wei_buff_size = jcp.nb_oc_blocking * jcp.nb_ic_int * jcp.kh
             * jcp.kw * jcp.ic_block_int_np * jcp.oc_block;
 
@@ -680,6 +679,7 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
 
             int8_t decomp_buf[wei_buff_size];
             if(jcp.weight_compressed){
+                auto s = jit_decompress_call_s();
                 s.filt = weights
                         + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift;
                 s.scratch_buf = &decomp_buf;
