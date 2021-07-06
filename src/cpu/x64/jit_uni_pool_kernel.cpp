@@ -225,7 +225,7 @@ status_t jit_uni_pool_kernel<isa>::init_conf(jit_pool_conf_t &jpp,
         jpp.ur_bc = 1;
         jpp.ur_bc_tail = 0;
     }
-    auto ur_w = nstl::min(jpp.ow, jpp.ur / jpp.ur_bc);
+    auto ur_w = nstl::max(jpp.ow, jpp.ur / jpp.ur_bc);
     if (utils::div_up(jpp.l_pad, jpp.stride_w) > ur_w)
         return status::unimplemented;
     if (utils::div_up(right_pad, jpp.stride_w) > ur_w)
