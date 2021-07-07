@@ -225,13 +225,11 @@ status_t jit_uni_pool_kernel<isa>::init_conf(jit_pool_conf_t &jpp,
         jpp.ur_bc = 1;
         jpp.ur_bc_tail = 0;
     }
-    auto ur_w = nstl::min(jpp.ow, jpp.ur / jpp.ur_bc);
-    while (utils::div_up(jpp.l_pad, jpp.stride_w) > ur_w ||
-           utils::div_up(right_pad, jpp.stride_w) > ur_w) {
-        jpp.stride_w = jpp.stride_w + 1;
-        jpp.stride_h = (ndims > 3) ? jpp.stride_h + 1 : jpp.stride_h;
-        jpp.stride_d = (ndims > 4) ? jpp.stride_d + 1 : jpp.stride_d;
-    }
+    auto ur_w = nstl::max(nstl::min(jpp.ow, jpp.ur / jpp.ur_bc), 6);
+    if (utils::div_up(jpp.l_pad, jpp.stride_w) > ur_w)
+        return status::unimplemented;
+    if (utils::div_up(right_pad, jpp.stride_w) > ur_w)
+        return status::unimplemented;
 
     // scratchpad for c_block slice of input and/or output
     using namespace memory_tracking::names;
