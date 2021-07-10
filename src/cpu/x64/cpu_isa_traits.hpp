@@ -18,6 +18,7 @@
 #define CPU_X64_CPU_ISA_TRAITS_HPP
 
 #include <type_traits>
+#include <set>
 
 #include "dnnl_types.h"
 
@@ -197,6 +198,26 @@ struct cpu_isa_traits<avx512_vpopcnt> {
     static constexpr dnnl_cpu_isa_t user_option_val
             = dnnl_cpu_isa_avx512_vpopcnt;
     static constexpr const char *user_option_env = "AVX512_VPOPCNT";
+};
+
+using vmm_index_set_t = typename std::set<size_t>;
+using vmm_index_set_iterator_t = typename std::set<size_t>::iterator;
+template <typename Vmm>
+struct vmm_size_t;
+
+template <>
+struct vmm_size_t<Xbyak::Zmm> {
+    static constexpr size_t bytes = 64u;
+};
+
+template <>
+struct vmm_size_t<Xbyak::Ymm> {
+    static constexpr size_t bytes = 32u;
+};
+
+template <>
+struct vmm_size_t<Xbyak::Xmm> {
+    static constexpr size_t bytes = 16u;
 };
 
 namespace {
