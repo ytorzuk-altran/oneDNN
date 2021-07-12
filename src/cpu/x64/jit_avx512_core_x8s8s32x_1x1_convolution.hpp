@@ -326,7 +326,7 @@ struct jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t : public primitive_t {
             CHECK(kernel_dw_->create_kernel());
         }
 
-        CHECK(init_rtus_driver<avx512_common>(this));
+        CHECK(init_rtus_driver<avx2>(this));
         return status::success;
     }
 
@@ -343,7 +343,7 @@ private:
             const memory_tracking::grantor_t &scratchpad, int MB) const;
     const pd_t *pd() const { return (const pd_t *)primitive_t::pd().get(); }
     std::unique_ptr<jit_avx512_core_x8s8s32x_1x1_conv_kernel> kernel_;
-    std::unique_ptr<rtus_driver_t<avx512_common>> rtus_driver_;
+    std::unique_ptr<rtus_driver_t<avx2>> rtus_driver_;
     using dw_conv_kernel_t = jit_avx512_core_x8s8s32x_fwd_kernel;
     std::unique_ptr<dw_conv_kernel_t> kernel_dw_;
 };
