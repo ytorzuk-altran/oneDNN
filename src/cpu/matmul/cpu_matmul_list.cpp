@@ -32,7 +32,6 @@ using namespace dnnl::impl::data_type;
 using namespace matmul;
 
 const pd_create_f impl_list[] = {
-#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(gemm_f32_matmul_t)
         CPU_INSTANCE(gemm_bf16_matmul_t, f32)
         CPU_INSTANCE(gemm_bf16_matmul_t, bf16)
@@ -55,7 +54,6 @@ const pd_create_f impl_list[] = {
         CPU_INSTANCE(ref_matmul_t, u8, s8, s32, s32)
         CPU_INSTANCE(ref_matmul_t, u8, s8, s8, s32)
         CPU_INSTANCE(ref_matmul_t, u8, s8, u8, s32)
-#endif
         /* eol */
         nullptr,
 };
