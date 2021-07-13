@@ -1800,18 +1800,18 @@ void jit_avx512_core_amx_fwd_kernel_t::compute_icb_loop(int width,
                 for (int set_idx = 0; set_idx < jcp.n_stride_sets;
                         set_idx++) { // used to optimize input memory reuse in L1$
                     for (int kw = set_idx; kw < jcp.kw; kw += jcp.kw_step) {
-                        for (int ohb = 0; ohb < jcp.nb_oh_blocking; ohb++) {
-                            const size_t inp_off
-                                    = inp_offset(icb, ohb, kd, kh, kw);
-                            safe_tileloadd(Tmm(get_inp_tensor(ohb, tail)),
-                                    reg_inp_ptr, inp_off, reg_inp_stride);
-                        }
                         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
                             const size_t wei_off
                                     = wei_offset(icb, ocb, kd, kh, kw);
                             safe_tileloadd(Tmm(get_wei_tensor(ocb)),
                                     reg_wei_ptr, wei_off, reg_wei_stride);
-                            for (int ohb = 0; ohb < jcp.nb_oh_blocking; ohb++) {
+                        }                        
+                        for (int ohb = 0; ohb < jcp.nb_oh_blocking; ohb++) {
+                            const size_t inp_off
+                                    = inp_offset(icb, ohb, kd, kh, kw);
+                            safe_tileloadd(Tmm(get_inp_tensor(ohb, tail)),
+                                    reg_inp_ptr, inp_off, reg_inp_stride);
+                            for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
                                 tdpbxxd(Tmm(get_out_tensor(ohb, ocb, tail)),
                                         Tmm(get_inp_tensor(ohb, tail)),
                                         Tmm(get_wei_tensor(ocb)));

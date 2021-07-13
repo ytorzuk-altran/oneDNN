@@ -655,12 +655,6 @@ void jit_avx512_core_amx_1x1_fwd_kernel_t::icb_loop(bool do_store) {
     };
 
     auto compute_block = [=](int icb, int os_b) {
-        for (int osb = 0; osb < os_b; osb++) {
-            int ih = ((osb * jcp.tile_width) / jcp.ow) * jcp.stride_h;
-            int iw = ((osb * jcp.tile_width) % jcp.ow) * jcp.stride_w;
-            tileloadd(Tmm(get_inp_tensor(osb)),
-                    ptr[inp_ptr + stride_nhwc + inp_offset(ih, iw, icb)]);
-        }
         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
             const int wei_offset = jcp.typesize_in
                     * (ocb
@@ -669,7 +663,14 @@ void jit_avx512_core_amx_1x1_fwd_kernel_t::icb_loop(bool do_store) {
                                     * jcp.oc_block
                             + icb * jcp.ic_block_int_np * jcp.oc_block);
             tileloadd_nt(Tmm(get_wei_tensor(ocb)), wei_offset);
-            for (int osb = 0; osb < os_b; osb++) {
+        }
+        for (int osb = 0; osb < os_b; osb++) {
+            int ih = ((osb * jcp.tile_width) / jcp.ow) * jcp.stride_h;
+            int iw = ((osb * jcp.tile_width) % jcp.ow) * jcp.stride_w;
+            tileloadd(Tmm(get_inp_tensor(osb)),
+                    ptr[inp_ptr + stride_nhwc + inp_offset(ih, iw, icb)]);
+
+            for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
                 tdpbxxd(Tmm(get_out_tensor(osb, ocb)), Tmm(get_inp_tensor(osb)),
                         Tmm(get_wei_tensor(ocb)));
                 interleave_store();
