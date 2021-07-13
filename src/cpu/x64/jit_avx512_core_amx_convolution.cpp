@@ -579,6 +579,9 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
         int wei_buff_size = jcp.nb_oc_blocking * jcp.nb_ic_int * jcp.kh
             * jcp.kw * jcp.ic_block_int_np * jcp.oc_block;
 
+        int8_t decomp_buf[wei_oc_shift];
+        auto s = jit_decompress_call_s();
+
         const int oh_work = jcp.oh_pad;
         const int sp_stride = mem_blk_off(dst_d, 0, 0, 0, 0, 1);
         const int dilate_d = jcp.dilate_d + 1;
@@ -677,9 +680,7 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
             p.kd_padding
                     = nstl::max(0, jcp.kd - d_f_overflow - d_back_overflow);
 
-            int8_t decomp_buf[wei_buff_size];
             if(jcp.weight_compressed){
-                auto s = jit_decompress_call_s();
                 s.filt = weights
                         + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift;
                 s.scratch_buf = &decomp_buf;
