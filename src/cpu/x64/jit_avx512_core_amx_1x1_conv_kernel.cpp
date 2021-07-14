@@ -662,7 +662,8 @@ void jit_avx512_core_amx_1x1_fwd_kernel_t::icb_loop(bool do_store) {
                                             jcp.ic_block_int)
                                     * jcp.oc_block
                             + icb * jcp.ic_block_int_np * jcp.oc_block);
-            tileloadd_nt(Tmm(get_wei_tensor(ocb)), wei_offset);
+            // tileloadd_nt(Tmm(get_wei_tensor(ocb)), wei_offset);
+            tileloadd(Tmm(get_wei_tensor(ocb)), ptr[wei_ptr + wei_offset + stride_seq]);
         }
         for (int osb = 0; osb < os_b; osb++) {
             int ih = ((osb * jcp.tile_width) / jcp.ow) * jcp.stride_h;
