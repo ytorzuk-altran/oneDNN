@@ -1096,19 +1096,20 @@ void jit_brgemm_kernel_base_t::gemm_microkernel_amx(int bd_block2,
             tileloaddt1(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
     };
 
+    for (int ldb = 0; ldb < ld_block2; ldb++) {
+        const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
+        tileloadd(Tmm(brgemm_amx::get_B_tensor(idx)), 
+          ptr[reg_aux_B + B_offset(ldb, 0, true) + reg_stride_ldb]); 
+    }
     for (int bdb = 0; bdb < bd_block2; bdb++) {
         tileloadd(Tmm(brgemm_amx::get_A_tensor(bdb)),
                 ptr[reg_aux_A + A_offset(bdb, 0, true) + reg_stride_lda]);
-    }
-    for (int ldb = 0; ldb < ld_block2; ldb++) {
-        const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
-        maybe_tileloadd_nt(
-                Tmm(brgemm_amx::get_B_tensor(idx)), B_offset(ldb, 0, true));
-        for (int bdb = 0; bdb < bd_block2; bdb++) {
+        for (int ldb = 0; ldb < ld_block2; ldb++) {
+            const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;
             tdpbxxd(Tmm(brgemm_amx::get_C_tensor(bdb, idx)),
                     Tmm(brgemm_amx::get_A_tensor(bdb)),
                     Tmm(brgemm_amx::get_B_tensor(idx)));
-        }
+        }          
     }
 }
 

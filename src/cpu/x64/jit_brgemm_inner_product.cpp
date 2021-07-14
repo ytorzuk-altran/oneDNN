@@ -98,7 +98,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
             = pd()->get_brg_kernel_idx( // TODO: Can be calculated on initialization stage
                     false, is_os_tail, is_oc_tail, false);
 
-    const auto ker = [&](const int ithr, int n, int ocb, int icc) {
+    const auto ker = [&](const int ithr, int n, int ocb, int icc, int8_t decomp_buf[]) {
         auto addr_batch = addr_batch_global + ithr * jbgp.adjusted_batch_size;
 
         const size_t c_buffer_per_thr
@@ -130,8 +130,8 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                 amx_tile_configure(&brg_kernel_palettes_[brg_ker_idx][0]);
 
             auto wei_offset = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb);          
-            const size_t decomp_buffer_size = (size_t) jbgp.ic * 64;
-            int8_t decomp_buf[decomp_buffer_size];
+            // const size_t decomp_buffer_size = (size_t) jbgp.ic * 64;
+            // alignas(64) int8_t decomp_buf[decomp_buffer_size];
 
             for (int b = 0; b < gemm_batch; b++) {
                 addr_batch[b].ptr.A = src
@@ -141,7 +141,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                 if(jbgp.weights_compressed){
                         brgemm_decomp_kernel_params_t dcomp_params;
                         dcomp_params.ptr_B = weights + wei_offset;
-                        dcomp_params.scratch_buf = &decomp_buf;
+                        dcomp_params.scratch_buf = decomp_buf;
                         dcomp_params.bitmask_ptr = weights + (jbgp.oc * jbgp.ic) + wei_offset / 8;
                         (*brg_decomp_kernel_)(&dcomp_params);
                         addr_batch[b].ptr.B = decomp_buf;      
@@ -231,6 +231,9 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
         if (is_amx)
             amx_tile_configure(&brg_kernel_palettes_[base_brg_ker_idx][0]);
 
+         const size_t decomp_buffer_size = (size_t) jbgp.ic * 64;
+         alignas(64) int8_t decomp_buf[decomp_buffer_size];
+         
         int occ {0}, osc {0};
         nd_iterator_init(start, osc, os_chunks, occ, oc_chunks);
         while (start < end) {
@@ -258,7 +261,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
 
             while (loop_start < loop_end) {
                 const int n = (osb + osb_s) * jbgp.os_block;
-                ker(ithr, n, ocb + ocb_s, icc);
+                ker(ithr, n, ocb + ocb_s, icc, decomp_buf);
                 ++loop_start;
                 if (ocb_inner_most)
                     nd_iterator_step(
