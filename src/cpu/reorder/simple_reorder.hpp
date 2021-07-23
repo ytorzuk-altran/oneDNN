@@ -331,9 +331,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 }
                 bitmask_idx++;
             }
-            while (outp < max_outp) {
-                *outp++ = 0;
-            }
+        //     while (outp < max_outp) {
+        //         *outp++ = 0;
+        //     }
         });
 	return status::success;
     }
@@ -436,9 +436,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                   }
               }
           }
-         while (outp < max_outp) {
-              *outp++ = 0;
-         }
+        //  while (outp < max_outp) {
+        //       *outp++ = 0;
+        //  }
       });
       // printf("\n\n");
       return status::success;

@@ -130,10 +130,10 @@ struct memory_desc_wrapper : public c_compatible {
                 || cmask == 13 || cmask == 27 || cmask == 219);
             dim_t prod = 1;
             if (cmask == 13) {
-                prod = padded_dims()[0] * padded_dims()[1]; 
+                prod = padded_dims()[0] * padded_dims()[1]/64; 
 			}else if (cmask == 219) {
                 prod = padded_dims()[0] * padded_dims()[1] 
-                    * padded_dims()[2] * padded_dims()[3];
+                    * padded_dims()[2] * padded_dims()[3]/64;
             } else {
                 for (int d = 0; d < ndims(); ++d)
                     if (cmask & (1 << d)) prod *= padded_dims()[d];
