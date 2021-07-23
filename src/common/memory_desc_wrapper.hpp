@@ -417,6 +417,11 @@ struct memory_desc_wrapper : public c_compatible {
     static status_t compute_blocking(
             memory_desc_t &memory_desc, format_tag_t tag);
 
+    static status_t compute_blocking(format_tag_t tag,
+                                     std::vector<size_t> &perm,
+                                     std::vector<size_t> &inner_blks,
+                                     std::vector<size_t> &inner_idxs);
+
 private:
     /* TODO: put logical_offset in utils */
     template <typename T>
