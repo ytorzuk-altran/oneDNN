@@ -111,7 +111,7 @@ extern const impl_list_map_t comp_s8_s8_impl_list_map;
 
 #ifdef __INTEL_COMPILER
 /* direct copy for icc, which is faster than jitted code */
-#define REG_FAST_DIRECT_COPY_COMMA(sdt, ddt) REG_SR_DIRECT_COPY(sdt, ddt),
+#define REG_FAST_DIRECT_COPY_COMMA(sdt, ddt) REG_SR_DIRECT_COPY(sdt, ddt)
 #else
 #define REG_FAST_DIRECT_COPY_COMMA(sdt, ddt)
 #endif
