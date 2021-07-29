@@ -26,11 +26,10 @@
 namespace dnnl {
 namespace impl {
 
-status_t fill_blocked(memory_desc_t &md, std::initializer_list<int> perm,
-        std::initializer_list<int> inner_blks,
-        std::initializer_list<int> inner_idxs) {
+template<typename T>
+static status_t fill_blocked_impl(memory_desc_t &md, T&& perm, T&& inner_blks, T&& inner_idxs) {
     const bool ok = true && perm.size() == (size_t)md.ndims
-            && inner_blks.size() == inner_idxs.size();
+                    && inner_blks.size() == inner_idxs.size();
     if (!ok) return status::invalid_arguments;
 
     md.offset0 = 0;
@@ -79,6 +78,18 @@ status_t fill_blocked(memory_desc_t &md, std::initializer_list<int> perm,
     }
 
     return status::success;
+}
+
+status_t fill_blocked(memory_desc_t &md, std::initializer_list<int> perm,
+        std::initializer_list<int> inner_blks,
+        std::initializer_list<int> inner_idxs) {
+    return fill_blocked_impl(md, perm, inner_blks, inner_idxs);
+}
+
+status_t fill_blocked(memory_desc_t &md, std::vector<int>& perm,
+                      std::vector<int>& inner_blks,
+                      std::vector<int>& inner_idxs) {
+    return fill_blocked_impl(md, perm, inner_blks, inner_idxs);
 }
 
 void memory_desc_wrapper::compute_strides_compat(dims_t *strides_compat) const {
@@ -645,8 +656,9 @@ status_t process_tag(F f, format_tag_t tag, Args&&... args) {
 }
 
 status_t memory_desc_wrapper::compute_blocking(memory_desc_t &memory_desc, format_tag_t tag) {
+    using fill_blocked_t = status_t(memory_desc_t&, std::initializer_list<int>, std::initializer_list<int>, std::initializer_list<int>);
     if (memory_desc.ndims == 0) return status::invalid_arguments;
-    return process_tag(fill_blocked, tag, memory_desc);
+    return process_tag<fill_blocked_t>(fill_blocked, tag, memory_desc);
 }
 
 status_t memory_desc_wrapper::compute_blocking(format_tag_t tag,
