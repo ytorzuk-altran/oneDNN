@@ -835,12 +835,12 @@ status_t jit_avx512_core_bf16_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
             dat_tag_nxc, dat_tag_nCx16c, dat_tag_nCx8c, dat_tag_nCx4c);
     bool is_data_layout_nxc
             = utils::everyone_is(dat_tag_nxc, curr_src_tag, curr_dst_tag);
-    jcp.is_1stconv = is_1stconv(jcp);
 
     const int regs = isa_has_bf16(jcp.isa) ? 31 /* expl_bcast case */ : 26;
     const bool ok_to_pad_channels = jcp.ngroups == 1 && !is_data_layout_nxc;
 
-    jcp.simd_w = cpu_isa_traits<avx512_core>::vlen / sizeof(float);
+    jcp.simd_w = 8; // use ymm by default
+    jcp.is_1stconv = is_1stconv(jcp);
 
     const bool ok_to_try_lower_zmm = true
             && IMPLICATION(is_data_layout_nxc,
@@ -874,23 +874,36 @@ status_t jit_avx512_core_bf16_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
 
     format_tag_t src_tag, dst_tag, wei_tag;
 
-    if (jcp.simd_w == 8) {
-        assert(with_groups);
-        dst_tag = src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx8c;
-        wei_tag = pick(ndims - 3, gOIw4i8o2i, gOIhw4i8o2i, gOIdhw4i8o2i);
+    if (jcp.is_1stconv) {
+        src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_ncx;
+        if (jcp.simd_w == 8) {
+            dst_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx8c;
+            wei_tag = pick(2 * ndims - 6 + with_groups, OwI8o2i, gOwI8o2i,
+                    OhwI8o2i, gOhwI8o2i, OdhwI8o2i, gOdhwI8o2i);
+        } else if (jcp.simd_w == 16) {
+            dst_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx16c;
+            wei_tag = pick(2 * ndims - 6 + with_groups, OwI16o2i, gOwI16o2i,
+                    OhwI16o2i, gOhwI16o2i, OdhwI16o2i, gOdhwI16o2i);
+        } else {
+            assert(!"Invalid selection of simd width.");
+            return status::unimplemented;
+        }
     } else if (jcp.simd_w == 4) {
         assert(with_groups);
         dst_tag = src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx4c;
         wei_tag = pick(ndims - 3, gOIw2i4o2i, gOIhw2i4o2i, gOIdhw2i4o2i);
-    } else if (jcp.is_1stconv) {
-        dst_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx16c;
-        src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_ncx;
-        wei_tag = pick(2 * ndims - 6 + with_groups, OwI16o2i, gOwI16o2i,
-                OhwI16o2i, gOhwI16o2i, OdhwI16o2i, gOdhwI16o2i);
-    } else {
+    } else if (jcp.simd_w == 8) {
+        // assert(with_groups);
+        dst_tag = src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx8c;
+        wei_tag = pick(2 * (ndims - 3) + with_groups, OIw4i8o2i, gOIw4i8o2i,
+                OIhw4i8o2i, gOIhw4i8o2i, OIdhw4i8o2i, gOIdhw4i8o2i);
+    } else if (jcp.simd_w == 16) {
         dst_tag = src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx16c;
         wei_tag = pick(2 * ndims - 6 + with_groups, OIw8i16o2i, gOIw8i16o2i,
                 OIhw8i16o2i, gOIhw8i16o2i, OIdhw8i16o2i, gOIdhw8i16o2i);
+    } else {
+        assert(!"Invalid selection of simd width.");
+        return status::unimplemented;
     }
 
     if (src_md.format_kind == format_kind::any)

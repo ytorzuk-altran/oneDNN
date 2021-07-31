@@ -63,6 +63,8 @@ enum class inner_blk_t {
     _16a4b,
     _16b2c,
     _16b4c,
+    _8a2b,
+    _8b2c,
 
     _2c8b4c,
     _8a16b2a,
@@ -76,6 +78,7 @@ enum class inner_blk_t {
     _2c4b2c,
     _4b8c2b,
     _4c8b2c,
+    _4b8a2b,
 
     _16c16b4c,
     _16b16a4b,
@@ -100,7 +103,8 @@ constexpr int AB_or_BC_blk_off(int x0, int x1) {
                     ib::_8b16c2b, ib::_4c16b4c, ib::_8c16b2c, ib::_2a8b8a2b,
                     ib::_2b8c8b2c, ib::_4a8b8a4b, ib::_4b8c8b4c, ib::_2b4c2b,
                     ib::_2c4b2c, ib::_4b8c2b, ib::_4c8b2c, ib::_16c16b4c,
-                    ib::_16b16a4b, ib::_16c16b2c, ib::_16b16a2b),
+                    ib::_16b16a4b, ib::_16c16b2c, ib::_16b16a2b,
+                    ib::_4b8a2b, ib::_8a2b, ib::_8b2c),
             "unexpected inner_blk format");
 
     // clang-format off
@@ -124,6 +128,8 @@ constexpr int AB_or_BC_blk_off(int x0, int x1) {
         : (f == ib::_4b8c2b || f == ib::_4c8b2c) ? (x0 / 2) * 16 + x1 * 2 + x0 % 2
         : (f == ib::_2a8b8a2b || f == ib::_2b8c8b2c) ? (x0 / 8) * 128 + (x1 / 2) * 16 + (x0 % 8) * 2 + x1 % 2
         : (f == ib::_4a8b8a4b || f == ib::_4b8c8b4c) ? (x0 / 8) * 256 + (x1 / 4) * 32 + (x0 % 8) * 4 + x1 % 4
+        : (f == ib::_4b8a2b) ? (x1 / 2) * 16 + x0 * 2 + x1 % 2
+        : (f == ib::_8a2b || f == ib::_8b2c) ? 2 * x0 + x1
         : INT_MIN;
     // clang-format on
 }
@@ -333,6 +339,16 @@ DECL_TRAITS(aBCdef4b8c2b, _BC, _4b8c2b, 6);
 DECL_TRAITS(aBCd4c8b2c, _BC, _4c8b2c, 4);
 DECL_TRAITS(aBCde4c8b2c, _BC, _4c8b2c, 5);
 DECL_TRAITS(aBCdef4c8b2c, _BC, _4c8b2c, 6);
+DECL_TRAITS(ABc4b8a2b, _AB, _4b8a2b, 3);
+DECL_TRAITS(ABcd4b8a2b, _AB, _4b8a2b, 4);
+DECL_TRAITS(ABcde4b8a2b, _AB, _4b8a2b, 5);
+
+DECL_TRAITS(AcB8a2b, _AB, _8a2b, 3);
+DECL_TRAITS(AcdB8a2b, _AB, _8a2b, 4);
+DECL_TRAITS(AcdeB8a2b, _AB, _8a2b, 5);
+DECL_TRAITS(aBdC8b2c, _BC, _8b2c, 3);
+DECL_TRAITS(aBdeC8b2c, _BC, _8b2c, 4);
+DECL_TRAITS(aBdefC8b2c, _BC, _8b2c, 5);
 
 } // namespace impl
 } // namespace dnnl
