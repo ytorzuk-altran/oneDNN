@@ -1,5 +1,5 @@
 /*******************************************************************************
-* Copyright 2016-2020 Intel Corporation
+* Copyright 2016-2021 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -58,6 +58,8 @@ struct _jit_avx512_common_conv_fwd_kernel : public jit_generator {
     const primitive_attr_t &attr_;
 
 private:
+    constexpr static int isa_simd_width_ = 8;
+
     using reg64_t = const Xbyak::Reg64;
     enum {
         typesize = sizeof(float),
@@ -129,9 +131,9 @@ private:
     Xbyak::Zmm zmm_d_weights = Xbyak::Zmm(31);
     Xbyak::Zmm zmm_d_bias = Xbyak::Zmm(30);
 
-    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> eltwise_injectors;
-    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common>*> depthwise_injectors;
-    nstl::vector<jit_uni_quantization_injector_f32<avx512_common>*> quantization_injectors;
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_core, Vmm>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_core, Vmm>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<avx512_core, Vmm>*> quantization_injectors;
 
     inline void prepare_output(int ur_w);
     inline void store_output(int ur_w);

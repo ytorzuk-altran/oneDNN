@@ -1056,17 +1056,17 @@ void _jit_avx512_common_conv_fwd_kernel<Vmm>::generate() {
     for (int i = 0; i < p.len(); i++) {
         auto &post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
-            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common>(
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_core, Vmm>(
                     this,
                     post_op.eltwise
             ));
         } else if (post_op.is_depthwise()) {
-            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common>(
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_core, Vmm>(
                     this,
                     post_op.depthwise.alg
             ));
         } else if (post_op.is_quantization()) {
-            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_common>(
+            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_core, Vmm>(
                     this,
                     post_op,
                     zmm_d_weights, zmm_d_bias, reg_d_weights, reg_d_bias
@@ -1339,7 +1339,8 @@ status_t jit_avx512_common_conv_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
         memory_desc_t &bias_md, const primitive_attr_t &attr, int nthreads) {
     using namespace prop_kind;
 
-    if (!mayiuse(avx512_common)) return status::unimplemented;
+    // need avx512_core since we use ymm version
+    if (!mayiuse(avx512_core)) return status::unimplemented;
 
     const memory_desc_wrapper src_d(&src_md);
     const memory_desc_wrapper weights_d(&weights_md);
@@ -1408,13 +1409,12 @@ status_t jit_avx512_common_conv_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
             = utils::everyone_is(dat_tag_nxc, curr_src_tag, curr_dst_tag);
     if (mayiuse(avx512_mic) && is_data_layout_nxc) return status::unimplemented;
 
-    jcp.is_1stconv = is_1stconv(jcp);
-
     bool ok_to_pad_channels = true && !is_data_layout_nxc && jcp.ngroups == 1
             && src_d.data_type() == data_type::f32;
 
-    const int full_simd_w = cpu_isa_traits<avx512_common>::vlen / typesize;
+    const int full_simd_w = 8; // ymm as default version
     jcp.simd_w = full_simd_w;
+    jcp.is_1stconv = is_1stconv(jcp);
     bool ok_to_try_lower_zmm = true
             && IMPLICATION(is_data_layout_nxc,
                     jcp.oc < full_simd_w && jcp.ic < full_simd_w
@@ -1459,10 +1459,13 @@ status_t jit_avx512_common_conv_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
     format_tag_t src_tag, dst_tag, wei_tag;
 
     if (jcp.simd_w == 8) {
-        assert(with_groups);
-        src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx8c;
-        dst_tag = src_tag;
-        wei_tag = pick(ndims - 3, gOIw8i8o, gOIhw8i8o, gOIdhw8i8o);
+        //assert(with_groups);
+        dst_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx8c;
+        src_tag = is_data_layout_nxc
+                ? dat_tag_nxc
+                : (jcp.is_1stconv ? dat_tag_ncx : dat_tag_nCx8c);
+        wei_tag = pick(2 * (ndims - 3) + with_groups, OIw8i8o, gOIw8i8o,
+                OIhw8i8o, gOIhw8i8o, OIdhw8i8o, gOIdhw8i8o);
     } else if (jcp.simd_w == 4) {
         assert(with_groups);
         src_tag = is_data_layout_nxc ? dat_tag_nxc : dat_tag_nCx4c;
@@ -1527,12 +1530,16 @@ status_t jit_avx512_common_conv_fwd_kernel::init_conf(jit_conv_conf_t &jcp,
                                                      gOihw16o, gOidhw16o))
                         : pick(ndims - 3, Oiw16o, Oihw16o, Oidhw16o);
             } else {
-                wei_tag = with_groups
-                        ? ((jcp.simd_w == 4) ? pick(
-                                   ndims - 3, gOwi4o, gOhwi4o, gOdhwi4o)
-                                             : pick(ndims - 3, gOwi16o,
-                                                     gOhwi16o, gOdhwi16o))
-                        : pick(ndims - 3, Owi16o, Ohwi16o, Odhwi16o);
+                if (jcp.simd_w == 8) {
+                    wei_tag = pick(2 * (ndims - 3) + with_groups, Owi8o, gOwi8o,
+                            Ohwi8o, gOhwi8o, Odhwi8o, gOdhwi8o);
+                } else if (jcp.simd_w == 16) {
+                    wei_tag = pick(2 * (ndims - 3) + with_groups, Owi16o,
+                            gOwi16o, Ohwi16o, gOhwi16o, Odhwi16o, gOdhwi16o);
+                } else {
+                    assert("Invalid simd_w value for 1st conv.");
+                    return status::unimplemented;
+                }
             }
         }
     } else {
