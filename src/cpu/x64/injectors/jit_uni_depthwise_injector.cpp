@@ -153,7 +153,7 @@ void jit_uni_depthwise_injector_f32<isa>::prelu_compute_vector(const Vmm &vmm_sr
         h->vxorps(vmm_mask, vmm_mask, vmm_mask);
         h->vcmpgtps(vmm_mask, vmm_src, vmm_mask);
         h->vblendvps(vmm_src, vmm_aux0, vmm_src, vmm_mask);
-    } else if (isa == avx512_common) {
+    } else if (isa == avx512_common || isa == avx512_core) {
         h->vxorpd(vmm_mask, vmm_mask, vmm_mask);
         h->vmovups(vmm_aux0, vmm_src);
         h->vcmpps(k_mask, vmm_src, vmm_mask, _cmp_lt_os);
