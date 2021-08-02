@@ -61,7 +61,7 @@ private:
 // clang-format off
 const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     {{forward, f32, f32, f32}, {
-        REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t<avx512_core>))
+//        REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t<avx512_core>))
         CPU_INSTANCE_AARCH64_ACL(acl_inner_product_fwd_t)
         REG_IP_P_FWD(CPU_INSTANCE(gemm_inner_product_fwd_t<f32>))
         REG_IP_P_FWD(CPU_INSTANCE(ref_inner_product_fwd_t))
@@ -82,7 +82,7 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{backward_data, f32, f32, f32}, {
-        REG_IP_P_BWD(CPU_INSTANCE_X64(brgemm_inner_product_bwd_data_t<avx512_core>))
+//        REG_IP_P_BWD(CPU_INSTANCE_X64(brgemm_inner_product_bwd_data_t<avx512_core>))
         REG_IP_P_BWD(CPU_INSTANCE(gemm_inner_product_bwd_data_t<f32>))
         REG_IP_P_BWD(CPU_INSTANCE(ref_inner_product_bwd_data_t))
         nullptr,
@@ -102,7 +102,7 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{backward_weights, f32, f32, f32}, {
-        REG_IP_P_BWD(CPU_INSTANCE_X64(brgemm_inner_product_bwd_weights_t<avx512_core>))
+//        REG_IP_P_BWD(CPU_INSTANCE_X64(brgemm_inner_product_bwd_weights_t<avx512_core>))
         REG_IP_P_BWD(CPU_INSTANCE(gemm_inner_product_bwd_weights_t<f32>))
         REG_IP_P_BWD(CPU_INSTANCE(ref_inner_product_bwd_weights_t))
         nullptr,
