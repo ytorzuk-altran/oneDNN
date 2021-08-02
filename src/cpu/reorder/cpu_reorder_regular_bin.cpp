@@ -25,13 +25,13 @@ namespace cpu {
 const impl_list_map_t regular_bin_impl_list_map {
     // bin ->
     {{bin, data_type::undef, 4}, {
-        REG_SR_DIRECT_COPY(bin, bin)
+        REG_SR_DIRECT_COPY(bin, bin),
 
-        REG_SR(bin, any, bin, OIhw8o32i, fmt_order::keep)
+        REG_SR(bin, any, bin, OIhw8o32i, fmt_order::keep),
 
-        REG_SR(bin, any, bin, OIhw16o32i, fmt_order::keep)
+        REG_SR(bin, any, bin, OIhw16o32i, fmt_order::keep),
 
-        REG_SR_BIDIR(u8, any, u8, nChw8c)
+        REG_SR_BIDIR(u8, any, u8, nChw8c),
 
         nullptr,
     }},
