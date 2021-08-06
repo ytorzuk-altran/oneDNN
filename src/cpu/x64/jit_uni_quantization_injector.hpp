@@ -56,7 +56,7 @@ struct jit_uni_quantization_injector_f32 {
 private:
     jit_generator* h;
 
-    size_t vlen = cpu_isa_traits<isa>::vlen;
+    size_t vlen = vmm_size_t<Vmm>::bytes;
 
     dnnl_post_ops::entry_t post_op_;
 

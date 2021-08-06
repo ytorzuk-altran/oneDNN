@@ -26,8 +26,8 @@ namespace impl {
 namespace cpu {
 namespace x64 {
 
-template <cpu_isa_t isa>
-int jit_uni_depthwise_injector_f32<isa>::aux_vecs_count(alg_kind_t depthwise_alg, bool is_broadcast) {
+template <cpu_isa_t isa, typename Wmm>
+int jit_uni_depthwise_injector_f32<isa, Wmm>::aux_vecs_count(alg_kind_t depthwise_alg, bool is_broadcast) {
     switch (depthwise_alg) {
         case alg_kind::depthwise_scale_shift: return isa == sse41 || is_broadcast ? 1 : 0;
         case alg_kind::depthwise_prelu: return 2;
@@ -37,10 +37,10 @@ int jit_uni_depthwise_injector_f32<isa>::aux_vecs_count(alg_kind_t depthwise_alg
     return 0;
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::injector_preamble(size_t start_idx, size_t end_idx, bool is_broadcast) {
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::injector_preamble(size_t start_idx, size_t end_idx, bool is_broadcast) {
     preserved_vecs_count = 0;
-    vecs_to_preserve = (size_t)jit_uni_depthwise_injector_f32<isa>::aux_vecs_count(depthwise_alg, is_broadcast);
+    vecs_to_preserve = (size_t)jit_uni_depthwise_injector_f32<isa, Wmm>::aux_vecs_count(depthwise_alg, is_broadcast);
 
     for (size_t i = 0; i < vecs_count; i++) {
         if (preserved_vecs_count >= vecs_to_preserve)
@@ -67,8 +67,8 @@ void jit_uni_depthwise_injector_f32<isa>::injector_preamble(size_t start_idx, si
     assign_regs();
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::injector_preamble_tail(size_t start_idx, size_t end_idx) {
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::injector_preamble_tail(size_t start_idx, size_t end_idx) {
     size_t tail_vecs_to_preserve = start_idx_tail - start_idx;
     int idx_off = (vecs_to_preserve - tail_vecs_to_preserve);
 
@@ -89,21 +89,21 @@ void jit_uni_depthwise_injector_f32<isa>::injector_preamble_tail(size_t start_id
     }
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::injector_postamble() {
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::injector_postamble() {
     for (size_t i = 0; i < preserved_vecs_count; ++i)
         h->uni_vmovups(Vmm(preserved_vec_idxs[i]), h->ptr[h->rsp + i * vlen]);
     h->add(h->rsp, preserved_vecs_count * vlen);
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::assign_regs() {
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::assign_regs() {
     vmm_mask = Vmm(preserved_vec_idxs[0]);
     vmm_aux0 = Vmm(preserved_vec_idxs[1]);
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::scale_shift_compute_vector(const Vmm &vmm_src,
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::scale_shift_compute_vector(const Vmm &vmm_src,
         const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias, bool is_broadcast) {
     if (isa == sse41) {
         if (is_broadcast)
@@ -129,8 +129,8 @@ void jit_uni_depthwise_injector_f32<isa>::scale_shift_compute_vector(const Vmm &
     };
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::prelu_compute_vector(const Vmm &vmm_src,
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::prelu_compute_vector(const Vmm &vmm_src,
         const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias, bool is_broadcast) {
     const unsigned char _cmp_gt_os = 6;
     const unsigned char _cmp_lt_os = 1;
@@ -165,8 +165,8 @@ void jit_uni_depthwise_injector_f32<isa>::prelu_compute_vector(const Vmm &vmm_sr
     }
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::compute_body(size_t start_idx, size_t end_idx,
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::compute_body(size_t start_idx, size_t end_idx,
         const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias, bool is_broadcast) {
     for (size_t idx = start_idx; idx < end_idx; idx++) {
         switch (depthwise_alg) {
@@ -179,8 +179,8 @@ void jit_uni_depthwise_injector_f32<isa>::compute_body(size_t start_idx, size_t 
     }
 }
 
-template <cpu_isa_t isa>
-void jit_uni_depthwise_injector_f32<isa>::compute_vector_range(int start_idx, int end_idx,
+template <cpu_isa_t isa, typename Wmm>
+void jit_uni_depthwise_injector_f32<isa, Wmm>::compute_vector_range(int start_idx, int end_idx,
         const Xbyak::Reg64& p_weights, const Xbyak::Reg64& p_bias, bool is_broadcast) {
     injector_preamble(start_idx, end_idx, is_broadcast);
     compute_body(start_idx_tail, end_idx, p_weights, p_bias, is_broadcast);
@@ -189,8 +189,14 @@ void jit_uni_depthwise_injector_f32<isa>::compute_vector_range(int start_idx, in
     injector_postamble();
 }
 
+template struct jit_uni_depthwise_injector_f32<avx512_core>;
+template struct jit_uni_depthwise_injector_f32<avx512_core, Xbyak::Ymm>;
+template struct jit_uni_depthwise_injector_f32<avx512_core, Xbyak::Xmm>;
 template struct jit_uni_depthwise_injector_f32<avx512_common>;
+template struct jit_uni_depthwise_injector_f32<avx512_common, Xbyak::Ymm>;
+template struct jit_uni_depthwise_injector_f32<avx512_common, Xbyak::Xmm>;
 template struct jit_uni_depthwise_injector_f32<avx2>;
+template struct jit_uni_depthwise_injector_f32<avx2, Xbyak::Xmm>;
 template struct jit_uni_depthwise_injector_f32<sse41>;
 
 } // namespace x64

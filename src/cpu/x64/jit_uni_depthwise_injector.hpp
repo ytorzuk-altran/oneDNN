@@ -31,7 +31,7 @@ namespace impl {
 namespace cpu {
 namespace x64 {
 
-template <cpu_isa_t isa>
+template <cpu_isa_t isa, typename Wmm = typename cpu_isa_traits<isa>::Vmm>
 struct jit_uni_depthwise_injector_f32 {
     jit_uni_depthwise_injector_f32(jit_generator* host, alg_kind_t depthwise_alg_, Xbyak::Opmask k_mask_ = Xbyak::Opmask(1))
         : h(host), depthwise_alg(depthwise_alg_), k_mask(k_mask_) {
@@ -43,10 +43,9 @@ struct jit_uni_depthwise_injector_f32 {
 private:
     jit_generator* h;
 
-    using Vmm = typename utils::conditional3<isa == sse41, Xbyak::Xmm,
-            isa == avx2, Xbyak::Ymm, Xbyak::Zmm>::type;
+    using Vmm = Wmm;
 
-    size_t vlen = cpu_isa_traits<isa>::vlen;
+    size_t vlen = vmm_size_t<Vmm>::bytes;
 
     alg_kind_t depthwise_alg;
 
