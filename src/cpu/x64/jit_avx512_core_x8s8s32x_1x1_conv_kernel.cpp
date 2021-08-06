@@ -450,15 +450,15 @@ void _jit_avx512_core_x8s8s32x_1x1_conv_kernel<Vmm>::generate() {
     for (int i = 0; i < p.len(); i++) {
         auto &post_op = p.entry_[i];
         if (post_op.is_eltwise()) {
-            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_common, Vmm>(
+            eltwise_injectors.push_back(new jit_uni_eltwise_injector_f32<avx512_core, Vmm>(
                     this, post_op.eltwise, true, eltwise_reserved, mask_post_op_reserved
             ));
         } else if (post_op.is_depthwise()) {
-            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_common, Vmm>(
+            depthwise_injectors.push_back(new jit_uni_depthwise_injector_f32<avx512_core, Vmm>(
                     this, post_op.depthwise.alg, mask_post_op_reserved
             ));
         } else if (post_op.is_quantization()) {
-            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_common, Vmm>(
+            quantization_injectors.push_back(new jit_uni_quantization_injector_f32<avx512_core, Vmm>(
                     this,
                     post_op,
                     zmm_d_weights, zmm_d_bias, reg_d_weights, reg_d_bias

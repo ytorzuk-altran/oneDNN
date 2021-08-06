@@ -57,9 +57,9 @@ struct _jit_avx512_core_x8s8s32x_1x1_conv_kernel : public jit_generator {
     const primitive_attr_t &attr_;
 
 private:
-    nstl::vector<jit_uni_eltwise_injector_f32<avx512_common, Vmm>*> eltwise_injectors;
-    nstl::vector<jit_uni_depthwise_injector_f32<avx512_common, Vmm>*> depthwise_injectors;
-    nstl::vector<jit_uni_quantization_injector_f32<avx512_common, Vmm>*> quantization_injectors;
+    nstl::vector<jit_uni_eltwise_injector_f32<avx512_core, Vmm>*> eltwise_injectors;
+    nstl::vector<jit_uni_depthwise_injector_f32<avx512_core, Vmm>*> depthwise_injectors;
+    nstl::vector<jit_uni_quantization_injector_f32<avx512_core, Vmm>*> quantization_injectors;
 
     /* register mapping */
     const Xbyak::Reg64 reg_last_load = r8;
@@ -88,8 +88,8 @@ private:
     const Xbyak::Reg64 reg_d_bias = reduce_loop_iter;
     const Xbyak::Reg64 reg_oc_off = aux_reg_load_data;
 
-    Xbyak::Zmm zmm_d_weights = Xbyak::Zmm(31);
-    Xbyak::Zmm zmm_d_bias = Xbyak::Zmm(30);
+    Vmm zmm_d_weights = Vmm(31);
+    Vmm zmm_d_bias = Vmm(30);
 
     const Xbyak::Opmask mask_post_op_reserved = k1;
     Xbyak::Reg64 eltwise_reserved = rax;

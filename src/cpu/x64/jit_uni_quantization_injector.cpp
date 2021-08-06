@@ -153,8 +153,8 @@ void jit_uni_quantization_injector_f32<isa, Vmm>::compute_input_scale_shift(int 
         else
             h->uni_vfmadd213ps(vmm_dst, vmm_d_weights_, vmm_d_bias_);
 
-        if (do_rounding)
-            h->uni_vroundps(vmm_dst, vmm_dst, 0);
+//        if (do_rounding)
+//            h->uni_vroundps(vmm_dst, vmm_dst, 0);
     }
 }
 
