@@ -18,6 +18,7 @@
 #include <cmath>
 #include <memory>
 #include <mutex>
+#include <memory>
 
 #include "common/dnnl_thread.hpp"
 #include "common/utils.hpp"
