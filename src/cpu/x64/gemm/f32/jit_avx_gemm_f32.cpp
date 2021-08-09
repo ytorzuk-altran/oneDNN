@@ -17,6 +17,7 @@
 #include <atomic>
 #include <cmath>
 #include <mutex>
+#include <memory>
 
 #include "common/dnnl_thread.hpp"
 #include "common/utils.hpp"
@@ -2326,7 +2327,7 @@ xbyak_gemm_t *get_xbyak_gemm(
     };
 
     // Kernel table [isTransA][isTransB][hasBias][beta (0, 1, other)]
-    static xbyak_gemm_t *kernel_table[2][2][2][3];
+    static std::unique_ptr<xbyak_gemm_t> kernel_table[2][2][2][3];
     static std::once_flag initialized;
     dnnl_status_t st = dnnl_success;
     std::call_once(initialized, [&] {
@@ -2339,8 +2340,8 @@ xbyak_gemm_t *get_xbyak_gemm(
                         auto &kern = kernel_table[isTransA][isTransB][hasBias]
                                                  [beta_idx(beta)];
 
-                        kern = new xbyak_gemm_t(
-                                isTransA, isTransB, beta, hasBias);
+                        kern.reset(new xbyak_gemm_t(
+                                isTransA, isTransB, beta, hasBias));
                         if (kern->create_kernel() != dnnl_success) {
                             st = dnnl_runtime_error;
                             return;
@@ -2349,7 +2350,7 @@ xbyak_gemm_t *get_xbyak_gemm(
     });
 
     return (st == dnnl_success)
-            ? kernel_table[isTransA][isTransB][hasBias][beta_idx(beta)]
+            ? kernel_table[isTransA][isTransB][hasBias][beta_idx(beta)].get()
             : nullptr;
 }
 
