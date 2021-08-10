@@ -691,24 +691,24 @@ status_t jit_uni_planar_conv_fwd_kernel_f32<isa>::init_conf(jit_conv_conf_t &jcp
     jcp.ic = src_d.dims()[1] / jcp.ngroups;
 
     jcp.id = (ndims == 5) ? src_d.dims()[2] : 1;
-    jcp.ih = src_d.dims()[ndims-2];
+    jcp.ih = (ndims == 3) ? 1 : src_d.dims()[ndims-2];
     jcp.iw = src_d.dims()[ndims-1];
     jcp.od = (ndims == 5) ? dst_d.dims()[2] : 1;
-    jcp.oh = dst_d.dims()[ndims-2];
+    jcp.oh = (ndims == 3) ? 1 : dst_d.dims()[ndims-2];
     jcp.ow = dst_d.dims()[ndims-1];
     jcp.kd = (ndims == 5) ? weights_d.dims()[with_groups + 2] : 1;
-    jcp.kh = weights_d.dims()[with_groups + ndims-2];
+    jcp.kh = (ndims == 3) ? 1 : weights_d.dims()[with_groups + ndims-2];
     jcp.kw = weights_d.dims()[with_groups + ndims-1];
 
     jcp.f_pad = (ndims == 5) ? cd.padding[0][0] : 0;
-    jcp.t_pad = cd.padding[0][ndims-4];
+    jcp.t_pad = (ndims == 3) ? 0 : cd.padding[0][ndims-4];
     jcp.l_pad = cd.padding[0][ndims-3];
     jcp.stride_d = (ndims == 5) ? cd.strides[0] : 1;
-    jcp.stride_h = cd.strides[ndims-4];
+    jcp.stride_h = (ndims == 3) ? 1 : cd.strides[ndims-4];
     jcp.stride_w = cd.strides[ndims-3];
 
     jcp.dilate_d = (ndims == 5) ? cd.dilates[0] : 0;
-    jcp.dilate_h = cd.dilates[ndims-4];
+    jcp.dilate_h = (ndims == 3) ? 0 : cd.dilates[ndims-4];
     jcp.dilate_w = cd.dilates[ndims-3];
 
     jcp.b_pad = (jcp.oh - 1) * jcp.stride_h + (jcp.kh - 1) * (jcp.dilate_h + 1)
