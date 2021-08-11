@@ -93,9 +93,9 @@ private:
 const std::map<conv_impl_key_t, std::vector<pd_create_f>> impl_list_map {
     // FWD fp
     {{forward, f32, f32, f32}, {
-        CPU_INSTANCE_X64(jit_avx512_common_planar_convolution_fwd_t)
-        CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_fwd_t)
-        CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_fwd_t)
+//        CPU_INSTANCE_X64(jit_avx512_common_planar_convolution_fwd_t)
+//        CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_fwd_t)
+//        CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_fwd_t)
 //        CPU_INSTANCE_X64(jit_avx512_common_1x1_convolution_fwd_f32_t)
         CPU_INSTANCE_X64(jit_avx512_core_ymm_1x1_convolution_fwd_f32_t)
         CPU_INSTANCE_X64(jit_avx512_core_f32_wino_conv_2x3_fwd_t)
