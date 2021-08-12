@@ -2472,6 +2472,11 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
 
     if (!set_or_check_wei_format()) return status::unimplemented;
 
+    if (weight_compressed) {
+        weights_md.extra.flags |= memory_extra_flags::conv_compression;
+        weights_md.extra.compensation_mask |= 219;
+    }
+
     jcp.typesize_in = types::data_type_size(src_d.data_type());
     jcp.typesize_out = types::data_type_size(dst_d.data_type());
     jcp.typesize_bia

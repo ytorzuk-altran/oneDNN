@@ -647,20 +647,20 @@ void jit_avx512_core_amx_1x1_fwd_kernel_t::icb_loop(bool do_store) {
         }
     };
 
-    auto tileloadd_nt = [=](const Tmm &t1, int offset) {
-        int ab_size = jcp.nb_os2_blocking * jcp.nb_os_blocking * jcp.tile_width
-                * (jcp.nb_ic_int * jcp.ic_block_int_np
-                        + jcp.nb_oc_blocking * jcp.oc_block);
-        int c_size = (jcp.nb_ic_int * jcp.ic_block_int_np * jcp.nb_oc_blocking
-                * jcp.oc_block);
-        // If the size of  src + wei used in the kernel cannot fit into L1 cache,
-        // use non-temporal load of weights to help keep src in L1 cache
-        if (static_cast<size_t>(jcp.typesize_in * (ab_size + c_size))
-                >= platform::get_per_core_cache_size(1))
-            tileloaddt1(t1, ptr[wei_ptr + offset + stride_seq]);
-        else
-            tileloadd(t1, ptr[wei_ptr + offset + stride_seq]);
-    };
+//    auto tileloadd_nt = [=](const Tmm &t1, int offset) {
+//        int ab_size = jcp.nb_os2_blocking * jcp.nb_os_blocking * jcp.tile_width
+//                * (jcp.nb_ic_int * jcp.ic_block_int_np
+//                        + jcp.nb_oc_blocking * jcp.oc_block);
+//        int c_size = (jcp.nb_ic_int * jcp.ic_block_int_np * jcp.nb_oc_blocking
+//                * jcp.oc_block);
+//        // If the size of  src + wei used in the kernel cannot fit into L1 cache,
+//        // use non-temporal load of weights to help keep src in L1 cache
+//        if (static_cast<size_t>(jcp.typesize_in * (ab_size + c_size))
+//                >= platform::get_per_core_cache_size(1))
+//            tileloaddt1(t1, ptr[wei_ptr + offset + stride_seq]);
+//        else
+//            tileloadd(t1, ptr[wei_ptr + offset + stride_seq]);
+//    };
 
     auto compute_block = [=](int icb, int os_b) {
         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
@@ -1082,6 +1082,11 @@ status_t jit_avx512_core_amx_1x1_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
     };
 
     if (!set_or_check_wei_format()) { return status::unimplemented; }
+
+    if (weight_compressed) {
+        weights_md.extra.flags |= memory_extra_flags::conv_compression;
+        weights_md.extra.compensation_mask |= 219;
+    }
 
     format_tag_t dat_tag = utils::pick(
             ndims - 3, format_tag::nwc, format_tag::nhwc, format_tag::ndhwc);
