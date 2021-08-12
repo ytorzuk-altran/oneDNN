@@ -1080,21 +1080,21 @@ void jit_brgemm_kernel_base_t::gemm_microkernel_amx(int bd_block2,
         }
     };
 
-    auto maybe_tileloadd_nt = [=](const Tmm &t1, int offset) {
-        if (brg.brgattr.hint_expected_A_size != LLONG_MAX
-                && brg.brgattr.hint_expected_B_size != LLONG_MAX
-                && brg.brgattr.hint_expected_C_size != LLONG_MAX) {
-            if (static_cast<size_t>(
-                        brg.typesize_A * brg.brgattr.hint_expected_A_size
-                        + brg.typesize_B * brg.brgattr.hint_expected_B_size
-                        + brg.typesize_C * brg.brgattr.hint_expected_C_size)
-                    >= platform::get_per_core_cache_size(1))
-                tileloaddt1(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
-            else
-                tileloadd(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
-        } else
-            tileloaddt1(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
-    };
+//    auto maybe_tileloadd_nt = [=](const Tmm &t1, int offset) {
+//        if (brg.brgattr.hint_expected_A_size != LLONG_MAX
+//                && brg.brgattr.hint_expected_B_size != LLONG_MAX
+//                && brg.brgattr.hint_expected_C_size != LLONG_MAX) {
+//            if (static_cast<size_t>(
+//                        brg.typesize_A * brg.brgattr.hint_expected_A_size
+//                        + brg.typesize_B * brg.brgattr.hint_expected_B_size
+//                        + brg.typesize_C * brg.brgattr.hint_expected_C_size)
+//                    >= platform::get_per_core_cache_size(1))
+//                tileloaddt1(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
+//            else
+//                tileloadd(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
+//        } else
+//            tileloaddt1(t1, ptr[reg_aux_B + offset + reg_stride_ldb]);
+//    };
 
     for (int ldb = 0; ldb < ld_block2; ldb++) {
         const int idx = (is_ld_tail) ? brg.ld_block2 : ldb;

@@ -129,7 +129,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
             if (is_amx && (is_os_tail || is_oc_tail))
                 amx_tile_configure(&brg_kernel_palettes_[brg_ker_idx][0]);
 
-            auto wei_offset = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb);          
+//            auto wei_offset = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb);
             // const size_t decomp_buffer_size = (size_t) jbgp.ic * 64;
             // alignas(64) int8_t decomp_buf[decomp_buffer_size];
 

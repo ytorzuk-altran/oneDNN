@@ -306,7 +306,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
             const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
             const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
             int bitmask_idx = (O * NB_IC * H * W + I * H * W + h * W + w) * i_outer_blksize;
-            auto max_outp = &outp[o_blksize * i_blksize];
+//            auto max_outp = &outp[o_blksize * i_blksize];
             const float *scales_here = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
 
             for (int ic_base = 0; ic_base < ic_block; ic_base += 4) {
@@ -382,9 +382,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
       const int plain_o_stride = input_d.blocking_desc().strides[0];
       const int plain_i_stride = input_d.blocking_desc().strides[1];
 
-      const float *scales = pd->attr()->output_scales_.scales_;
-      const size_t D_mask = utils::array_product(input_d.dims(),
-              math::ilog2q(pd->attr()->output_scales_.mask_ + 1));
+//      const float *scales = pd->attr()->output_scales_.scales_;
+//      const size_t D_mask = utils::array_product(input_d.dims(),
+//              math::ilog2q(pd->attr()->output_scales_.mask_ + 1));
 
       size_t offset = padded_dims[0] * padded_dims[1];
 
@@ -402,9 +402,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         //   printf("  input: %d\n", input_d.blk_off(o_blksize * O, i_blksize * I));
         //   printf("  bitmask_idx: %d\n\n", bitmask_idx);
 
-          auto max_outp = &outp[o_blksize * i_blksize];
-          const float *scales_here
-                  = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
+//          auto max_outp = &outp[o_blksize * i_blksize];
+//          const float *scales_here
+//                  = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
           for (int ic_base = 0; ic_base < ic_block; ic_base += 4) { // 64, steps of 4
              bitmask_ptr[bitmask_idx] = 0;
               int bit = 0;
@@ -2117,10 +2117,10 @@ struct simple_reorder_t : public primitive_t {
                             | dnnl_primitive_attr::skip_mask_t::zero_points
                             | dnnl_primitive_attr::skip_mask_t::
                                     zero_points_runtime
-                            | dnnl_primitive_attr::skip_mask_t::post_ops)
-                    && simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
+                            | dnnl_primitive_attr::skip_mask_t::post_ops);
+                    bool is_applicable = simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                             spec>::is_applicable(src_md, dst_md, attr);
-            if (!args_ok) return status::invalid_arguments;
+            if (!args_ok || !is_applicable) return status::invalid_arguments;
 
             auto _pd = new pd_t(attr, src_engine->kind(), src_md,
                     dst_engine->kind(), dst_md);
