@@ -28,6 +28,10 @@
 namespace dnnl {
 namespace impl {
 
+status_t fill_blocked(memory_desc_t &md, std::vector<int> &perm,
+        std::vector<int> &inner_blks,
+        std::vector<int> &inner_idxs);
+
 /** thin wrapper class over \struct memory_desc_t which allows easy
  * manipulations with underlying C structure, which is taken by reference */
 struct memory_desc_wrapper : public c_compatible {
