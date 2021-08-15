@@ -128,7 +128,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_AARCH64_ACL(acl_indirect_gemm_convolution_fwd_t)
         CPU_INSTANCE_AARCH64_ACL(acl_gemm_convolution_fwd_t<f32>)
         CPU_INSTANCE(gemm_convolution_fwd_t)
-        CPU_INSTANCE(ref_convolution_fwd_t<f32>)
+//        CPU_INSTANCE(ref_convolution_fwd_t<f32>)
         nullptr,
     }},
     {{forward, bf16, bf16, f32}, {
