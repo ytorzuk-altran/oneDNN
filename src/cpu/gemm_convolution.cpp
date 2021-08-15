@@ -208,7 +208,7 @@ status_t gemm_convolution_fwd_t::execute_forward_thr_nspc(const exec_ctx_t &ctx,
                                 args.dst_md = pd()->dst_md();
 
                                 for (size_t oc = start_oc; oc <= end_oc; oc++) {
-                                    args.l_offset = (g * jcp.oc + oc) * jcp.os;
+                                    args.l_offset = (g * jcp.oc + oc) * jcp.os * jcp.od;
                                     post_ops_->execute(dst_arr[oc], args);
                                 }
                             }
