@@ -1097,7 +1097,7 @@ struct jit_single_blk_kernel_t : public jit_generator {
         vxorps(ymm_tmp, ymm_tmp, ymm_tmp);
         vpcmpeqd(ymm_mask, ymm_mask, ymm_mask);
         // blend in
-        auto in_mask = -1 << mask;
+        auto in_mask = static_cast<unsigned>(-1) << mask;
         vpblendd(ymm_mask, ymm_mask, ymm_tmp, in_mask);
     }
 
