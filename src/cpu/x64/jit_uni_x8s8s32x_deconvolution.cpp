@@ -419,7 +419,7 @@ _jit_uni_x8s8s32x_deconv_fwd_kernel<isa,
 
         postops_injector_ = utils::make_unique<
                 injector::jit_uni_postops_injector_t<isa, Vmm>>(
-                this, jcp_.post_ops, bsp);
+                this, jcp_.post_ops, bsp, qsp);
     }
 }
 
