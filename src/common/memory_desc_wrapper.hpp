@@ -289,7 +289,8 @@ struct memory_desc_wrapper : public c_compatible {
      * following statement might be true: lhs == rhs && !lhs.similar_to(rhs) */
     /* TODO: revise */
     bool similar_to(const memory_desc_wrapper &rhs, bool with_padding = true,
-            bool with_data_type = true, int dim_start = 0) const;
+            bool with_data_type = true, int dim_start = 0, int stride_start = -1,
+            bool is_weak_cmp = false, bool check_off0 = false) const;
 
     /** returns true if one memory can be reordered to another */
     bool consistent_with(const memory_desc_wrapper &rhs) const;
@@ -455,7 +456,7 @@ private:
 };
 
 inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
-        bool with_padding, bool with_data_type, int dim_start) const {
+        bool with_padding, bool with_data_type, int dim_start, int stride_start, bool is_weak_cmp, bool check_off0) const {
     using namespace utils;
 
     if (one_of(format_kind(), format_kind::undef, format_kind::any))
@@ -463,23 +464,30 @@ inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
     if (is_wino_desc() || is_rnn_packed_desc()) return false;
 
     const int ds = dim_start;
+    if (stride_start == -1)
+        stride_start = ds;
     const auto &blk = blocking_desc();
     const auto &r_blk = rhs.blocking_desc();
+
+    bool isSameDims = is_weak_cmp ? array_cmp_weak(dims() + ds, rhs.dims() + ds, ndims() - ds)
+                        : array_cmp(dims() + ds, rhs.dims() + ds, ndims() - ds);
+    bool isSameStrides = is_weak_cmp ? array_cmp_weak(blk.strides + stride_start, r_blk.strides + stride_start, ndims() - stride_start)
+                        : array_cmp(blk.strides + stride_start, r_blk.strides + stride_start, ndims() - stride_start);
+    bool isSamePaddedDims = is_weak_cmp ? array_cmp_weak(padded_dims() + ds, rhs.padded_dims() + ds, ndims() - ds)
+                        : array_cmp(padded_dims() + ds, rhs.padded_dims() + ds, ndims() - ds);
+    bool isSamePaddedOffsets = is_weak_cmp ? array_cmp_weak(padded_offsets() + ds, rhs.padded_offsets() + ds, ndims() - ds)
+                        : array_cmp(padded_offsets() + ds, rhs.padded_offsets() + ds, ndims() - ds);
 
     return ndims() == rhs.ndims() && dim_start <= ndims() /* guard */
             && format_kind() == rhs.format_kind()
             && IMPLICATION(with_data_type, data_type() == rhs.data_type())
-            && array_cmp(dims() + ds, rhs.dims() + ds, ndims() - ds)
-            && array_cmp(blk.strides + ds, r_blk.strides + ds, ndims() - ds)
+            && isSameDims
+            && isSameStrides
             && blk.inner_nblks == r_blk.inner_nblks
             && array_cmp(blk.inner_blks, r_blk.inner_blks, blk.inner_nblks)
             && array_cmp(blk.inner_idxs, r_blk.inner_idxs, blk.inner_nblks)
-            && IMPLICATION(with_padding,
-                    true
-                            && array_cmp(padded_dims() + ds,
-                                    rhs.padded_dims() + ds, ndims() - ds)
-                            && array_cmp(padded_offsets() + ds,
-                                    rhs.padded_offsets() + ds, ndims() - ds));
+            && IMPLICATION(with_padding, true && isSamePaddedDims && isSamePaddedOffsets)
+            && IMPLICATION(check_off0, (offset0() == DNNL_RUNTIME_DIM_VAL || rhs.offset0() ==DNNL_RUNTIME_DIM_VAL || offset0() == rhs.offset0()));
 }
 
 inline bool memory_desc_wrapper::consistent_with(
