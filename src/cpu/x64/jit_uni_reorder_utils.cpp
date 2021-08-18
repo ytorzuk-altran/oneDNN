@@ -176,7 +176,8 @@ status_t prb_init(prb_t &p, const memory_desc_t &imd, const memory_desc_t &omd,
         const bool pdim_tail = ip_tmp_tail > 0
                 && (ip_tmp_dim + oblocks[d] - ip_tmp_tail) == op_tmp_dim
                 && op_tmp_tail == 0 && ip_tail == 0;
-        if (!pdim_consistent && !pdim_tail) return status::unimplemented;
+        // todo: [AV] reverted old behavior with pdim_consistent check only due to segfault in "onnx_model_conv3d_bias" ngraph test
+        if (!pdim_consistent) return status::unimplemented;
         if (pdim_tail) {
             blk_idx = d;
             ip_tail = ip_tmp_tail;
