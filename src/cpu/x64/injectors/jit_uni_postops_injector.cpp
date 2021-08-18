@@ -232,11 +232,15 @@ void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
             else
                 depthwise_injectors[depthwise_inj_idx]->init_ptrs(ddp.reg_d_weights, ddp.reg_d_bias, ddp.reg_init_off, false);
 
+            bool need_to_preserve = false;
+            if (post_op.depthwise.alg == dnnl_depthwise_prelu && isa == sse41)
+                need_to_preserve = true;
+
             for (auto vmm_idx : vmm_idxs) {
                 depthwise_injectors[depthwise_inj_idx]->compute(vmm_idx, vmm_idx + 1,
-                                                                ddp.vmm_d_weights_idx, ddp.vmm_d_bias_idx,
+                                                                need_to_preserve ? 0 : ddp.vmm_d_weights_idx, ddp.vmm_d_bias_idx,
                                                                 ddp.reg_d_weights, ddp.reg_d_bias,
-                                                                is_broadcast, ddp.vmm_idx_off.at(vmm_idx));
+                                                                is_broadcast, ddp.vmm_idx_off.at(vmm_idx), need_to_preserve);
             }
 
             depthwise_inj_idx++;
