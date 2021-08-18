@@ -92,7 +92,7 @@ struct jit_uni_depthwise_injector_f32 {
     void compute(int start_idx, int end_idx,
                  int vmm_d_weights_idx, int vmm_d_bias_idx,
                  const Xbyak::Reg64& reg_d_weights, const Xbyak::Reg64& reg_d_bias,
-                 bool is_broadcast = false, int offset = 0);
+                 bool is_broadcast = false, int offset = 0, bool need_to_preserve = false);
 
 private:
     jit_generator* h;
