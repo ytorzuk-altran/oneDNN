@@ -18,6 +18,7 @@
 #include "common/dnnl_thread.hpp"
 #include "common/nstl.hpp"
 #include "common/utils.hpp"
+#include "cpu/x64/injectors/injector_utils.hpp"
 
 #include "cpu/x64/injectors/jit_uni_depthwise_injector.hpp"
 
@@ -204,13 +205,33 @@ void jit_uni_depthwise_injector_f32<isa>::init_ptrs(const Xbyak::Reg64& reg_d_we
     }
 }
 
+template <typename Vmm>
+static void push_vmm(jit_generator *host, const Vmm &vmm) {
+    host->sub(host->rsp, injector_utils::vmm_size_t<Vmm>::bytes);
+    host->uni_vmovups(host->ptr[host->rsp], vmm);
+}
+
+template <typename Vmm>
+static void pop_vmm(jit_generator *host, const Vmm &vmm) {
+    host->uni_vmovups(vmm, host->ptr[host->rsp]);
+    host->add(host->rsp, injector_utils::vmm_size_t<Vmm>::bytes);
+}
+
 template <cpu_isa_t isa>
 void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
                                                   int vmm_d_weights_idx, int vmm_d_bias_idx,
                                                   const Xbyak::Reg64& reg_d_weights, const Xbyak::Reg64& reg_d_bias,
-                                                  bool is_broadcast, int offset) {
+                                                  bool is_broadcast, int offset, bool need_to_preserve) {
     vmm_mask = Vmm(vmm_d_weights_idx);
     vmm_aux0 = Vmm(vmm_d_bias_idx);
+
+    if (need_to_preserve) {
+        preserved_vecs_count = aux_vecs_count(depthwise_alg, is_broadcast);
+        if (preserved_vecs_count > 0)
+            push_vmm(h, vmm_mask);
+        if (preserved_vecs_count > 1)
+            push_vmm(h, vmm_aux0);
+    }
 
     for (int idx = start_idx; idx < end_idx; idx++) {
         switch (depthwise_alg) {
@@ -220,6 +241,13 @@ void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
                 prelu_compute_vector(Vmm(idx), reg_d_weights, reg_d_bias, is_broadcast, offset); break;
             default: assert(!"unsupported depthwise algorithm");
         }
+    }
+
+    if (need_to_preserve) {
+        if (preserved_vecs_count > 1)
+            pop_vmm(h, vmm_aux0);
+        if (preserved_vecs_count > 1)
+            pop_vmm(h, vmm_mask);
     }
 }
 
