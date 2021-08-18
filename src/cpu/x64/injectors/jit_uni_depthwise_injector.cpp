@@ -208,9 +208,17 @@ template <cpu_isa_t isa>
 void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
                                                   int vmm_d_weights_idx, int vmm_d_bias_idx,
                                                   const Xbyak::Reg64& reg_d_weights, const Xbyak::Reg64& reg_d_bias,
-                                                  bool is_broadcast, int offset) {
+                                                  bool is_broadcast, int offset, bool need_to_preserve) {
     vmm_mask = Vmm(vmm_d_weights_idx);
     vmm_aux0 = Vmm(vmm_d_bias_idx);
+
+    if (need_to_preserve) {
+        preserved_vecs_count = aux_vecs_count(depthwise_alg, is_broadcast);
+        if (preserved_vecs_count > 0)
+            h->push(vmm_mask);
+        if (preserved_vecs_count > 1)
+            h->push(vmm_aux0);
+    }
 
     for (int idx = start_idx; idx < end_idx; idx++) {
         switch (depthwise_alg) {
@@ -220,6 +228,13 @@ void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
                 prelu_compute_vector(Vmm(idx), reg_d_weights, reg_d_bias, is_broadcast, offset); break;
             default: assert(!"unsupported depthwise algorithm");
         }
+    }
+
+    if (need_to_preserve) {
+        if (preserved_vecs_count > 1)
+            h->pop(vmm_aux0);
+        if (preserved_vecs_count > 1)
+            h->pop(vmm_mask);
     }
 }
 
