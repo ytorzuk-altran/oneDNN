@@ -290,7 +290,7 @@ struct memory_desc_wrapper : public c_compatible {
     /* TODO: revise */
     bool similar_to(const memory_desc_wrapper &rhs, bool with_padding = true,
             bool with_data_type = true, int dim_start = 0, int stride_start = -1,
-            bool is_weak_cmp = false, bool check_off0 = false) const;
+            bool use_weak_cmp = false, bool check_off0 = false) const;
 
     /** returns true if one memory can be reordered to another */
     bool consistent_with(const memory_desc_wrapper &rhs) const;
@@ -456,7 +456,7 @@ private:
 };
 
 inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
-        bool with_padding, bool with_data_type, int dim_start, int stride_start, bool is_weak_cmp, bool check_off0) const {
+        bool with_padding, bool with_data_type, int dim_start, int stride_start, bool use_weak_cmp, bool check_off0) const {
     using namespace utils;
 
     if (one_of(format_kind(), format_kind::undef, format_kind::any))
@@ -469,25 +469,22 @@ inline bool memory_desc_wrapper::similar_to(const memory_desc_wrapper &rhs,
     const auto &blk = blocking_desc();
     const auto &r_blk = rhs.blocking_desc();
 
-    bool isSameDims = is_weak_cmp ? array_cmp_weak(dims() + ds, rhs.dims() + ds, ndims() - ds)
-                        : array_cmp(dims() + ds, rhs.dims() + ds, ndims() - ds);
-    bool isSameStrides = is_weak_cmp ? array_cmp_weak(blk.strides + stride_start, r_blk.strides + stride_start, ndims() - stride_start)
-                        : array_cmp(blk.strides + stride_start, r_blk.strides + stride_start, ndims() - stride_start);
-    bool isSamePaddedDims = is_weak_cmp ? array_cmp_weak(padded_dims() + ds, rhs.padded_dims() + ds, ndims() - ds)
-                        : array_cmp(padded_dims() + ds, rhs.padded_dims() + ds, ndims() - ds);
-    bool isSamePaddedOffsets = is_weak_cmp ? array_cmp_weak(padded_offsets() + ds, rhs.padded_offsets() + ds, ndims() - ds)
-                        : array_cmp(padded_offsets() + ds, rhs.padded_offsets() + ds, ndims() - ds);
-
+    auto custom_cpm = use_weak_cmp ? array_cmp_weak : array_cmp<dnnl_dim_t>;
     return ndims() == rhs.ndims() && dim_start <= ndims() /* guard */
             && format_kind() == rhs.format_kind()
             && IMPLICATION(with_data_type, data_type() == rhs.data_type())
-            && isSameDims
-            && isSameStrides
+            && custom_cpm(dims() + ds, rhs.dims() + ds, ndims() - ds)
+            && custom_cpm(blk.strides + ds, r_blk.strides + ds, ndims() - ds)
             && blk.inner_nblks == r_blk.inner_nblks
             && array_cmp(blk.inner_blks, r_blk.inner_blks, blk.inner_nblks)
             && array_cmp(blk.inner_idxs, r_blk.inner_idxs, blk.inner_nblks)
-            && IMPLICATION(with_padding, true && isSamePaddedDims && isSamePaddedOffsets)
-            && IMPLICATION(check_off0, (offset0() == DNNL_RUNTIME_DIM_VAL || rhs.offset0() ==DNNL_RUNTIME_DIM_VAL || offset0() == rhs.offset0()));
+            && IMPLICATION(with_padding,
+                    true
+                            && custom_cpm(padded_dims() + ds,
+                                    rhs.padded_dims() + ds, ndims() - ds)
+                            && custom_cpm(padded_offsets() + ds,
+                                    rhs.padded_offsets() + ds, ndims() - ds))
+            && IMPLICATION(check_off0, (offset0() == DNNL_RUNTIME_DIM_VAL || rhs.offset0() ==DNNL_RUNTIME_DIM_VAL || offset0() == rhs.offset0()));           
 }
 
 inline bool memory_desc_wrapper::consistent_with(
