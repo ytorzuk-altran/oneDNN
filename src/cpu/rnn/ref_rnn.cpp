@@ -1139,7 +1139,7 @@ void _ref_rnn_common_t<aprop, src_type, weights_type, acc_type>::execute_(
     auto diff_bias = CTX_OUT_MEM(float *, DNNL_ARG_DIFF_BIAS);
 
     // Fetching extra buffers from scratchpad
-    float *ws_bias = (float *)(scratch_ptr + ws_bias_offset_);
+    float *ws_bias = (float *)((uintptr_t)scratch_ptr + ws_bias_offset_);
 
     // initialize diff_states to 0
     if (aprop == prop_kind::backward) {
