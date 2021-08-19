@@ -256,8 +256,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, s8, f32>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<s8, f32>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<s8, f32>)
-        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, f32, s32>)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, f32, s32>)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, s8, s8, s32}, {
@@ -272,8 +272,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, s8, s32>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<s8, s32>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<s8, s32>)
-        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, s32, s32>)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, s32, s32>)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, s8, s8, s8}, {
@@ -289,8 +289,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<s8, s8>)
         CPU_INSTANCE_AARCH64_ACL(acl_gemm_convolution_fwd_t<s8, s8, s8, s32>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<s8, s8>)
-        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, s8, s32>)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, s8, s32>)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, s8, s8, u8}, {
@@ -305,8 +305,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, s8, u8>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<s8, u8>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<s8, u8>)
-        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, u8, s32>)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_convolution_fwd_t<s8, s8, u8, s32>)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     // FWD int8 (src:u8)
@@ -325,7 +325,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, u8, f32>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<u8, f32>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, f32>)
-        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, f32, s32>)
+//        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, f32, s32>)
         nullptr,
     }},
     {{forward, u8, s8, s32}, {
@@ -343,7 +343,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, u8, s32>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<u8, s32>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, s32>)
-        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, s32, s32>)
+//        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, s32, s32>)
         nullptr,
     }},
     {{forward, u8, s8, s8}, {
@@ -361,8 +361,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, u8, s8>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<u8, s8>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, s8>)
-        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, s8, s32>)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, s8, s32>)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, u8, s8, u8}, {
@@ -380,8 +380,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t<sse41, u8, u8>)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t<u8, u8>)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t<u8, u8>)
-        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, u8, s32>)
-        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+//        CPU_INSTANCE(ref_convolution_fwd_t<u8, s8, u8, s32>)
+//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     // BWD int8 (diff_dst:u8)
