@@ -149,7 +149,8 @@ pp_ker_t *pp_ker_t::create(
 
 bool post_ops_ok(const post_ops_t &post_ops, const memory_desc_wrapper *dst_d) {
 #if DNNL_X64
-    return x64::gemm_x8s8s32x_convolution_utils::post_ops_ok(post_ops, dst_d);
+    if (x64::gemm_x8s8s32x_convolution_utils::post_ops_ok(post_ops, dst_d))
+        return true;
 #endif
     return std::all_of(post_ops.entry_.cbegin(), post_ops.entry_.cend(),
             [](const dnnl_post_ops::entry_t &post_op) {
