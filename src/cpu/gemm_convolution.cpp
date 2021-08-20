@@ -173,7 +173,7 @@ status_t gemm_convolution_fwd_t::execute_forward_thr_nspc(const exec_ctx_t &ctx,
                         data_t *__restrict dst_arr = dst + os * dst_os_stride;
 
                         if (jcp.with_bias) {
-                            PRAGMA_OMP_SIMD()
+//                            PRAGMA_OMP_SIMD()
                             for (size_t oc = start_oc; oc <= end_oc; oc++) {
                                 dst_arr[oc] += bia_arr[oc];
                             }
@@ -189,7 +189,7 @@ status_t gemm_convolution_fwd_t::execute_forward_thr_nspc(const exec_ctx_t &ctx,
                                 if (eltwise.alg == alg_kind::eltwise_relu) {
                                     const auto alpha = eltwise.alpha;
                                     const auto scale = eltwise.scale;
-                                    PRAGMA_OMP_SIMD()
+//                                    PRAGMA_OMP_SIMD()
                                     for (size_t oc = start_oc; oc <= end_oc;
                                             oc++) {
                                         if (dst_arr[oc] < 0)
