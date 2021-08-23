@@ -201,14 +201,14 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
             = jcp.signed_input ? get_wei_comp(wei_base, wei_md) :
               jcp.with_input_zp ? output_compensation_base : nullptr;
 
-    const bool should_apply_zp_src_comp_pad = jcp.zp.src_exists
-            && jit_gemm_convolution_utils::padding_exists(jcp);
-    const bool should_apply_zp_src_comp_pad_jit_pp
-            = should_apply_zp_src_comp_pad
-            && gemm_x8s8s32x_convolution_utils::mayiuse_jit_pp_kernel();
-    const bool should_apply_zp_src_comp_outside_pp
-            = should_apply_zp_src_comp_pad
-            && !gemm_x8s8s32x_convolution_utils::mayiuse_jit_pp_kernel();
+//    const bool should_apply_zp_src_comp_pad = jcp.zp.src_exists
+//            && jit_gemm_convolution_utils::padding_exists(jcp);
+    const bool should_apply_zp_src_comp_pad_jit_pp = false;
+//            = should_apply_zp_src_comp_pad
+//            && gemm_x8s8s32x_convolution_utils::mayiuse_jit_pp_kernel();
+    const bool should_apply_zp_src_comp_outside_pp = false;
+//            = should_apply_zp_src_comp_pad
+//            && !gemm_x8s8s32x_convolution_utils::mayiuse_jit_pp_kernel();
 
     int g {0}, n {0}, ohb {0}, owb {0};
     size_t start = 0, end = 0;
