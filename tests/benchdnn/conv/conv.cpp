@@ -383,7 +383,7 @@ int fill_wei(
     const bool wino_s8 = prb->alg == WINO && prb->cfg[WEI].dt == dnnl_s8;
     const bool is_def_zp = prb->attr.zero_points.is_def(DNNL_ARG_SRC);
     const bool diff_data_type = mem_dt.dt() != mem_fp.dt();
-
+    const bool compress_s8 = prb->alg == COMPRESS;
     dnnl_data_type_t dt_check = dnnl_s8;
 #if DNNL_AARCH64
     /* Note for x64:
@@ -405,7 +405,7 @@ int fill_wei(
     const bool wei_x8x8
             = prb->cfg[WEI].dt == dnnl_s8 && prb->cfg[SRC].dt == dt_check;
     const bool check_reorder = (is_bench_mode(CORR)) && diff_data_type
-            && !wino_s8 && !wei_x8x8 && is_def_zp;
+            && !wino_s8 && !wei_x8x8 && is_def_zp && !compress_s8;
 
     dnn_mem_t extra_mem;
     if (check_reorder) {
@@ -612,7 +612,13 @@ inline int init_pd_custom(dnnl_engine_t engine, const prb_t *prb,
     dnnl_alg_kind_t alg = dnnl_convolution_direct;
     if (prb->alg == WINO) alg = dnnl_convolution_winograd;
     if (prb->alg == AUTO) alg = dnnl_convolution_auto;
-
+    if (prb->ic >= 64 && prb->alg == alg_t::COMPRESS) {
+        alg = dnnl_convolution_compress;
+        dnnl_memory_extra_desc_t wei_md_extra {};
+        wei_md_extra.flags = dnnl_memory_extra_flag_conv_compression;
+        wei_md_extra.compensation_mask = 219;
+        wei_d.extra = wei_md_extra;
+    }
     switch (prb->dir) {
         case FWD_D:
         case FWD_B:
@@ -863,7 +869,7 @@ int doit(const prb_t *prb, res_t *res) {
 
     const auto &src_md
             = prb->dir == BWD_D ? q(DNNL_ARG_DIFF_SRC) : q(DNNL_ARG_SRC);
-    const auto &wei_md = prb->dir & FLAG_WEI ? q(DNNL_ARG_DIFF_WEIGHTS)
+    auto wei_md = prb->dir & FLAG_WEI ? q(DNNL_ARG_DIFF_WEIGHTS)
                                              : q(DNNL_ARG_WEIGHTS);
     const auto &bia_md
             = prb->dir & FLAG_WEI ? q(DNNL_ARG_DIFF_BIAS) : q(DNNL_ARG_BIAS);
@@ -897,6 +903,12 @@ int doit(const prb_t *prb, res_t *res) {
             BENCHDNN_PRINT(
                     5, "%s\n", "benchdnn: use CPU primitive as the reference");
         }
+    }
+    if (prb->ic >= 64 && prb->alg == alg_t::COMPRESS) {
+        dnnl_memory_extra_desc_t wei_md_extra {};
+        wei_md_extra.flags = dnnl_memory_extra_flag_conv_compression;
+        wei_md_extra.compensation_mask = 219;
+        wei_md.extra = wei_md_extra;
     }
     auto prim_ref = make_benchdnn_dnnl_wrapper(prim_ref_);
 

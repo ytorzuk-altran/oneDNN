@@ -116,7 +116,7 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
 
     const auto ker = [&](int ithr_oc_mb, int nthr_oc_mb, int ithr_ic, int n,
                              int ocb, int icc, bool do_init, int buffer_a_osb,
-                             bool copy_buffer_a) {
+                             bool copy_buffer_a, int8_t decomp_buf[]) {
         const int ithr = nthr_oc_mb * ithr_ic + ithr_oc_mb;
         auto addr_batch = addr_batch_global + ithr * jbgp.adjusted_batch_size;
 
@@ -187,8 +187,26 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                                 + get_blk_off(src_d, jbgp.src_dt, n,
                                         ic + b * jbgp.ic_block));
                 addr_batch[b].ptr.A = A_ptr;
-                addr_batch[b].ptr.B = weights
-                        + get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b);
+                auto wei_offset
+                        = get_blk_off(weights_d, jbgp.wei_dt, ocb, icb + b);
+                if (jbgp.weights_compressed) {
+                    const int16_t *compressed_tile_lengths_ptr
+                            = reinterpret_cast<const int16_t *>(weights);
+                    int compressed_weights_offset = wei_offset / 4096;
+
+                    brgemm_decomp_kernel_params_t dcomp_params;
+                    dcomp_params.ptr_B = weights + jbgp.weights_starting_offset
+                            + compressed_tile_lengths_ptr
+                                            [compressed_weights_offset]
+                                    * 64;
+                    dcomp_params.bitmask_ptr
+                            = weights + (jbgp.oc * jbgp.ic) + wei_offset / 8;
+                    dcomp_params.scratch_buf = decomp_buf;
+                    (*brg_decomp_kernel_)(&dcomp_params);
+                    addr_batch[b].ptr.B = decomp_buf;
+                } else {
+                    addr_batch[b].ptr.B = weights + wei_offset;
+                }
             }
 
             auto ptr_D = dst + dst_off;
@@ -303,6 +321,9 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
         if (is_amx)
             amx_tile_configure(&brg_kernel_palettes_[base_brg_ker_idx][0]);
 
+        const size_t decomp_buffer_size = (size_t)jbgp.ic * 64;
+        alignas(64) int8_t decomp_buf[decomp_buffer_size];
+
         int occ {0}, osc {0};
         nd_iterator_init(start, osc, os_chunks, occ, oc_chunks);
         while (start < end) {
@@ -332,7 +353,8 @@ void brgemm_inner_product_fwd_t<isa>::execute_forward(
                 const int cur_icc = icc + icc_start;
                 const bool copy_buffer_a = jbgp.use_buffer_a && ocb == 0;
                 ker(ithr_oc_mb, nthr_oc_mb, ithr_ic, n, ocb + ocb_s, cur_icc,
-                        cur_icc == icc_start, osb, copy_buffer_a);
+                        cur_icc == icc_start, osb, copy_buffer_a,
+                        decomp_buf);
 
                 ++loop_start;
                 if (ocb_inner_most)

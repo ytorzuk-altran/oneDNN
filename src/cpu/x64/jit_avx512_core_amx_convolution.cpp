@@ -583,6 +583,10 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
 
         auto p = jit_conv_call_s();
         amx_tile_configure(tcfg);
+        int wei_buff_size = jcp.nb_oc_blocking * jcp.nb_ic_int * jcp.kh
+            * jcp.kw * jcp.ic_block_int_np * jcp.oc_block;
+
+        alignas(64) int8_t decomp_buf[1000]; // wei_buff_size];
 
         const int oh_work = jcp.oh_pad;
         const int sp_stride = mem_blk_off(dst_d, 0, 0, 0, 0, 1);
@@ -682,6 +686,16 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
             p.kd_padding
                     = nstl::max(0, jcp.kd - d_f_overflow - d_back_overflow);
 
+            if(jcp.weight_compressed){
+                auto s = jit_decompress_call_s();
+                s.filt = weights
+                        + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift;
+                s.scratch_buf = &decomp_buf;
+                s.bitmask_ptr = weights + wei_dt_size * jcp.weight_comp_bitmask_off
+                        + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift / 8;
+                (*decomp_kernel_)(&s);
+            }
+
             int oh_step = jcp.nb_oh_blocking * jcp.oh_per_tile;
             for (int oh = oh_s; oh < oh_e; oh += oh_step) {
                 const int gen_kh = ((jcp.kh - 1) * (jcp.dilate_h + 1) + 1);
@@ -754,10 +768,14 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
                         ? &local_zp_pbuff[pbuff_offset]
                         : nullptr;
 
-                p.filt = weights
-                        + ((g * oc_chunks + occ) * wei_oc_shift
-                                  + d_f_overflow * wei_d_shift)
-                                * wei_dt_size;
+                if (jcp.weight_compressed)
+                    p.filt = &decomp_buf;
+                else
+                    p.filt = weights
+                            + ((g * oc_chunks + occ) * wei_oc_shift
+                                      + d_f_overflow * wei_d_shift)
+                                    * wei_dt_size;
+
                 p.bias = bias_w;
                 p.scales = &oscales[jcp.is_oc_scale * oc];
 

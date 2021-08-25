@@ -84,6 +84,10 @@ extern const impl_list_map_t regular_bin_impl_list_map;
 extern const impl_list_map_t comp_f32_s8_impl_list_map;
 extern const impl_list_map_t comp_bf16_s8_impl_list_map;
 extern const impl_list_map_t comp_s8_s8_impl_list_map;
+extern const impl_list_map_t compression_s8_s8_impl_list_map;
+extern const impl_list_map_t compression_f32_s8_impl_list_map;
+extern const impl_list_map_t conv_compression_s8_s8_impl_list_map;
+extern const impl_list_map_t conv_compression_f32_s8_impl_list_map;
 
 using spec_reference = spec::reference;
 using spec_direct_copy = spec::direct_copy;

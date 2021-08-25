@@ -138,6 +138,8 @@ status_t jit_avx512_core_amx_1x1_convolution_fwd_t<src_type, wei_type,
 
         amx_tile_configure(tcfg);
 
+        alignas(64) int8_t decomp_buf[wei_oc_shift];
+
         int mb {0}, g {0}, _osb {0}, _ocb {0};
         nd_iterator_init(start, mb, MB, g, jcp.ngroups, _osb, os_chunks,
                 _ocb, oc_chunks);
@@ -152,9 +154,22 @@ status_t jit_avx512_core_amx_1x1_convolution_fwd_t<src_type, wei_type,
             int oc = g * jcp.oc_without_padding + ocb * jcp.oc_block;
             int ic = g * jcp.ic_without_padding;
 
+            if (jcp.weight_compressed) {
+                auto s = jit_decompress_call_s();
+                s.filt = weights + wei_dt_size * _ocb * wei_oc_shift;
+                s.scratch_buf = &decomp_buf;
+                s.bitmask_ptr = weights
+                        + wei_dt_size * jcp.weight_comp_bitmask_off
+                        + _ocb * wei_oc_shift / 8;
+                (*decomp_kernel_)(&s);
+            }
+
             p.acc_s32 = wsp + ithr * jcp.wsp_buffer_size;
             p.src_prf = wsp_tile + ithr * (jcp.wsp_buffer_size / 2);
-            p.filt = weights + wei_dt_size * _ocb * wei_oc_shift;
+            if(jcp.weight_compressed) 
+                p.filt = &decomp_buf;
+            else
+                p.filt = weights + wei_dt_size * _ocb * wei_oc_shift;
             p.bias = bias_w;
             p.scales = &oscales[jcp.is_oc_scale * oc];
             p.oc_blocks = ocb;

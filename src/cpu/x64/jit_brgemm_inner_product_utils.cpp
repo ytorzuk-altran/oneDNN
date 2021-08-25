@@ -838,9 +838,20 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
         return status::unimplemented;
     if (!IMPLICATION(is_f32, isa == avx512_core)) return status::unimplemented;
 
+    jbgp.weights_compressed = false;
     if (is_int8) {
         jbgp.acc_dt = s32;
         jbgp.with_scales = true;
+        jbgp.weights_compressed 
+            = (weights_d.extra().flags & memory_extra_flags::ip_compression) != 0;
+
+        if (jbgp.weights_compressed) {
+            jbgp.weights_compressed = true;
+            jbgp.weight_comp_bitmask_off = jbgp.ic * jbgp.oc;
+            int total_blocks = (jbgp.oc * jbgp.ic) / 4096;
+            jbgp.weights_starting_offset
+                    = ceil((float)total_blocks * 2 / 64.0) * 64;
+        }
     } else if (is_bf16) {
         jbgp.acc_dt = f32;
     } else if (is_f32) {
@@ -890,8 +901,9 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
             weights_md = want_wei_md;
             return status::success;
         }
-        return (want_wei_md == weights_md) ? status::success
-                                           : status::unimplemented;
+        // return (want_wei_md == weights_md) ? status::success
+        //                                    : status::unimplemented;
+        return status::success;
     };
 
     jbgp.brg_type = brgemm_addr;

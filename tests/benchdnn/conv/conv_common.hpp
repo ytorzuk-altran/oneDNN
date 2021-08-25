@@ -36,9 +36,11 @@ enum alg_t {
     DIRECT,
     WINO,
     AUTO,
+    COMPRESS,
     convolution_direct = DIRECT,
     convolution_wino = WINO,
     convolution_auto = AUTO,
+    convolution_compress = COMPRESS,
 };
 alg_t str2alg(const char *str);
 const char *alg2str(alg_t alg);

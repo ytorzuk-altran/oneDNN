@@ -1201,6 +1201,7 @@ typedef enum {
 typedef enum {
     dnnl_alg_kind_undef,
     /// Direct convolution
+    dnnl_convolution_compress = 0x4,
     dnnl_convolution_direct = 0x1,
     /// Winograd convolution
     dnnl_convolution_winograd = 0x2,
@@ -1210,6 +1211,7 @@ typedef enum {
     dnnl_deconvolution_direct = 0xa,
     /// Winograd deconvolution
     dnnl_deconvolution_winograd = 0xb,
+    dnnl_ip_compress = 0x1,
     /// Eltwise: ReLU
     dnnl_eltwise_relu = 0x1f,
     /// Eltwise: hyperbolic tangent non-linearity (tanh)
@@ -1564,6 +1566,8 @@ typedef enum {
     = dnnl_memory_extra_flag_rnn_u8s8_compensation,
     dnnl_memory_extra_flag_compensation_conv_asymmetric_src = 0x8U,
     dnnl_memory_extra_flag_rnn_s8s8_compensation = 0x16U,
+    dnnl_memory_extra_flag_ip_compression = 0x32U,
+    dnnl_memory_extra_flag_conv_compression = 0x64U,
 } dnnl_memory_extra_flags_t;
 
 /// Description of extra information stored in memory

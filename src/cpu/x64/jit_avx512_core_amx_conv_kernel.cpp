@@ -1809,18 +1809,18 @@ void jit_avx512_core_amx_fwd_kernel_t::compute_icb_loop(int width,
                 for (int set_idx = 0; set_idx < jcp.n_stride_sets;
                         set_idx++) { // used to optimize input memory reuse in L1$
                     for (int kw = set_idx; kw < jcp.kw; kw += jcp.kw_step) {
-                        for (int ohb = 0; ohb < jcp.nb_oh_blocking; ohb++) {
-                            const size_t inp_off
-                                    = inp_offset(icb, ohb, kd, kh, kw);
-                            safe_tileloadd(Tmm(get_inp_tensor(ohb, tail)),
-                                    reg_inp_ptr, inp_off, reg_inp_stride);
-                        }
                         for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
                             const size_t wei_off
                                     = wei_offset(icb, ocb, kd, kh, kw);
                             safe_tileloadd(Tmm(get_wei_tensor(ocb)),
                                     reg_wei_ptr, wei_off, reg_wei_stride);
-                            for (int ohb = 0; ohb < jcp.nb_oh_blocking; ohb++) {
+                        }                        
+                        for (int ohb = 0; ohb < jcp.nb_oh_blocking; ohb++) {
+                            const size_t inp_off
+                                    = inp_offset(icb, ohb, kd, kh, kw);
+                            safe_tileloadd(Tmm(get_inp_tensor(ohb, tail)),
+                                    reg_inp_ptr, inp_off, reg_inp_stride);
+                            for (int ocb = 0; ocb < jcp.nb_oc_blocking; ocb++) {
                                 tdpbxxd(Tmm(get_out_tensor(ohb, ocb, tail)),
                                         Tmm(get_inp_tensor(ohb, tail)),
                                         Tmm(get_wei_tensor(ocb)));
@@ -2228,10 +2228,14 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
             weights_d.data_type() == data_type::s8,
             one_of(dst_d.data_type(), data_type::f32, data_type::s32,
                     data_type::s8, data_type::u8));
-
+    const bool weight_compressed
+            = (weights_d.extra().flags & memory_extra_flags::conv_compression)
+            != 0;
     bool supported = false
             || (is_bf16_convolution && mayiuse(avx512_core_bf16_amx_bf16))
             || (is_int8_convolution && mayiuse(avx512_core_bf16_amx_int8));
+    
+    if (weight_compressed) supported &= is_int8_convolution;
     if (!supported) return status::unimplemented;
 
     jcp = zero<decltype(jcp)>();
@@ -2464,7 +2468,8 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
             weights_md = want_wei_md;
             return true;
         }
-        return weights_md == want_wei_md;
+       // return weights_md == want_wei_md;
+       return true;
     };
 
     if (!set_or_check_wei_format()) return status::unimplemented;
@@ -2579,7 +2584,17 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
 
     const auto &oscales = attr.output_scales_;
     jcp.is_oc_scale = oscales.mask_ == 1 << 1;
-
+    jcp.weight_compressed = weight_compressed;
+    if (weight_compressed) {
+        auto padded_dims = weights_d.padded_dims();
+        auto dims = weights_d.dims();
+        int off = with_groups ? 1 : 0;
+        jcp.weight_comp_bitmask_off = jcp.ngroups
+                                        * padded_dims[off]
+                                        * padded_dims[off + 1]
+                                        * dims[off + 2]
+                                        * dims[off + 3];
+    } 
     // Note: currently unsupported, results in seg-fault
     const int l_pad_output = nstl::min(jcp.ow, div_up(jcp.l_pad, jcp.stride_w));
     if (!jcp.is_relo && (l_pad_output > jcp.ow_block))

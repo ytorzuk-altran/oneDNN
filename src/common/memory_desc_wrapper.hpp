@@ -103,6 +103,10 @@ struct memory_desc_wrapper : public c_compatible {
 
     /** return the size of data type of additional buffer */
     size_t additional_buffer_data_size(uint64_t flag_select) const {
+        if (extra().flags & memory_extra_flags::ip_compression)
+            return sizeof(uint64_t);
+        if (extra().flags & memory_extra_flags::conv_compression)
+            return sizeof(uint64_t);
         if (flag_select & memory_extra_flags::compensation_conv_s8s8)
             return sizeof(int32_t);
         if (flag_select & memory_extra_flags::rnn_u8s8_compensation)
@@ -116,8 +120,8 @@ struct memory_desc_wrapper : public c_compatible {
     bool is_additional_buffer() const {
         using namespace memory_extra_flags;
         return (extra().flags
-                & (compensation_conv_s8s8 | rnn_u8s8_compensation
-                        | compensation_conv_asymmetric_src));
+                & (compensation_conv_s8s8 | rnn_u8s8_compensation | ip_compression
+                        | conv_compression | compensation_conv_asymmetric_src));
     }
 
     /** returns the size of the appended buffer when the memory descriptor
@@ -126,16 +130,25 @@ struct memory_desc_wrapper : public c_compatible {
         using namespace memory_extra_flags;
 
         auto calculate_size = [=](int cmask, size_t buff_data_size) {
-            assert(utils::one_of(cmask, 1, 2, 3, 13, 27));
+            assert(utils::one_of(cmask, 1, 2, 3, 13, 27, 129));
             dim_t prod = 1;
-            for (int d = 0; d < ndims(); ++d)
-                if (cmask & (1 << d)) prod *= padded_dims()[d];
+            if (cmask == 13) {
+                prod = padded_dims()[0] * padded_dims()[1]/64; 
+            } else if (cmask == 219) {
+                prod = padded_dims()[0] * padded_dims()[1]
+                    * padded_dims()[2] * padded_dims()[3]/64;
+            } else {
+                for (int d = 0; d < ndims(); ++d)
+                    if (cmask & (1 << d)) prod *= padded_dims()[d];
+            }
             return (size_t)prod * buff_data_size;
         };
 
         size_t buff_size = 0;
-        const uint64_t comp_flags
-                = compensation_conv_s8s8 | rnn_u8s8_compensation;
+        const uint64_t comp_flags = compensation_conv_s8s8
+                | rnn_u8s8_compensation 
+                | dnnl_memory_extra_flag_ip_compression
+                | dnnl_memory_extra_flag_conv_compression;
         if (extra().flags & comp_flags) {
             buff_size += calculate_size(extra().compensation_mask,
                     additional_buffer_data_size(comp_flags));

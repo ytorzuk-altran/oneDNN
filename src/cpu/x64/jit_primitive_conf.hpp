@@ -109,6 +109,8 @@ struct jit_conv_conf_t {
     bool with_sum;
     data_type_t sum_dt;
     bool with_eltwise;
+    bool weight_compressed;
+    size_t weight_comp_bitmask_off;
     bool with_binary;
     bool with_depthwise;
     bool with_quantization;
@@ -430,6 +432,13 @@ struct jit_conv_winograd_conf_t : public jit_conv_conf_t {
     int dimN_nb_block;
 
     winograd_sched_t sched_policy;
+};
+
+struct jit_decompress_call_s {
+    const void *filt; /* hack, non-const for backward_weights */
+    const void *filt_prf;
+    const void *scratch_buf;
+    const void *bitmask_ptr;
 };
 
 struct jit_conv_call_s {

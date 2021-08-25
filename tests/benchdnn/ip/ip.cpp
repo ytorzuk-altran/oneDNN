@@ -65,6 +65,15 @@ static int init_pd(dnnl_engine_t engine, const prb_t *prb,
             CRIT);
     SAFE(init_md(&wei_d, prb->ndims, wei_dims, prb->cfg[WEI].dt, prb->wtag),
             CRIT);
+
+    if (prb->alg == alg_t::COMPRESS) {
+        dnnl_alg_kind_t alg = dnnl_ip_compress;
+        dnnl_memory_extra_desc_t wei_md_extra {};
+        wei_md_extra.flags = dnnl_memory_extra_flag_ip_compression;
+        wei_md_extra.compensation_mask = 13;
+        wei_d.extra = wei_md_extra;
+    }
+
     DNN_SAFE(dnnl_memory_desc_init_by_tag(&bia_d, 1, bia_dims, prb->cfg[BIA].dt,
                      dnnl_format_tag_any),
             WARN);
@@ -292,7 +301,7 @@ int doit(const prb_t *prb, res_t *res) {
 
     const auto &src_md
             = prb->dir == BWD_D ? q(DNNL_ARG_DIFF_SRC) : q(DNNL_ARG_SRC);
-    const auto &wei_md = prb->dir & FLAG_WEI ? q(DNNL_ARG_DIFF_WEIGHTS)
+    auto wei_md = prb->dir & FLAG_WEI ? q(DNNL_ARG_DIFF_WEIGHTS)
                                              : q(DNNL_ARG_WEIGHTS);
     const auto &bia_md
             = prb->dir & FLAG_WEI ? q(DNNL_ARG_DIFF_BIAS) : q(DNNL_ARG_BIAS);
@@ -305,6 +314,13 @@ int doit(const prb_t *prb, res_t *res) {
     const auto wei_tag = tag::abx;
 
     const auto &test_engine = get_test_engine();
+    if (prb->alg == alg_t::COMPRESS) {
+        dnnl_alg_kind_t alg = dnnl_ip_compress;
+        dnnl_memory_extra_desc_t wei_md_extra {};
+        wei_md_extra.flags = dnnl_memory_extra_flag_ip_compression;
+        wei_md_extra.compensation_mask = 13;
+        wei_md.extra = wei_md_extra;
+    }
 
     dnn_mem_t src_dt(src_md, test_engine);
     dnn_mem_t wei_dt(wei_md, test_engine);
