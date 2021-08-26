@@ -18,6 +18,7 @@
 #include "common/dnnl_thread.hpp"
 #include "common/nstl.hpp"
 #include "common/utils.hpp"
+#include "cpu/x64/injectors/injector_utils.hpp"
 
 #include "cpu/x64/injectors/jit_uni_depthwise_injector.hpp"
 
@@ -204,6 +205,18 @@ void jit_uni_depthwise_injector_f32<isa>::init_ptrs(const Xbyak::Reg64& reg_d_we
     }
 }
 
+template <typename Vmm>
+static void push_vmm(jit_generator *host, const Vmm &vmm) {
+    host->sub(host->rsp, injector_utils::vmm_size_t<Vmm>::bytes);
+    host->uni_vmovups(host->ptr[host->rsp], vmm);
+}
+
+template <typename Vmm>
+static void pop_vmm(jit_generator *host, const Vmm &vmm) {
+    host->uni_vmovups(vmm, host->ptr[host->rsp]);
+    host->add(host->rsp, injector_utils::vmm_size_t<Vmm>::bytes);
+}
+
 template <cpu_isa_t isa>
 void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
                                                   int vmm_d_weights_idx, int vmm_d_bias_idx,
@@ -215,9 +228,9 @@ void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
     if (need_to_preserve) {
         preserved_vecs_count = aux_vecs_count(depthwise_alg, is_broadcast);
         if (preserved_vecs_count > 0)
-            h->push(vmm_mask);
+            push_vmm(h, vmm_mask);
         if (preserved_vecs_count > 1)
-            h->push(vmm_aux0);
+            push_vmm(h, vmm_aux0);
     }
 
     for (int idx = start_idx; idx < end_idx; idx++) {
@@ -232,9 +245,9 @@ void jit_uni_depthwise_injector_f32<isa>::compute(int start_idx, int end_idx,
 
     if (need_to_preserve) {
         if (preserved_vecs_count > 1)
-            h->pop(vmm_aux0);
+            pop_vmm(h, vmm_aux0);
         if (preserved_vecs_count > 1)
-            h->pop(vmm_mask);
+            pop_vmm(h, vmm_mask);
     }
 }
 
