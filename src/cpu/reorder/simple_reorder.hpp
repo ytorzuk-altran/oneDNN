@@ -297,40 +297,63 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         uint64_t *bitmask_ptr = reinterpret_cast<uint64_t*>(output + offset);
         int count = 0;
 
-        parallel_nd(NB_IC, NB_OC, H, W, [&](int I, int O, int h, int w) {
-            auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I, h, w)];
-            auto outp = &output[output_d.blk_off(O, I, h, w)];
-            const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
-            const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
-            int bitmask_idx = (O * NB_IC * H * W + I * H * W + h * W + w) * i_outer_blksize;
-            auto max_outp = &outp[o_blksize * i_blksize];
-            const float *scales_here = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
-
-            for (int ic_base = 0; ic_base < ic_block; ic_base += 4) {
-                bitmask_ptr[bitmask_idx] = 0;
-                int bit = 0;
-                for (int oc = 0; oc < oc_block; oc++) {
-                    int plain_off = oc * plain_o_stride + ic_base * plain_i_stride;
-                    int ic_block_here = nstl::min(4, ic_block - ic_base);
-                    for (int ic = 0; ic < ic_block_here; ic++) {
-                        data_t<type_o> o = (type_i != type_o)
-                                ? qz_b0<data_t<type_i>, data_t<type_o>>()(
-                                        inp[plain_off], scales_here[oc])
-                                : inp[plain_off];
-                        if (o != 0) {
-                            *outp++ = o;
-                            bitmask_ptr[bitmask_idx] |= (1UL << bit);
+        int total_blocks = offset / 1024;
+        int16_t *comp_tile_len_ptr
+            = reinterpret_cast<int16_t *>(output);
+        int comp_tile_len_index = 0;
+        int cl_length = 0;
+        int output_offset = ceil((float)total_blocks * 2 / 64.0);
+        auto outp = &output[output_d.blk_off(0, 0, 0, 0) + output_offset * 64];
+        for (int O = 0; O < NB_OC; O++) {
+        for (int I = 0; I < NB_IC; I++) {
+        for (int h = 0; h < H; h++) {
+        for (int w = 0; w < W; w++) {
+                auto inp = &input[input_d.blk_off(o_blksize * O, i_blksize * I, h, w)];
+                // auto outp = &output[output_d.blk_off(O, I, h, w)];
+                const int oc_block = nstl::min(o_blksize, OC - O * o_blksize);
+                const int ic_block = nstl::min(i_blksize, IC - I * i_blksize);
+                int bitmask_idx = (O * NB_IC * H * W + I * H * W + h * W + w) 
+                                    * i_outer_blksize;
+                auto max_outp = &outp[o_blksize * i_blksize];
+                const float *scales_here = &scales[(D_mask == 1) ? 0 : (O * o_blksize)];
+                int non_zeros = 0;
+                comp_tile_len_ptr[comp_tile_len_index] = cl_length;
+                for (int ic_base = 0; ic_base < ic_block; ic_base += 4) {
+                    bitmask_ptr[bitmask_idx] = 0;
+                    int bit = 0;
+                    for (int oc = 0; oc < oc_block; oc++) {
+                        int plain_off = oc * plain_o_stride + ic_base * plain_i_stride;
+                        int ic_block_here = nstl::min(4, ic_block - ic_base);
+                        for (int ic = 0; ic < ic_block_here; ic++) {
+                            data_t<type_o> o = (type_i != type_o)
+                                    ? qz_b0<data_t<type_i>, data_t<type_o>>()(
+                                            inp[plain_off], scales_here[oc])
+                                    : inp[plain_off];
+                            if (o != 0) {
+                                non_zeros++;
+                                *outp++ = o;
+                                bitmask_ptr[bitmask_idx] |= (1UL << bit);
+                            }
+                            plain_off += plain_i_stride;
+                            bit++;
+                            count++;
                         }
-                        plain_off += plain_i_stride;
-                        bit++;
-                        count++;
                     }
+                    bitmask_idx++;
                 }
-                bitmask_idx++;
+                int16_t cl = (int16_t)ceil(non_zeros / 64.0);
+                comp_tile_len_index++;
+                cl_length = comp_tile_len_ptr[comp_tile_len_index - 1] + cl;
+                int unsed_bytes_in_cl = 64 - (non_zeros % 64);
+                if(unsed_bytes_in_cl == 64){
+                    unsed_bytes_in_cl = 0;
+                }
+                outp += unsed_bytes_in_cl; // 64: next output starts in new cacheline
             }
-
-        });
-	return status::success;
+        }
+        }
+        }
+      return status::success;
     }
 };
 

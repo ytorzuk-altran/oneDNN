@@ -60,6 +60,7 @@ void jit_avx512_core_amx_decompress_kernel_t::generate() {
     mov(wei_ptr, ptr[param1 + GET_OFF(filt)]);
     mov(reg_ptr_decomp_dst, ptr[param1 + GET_OFF(scratch_buf)]);
     mov(reg_ptr_decomp_mask, ptr[param1 + GET_OFF(bitmask_ptr)]);
+    lea(reg_ptr_decomp_src, ptr[wei_ptr]);
 
     int wei_buff_size = jcp.nb_oc_blocking * jcp.nb_ic_int * jcp.kh
             * jcp.kw * jcp.ic_block_int_np * jcp.oc_block;
@@ -67,7 +68,7 @@ void jit_avx512_core_amx_decompress_kernel_t::generate() {
     for(int block = 0; block < wei_buff_size/1024; block++){
         int wei_offset =  block * 1024;
         int bitmask_off = wei_offset / (1 * 8);
-        lea(reg_ptr_decomp_src, ptr[wei_ptr + wei_offset]);
+
         for (int cl = 0; cl < 16; cl = cl + 4) {
             mov(reg_comp_mask_tmp1, ptr[reg_ptr_decomp_mask + cl * 8 + bitmask_off]);
             kmovq(reg_comp_mask1, reg_comp_mask_tmp1);
@@ -96,17 +97,23 @@ void jit_avx512_core_amx_decompress_kernel_t::generate() {
 
             
             vpexpandb(zmm_comp1 | reg_comp_mask1 | T_z, zmm_comp1);
-            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + cl * 64], zmm_comp1);                                
+            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + cl * 64], zmm_comp1);
 
             vpexpandb(zmm_comp2 | reg_comp_mask2 | T_z, zmm_comp2);
             vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+1) * 64], zmm_comp2);
 
             vpexpandb(zmm_comp3 | reg_comp_mask3 | T_z, zmm_comp3);
-            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+2) * 64], zmm_comp3);                                
+            vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+2) * 64], zmm_comp3);
 
             vpexpandb(zmm_comp4 | reg_comp_mask4 | T_z, zmm_comp4);
             vmovdqu8(ptr[reg_ptr_decomp_dst + wei_offset + (cl+3) * 64], zmm_comp4);
         }        
+        mov(reg_ptr_decomp_src_align, reg_ptr_decomp_src);
+        not_(reg_ptr_decomp_src_align);
+        and_(reg_ptr_decomp_src_align, 0x3f); // get 6 LSBs of stack ptr
+        add(reg_ptr_decomp_src_align, 0x1);
+        and_(reg_ptr_decomp_src_align, 0x3f); // 0x0 if already aligned to cacheline
+        add(reg_ptr_decomp_src, reg_ptr_decomp_src_align); 
     }
     postamble();
 }

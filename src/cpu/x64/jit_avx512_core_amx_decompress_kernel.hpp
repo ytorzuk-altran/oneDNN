@@ -72,6 +72,8 @@ private:
     const Xbyak::Reg64 reg_comp_mask_tmp3 = rbx;
     const Xbyak::Reg64 reg_comp_mask_tmp4 = rdx;
 
+    const Xbyak::Reg64 reg_ptr_decomp_src_align = r10;
+    
     const Xbyak::Opmask reg_comp_mask1 = k1;
     const Xbyak::Opmask reg_comp_mask2 = k2;
     const Xbyak::Opmask reg_comp_mask3 = k3;

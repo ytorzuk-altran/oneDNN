@@ -2594,6 +2594,9 @@ status_t jit_avx512_core_amx_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
                                         * padded_dims[off + 1]
                                         * dims[off + 2]
                                         * dims[off + 3];
+        int total_blocks = jcp.weight_comp_bitmask_off / 1024;
+        jcp.weights_starting_offset
+                = ceil((float)total_blocks * 2 / 64.0) * 64;
     } 
     // Note: currently unsupported, results in seg-fault
     const int l_pad_output = nstl::min(jcp.ow, div_up(jcp.l_pad, jcp.stride_w));

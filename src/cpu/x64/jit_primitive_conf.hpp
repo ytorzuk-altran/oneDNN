@@ -110,6 +110,7 @@ struct jit_conv_conf_t {
     data_type_t sum_dt;
     bool with_eltwise;
     bool weight_compressed;
+    int weights_starting_offset;
     size_t weight_comp_bitmask_off;
     bool with_binary;
     bool with_depthwise;

@@ -130,7 +130,7 @@ struct memory_desc_wrapper : public c_compatible {
         using namespace memory_extra_flags;
 
         auto calculate_size = [=](int cmask, size_t buff_data_size) {
-            assert(utils::one_of(cmask, 1, 2, 3, 13, 27, 129));
+            assert(utils::one_of(cmask, 1, 2, 3, 13, 27, 219));
             dim_t prod = 1;
             if (cmask == 13) {
                 prod = padded_dims()[0] * padded_dims()[1]/64; 

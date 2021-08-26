@@ -1189,6 +1189,9 @@ status_t jit_avx512_core_amx_1x1_fwd_kernel_t::init_conf(jit_conv_conf_t &jcp,
         int off = with_groups ? 1 : 0;
         jcp.weight_comp_bitmask_off = jcp.ngroups * padded_dims[off]
                 * padded_dims[off + 1] * dims[off + 2] * dims[off + 3];
+        int total_blocks = jcp.weight_comp_bitmask_off / 1024;
+        jcp.weights_starting_offset
+                = ceil((float)total_blocks * 2 / 64.0) * 64;
     } 
     return status::success;
 }

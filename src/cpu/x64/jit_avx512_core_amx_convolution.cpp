@@ -687,12 +687,16 @@ status_t jit_avx512_core_amx_convolution_fwd_t<src_type, wei_type,
                     = nstl::max(0, jcp.kd - d_f_overflow - d_back_overflow);
 
             if(jcp.weight_compressed){
+                const int16_t *comp_tile_lens_ptr
+                            = reinterpret_cast<const int16_t *>(weights);
+                auto wei_offset = wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift;
+                int comp_weights_offset = wei_offset / 1024;
                 auto s = jit_decompress_call_s();
-                s.filt = weights
-                        + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift;
+                s.filt = weights + jcp.weights_starting_offset 
+                            + comp_tile_lens_ptr[comp_weights_offset] * 64;
                 s.scratch_buf = &decomp_buf;
                 s.bitmask_ptr = weights + wei_dt_size * jcp.weight_comp_bitmask_off
-                        + wei_dt_size * (g * oc_chunks + occ) * wei_oc_shift / 8;
+                        + wei_offset / 8;
                 (*decomp_kernel_)(&s);
             }
 
