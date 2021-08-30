@@ -24,10 +24,10 @@ namespace cpu {
 const impl_list_map_t regular_bf16_impl_list_map {
     // bf16 ->
     {{bf16, data_type::undef, 0}, {
-        REG_RNN_P_FWD(CPU_REORDER_INSTANCE(rnn_weights_reorder_t<bf16, bf16>))
+        REG_RNN_P_FWD(CPU_REORDER_INSTANCE(rnn_weights_reorder_t, bf16, bf16))
 
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_blk_reorder_t)))
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_uni_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, f32, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, f32, nCdhw16c))
@@ -50,10 +50,10 @@ const impl_list_map_t regular_bf16_impl_list_map {
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, u8, OIdhw16o16i))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, u8, OIdhw16i16o))
 
-        REG_REORDER_P(REG_SR(bf16, any, bf16, any, fmt_order::any, spec::reference))
-        REG_REORDER_P(REG_SR(bf16, any, f32, any, fmt_order::any, spec::reference))
-        REG_REORDER_P(REG_SR(bf16, any, s8, any, fmt_order::any, spec::reference))
-        REG_REORDER_P(REG_SR(bf16, any, u8, any, fmt_order::any, spec::reference))
+        REG_REORDER_P(REG_SR(bf16, any, bf16, any, fmt_order_any, spec_reference))
+        REG_REORDER_P(REG_SR(bf16, any, f32, any, fmt_order_any, spec_reference))
+        REG_REORDER_P(REG_SR(bf16, any, s8, any, fmt_order_any, spec_reference))
+        REG_REORDER_P(REG_SR(bf16, any, u8, any, fmt_order_any, spec_reference))
 
         nullptr,
     }},
