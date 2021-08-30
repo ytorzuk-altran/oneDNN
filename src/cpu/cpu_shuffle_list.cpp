@@ -33,9 +33,9 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const impl_list_item_t impl_list[] = {
-        CPU_INSTANCE_X64(jit_uni_shuffle_t<avx512_common>)
-        CPU_INSTANCE_X64(jit_uni_shuffle_t<avx>)
-        CPU_INSTANCE_X64(jit_uni_shuffle_t<sse41>)
+        CPU_INSTANCE_X64(jit_uni_shuffle_t, avx512_common)
+        CPU_INSTANCE_X64(jit_uni_shuffle_t, avx)
+        CPU_INSTANCE_X64(jit_uni_shuffle_t, sse41)
         CPU_INSTANCE(ref_shuffle_t)
         /* eol */
         nullptr,
