@@ -22,6 +22,7 @@
 #include "oneapi/dnnl/dnnl.h"
 
 #include "c_types_map.hpp"
+#include "dnnl_sel_build.hpp"
 #include "memory_tracking.hpp"
 #include "nstl.hpp"
 #include "primitive_attr.hpp"
@@ -368,6 +369,7 @@ protected:
     status_t create_primitive( \
             std::pair<std::shared_ptr<primitive_t>, bool> &primitive, \
             engine_t *engine) const override { \
+        DNNL_PRIMITIVE_CREATE(pd_t) \
         return primitive_t::create_primitive_common<impl_type, pd_t>( \
                 primitive, this, engine, use_global_scratchpad); \
     } \

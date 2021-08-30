@@ -19,6 +19,7 @@
 
 #include "c_types_map.hpp"
 #include "primitive_desc.hpp"
+#include "dnnl_sel_build.hpp"
 #include "utils.hpp"
 
 namespace dnnl {
@@ -59,6 +60,7 @@ struct impl_list_item_t {
     impl_list_item_t(type_deduction_helper_t<pd_t>) {
         using deduced_pd_t = typename type_deduction_helper_t<pd_t>::type;
         create_pd_func_ = &primitive_desc_t::create<deduced_pd_t>;
+        DNNL_PRIMITIVE_NAME_INIT(pd_t);
     }
 
     template <typename pd_t>
@@ -66,12 +68,14 @@ struct impl_list_item_t {
         using deduced_pd_t =
                 typename concat_type_deduction_helper_t<pd_t>::type;
         create_concat_pd_func_ = deduced_pd_t::create;
+        DNNL_PRIMITIVE_NAME_INIT(pd_t);
     }
 
     template <typename pd_t>
     impl_list_item_t(sum_type_deduction_helper_t<pd_t>) {
         using deduced_pd_t = typename sum_type_deduction_helper_t<pd_t>::type;
         create_sum_pd_func_ = deduced_pd_t::create;
+        DNNL_PRIMITIVE_NAME_INIT(pd_t);
     }
 
     template <typename pd_t>
@@ -79,6 +83,7 @@ struct impl_list_item_t {
         using deduced_pd_t =
                 typename reorder_type_deduction_helper_t<pd_t>::type;
         create_reorder_pd_func_ = deduced_pd_t::create;
+        DNNL_PRIMITIVE_NAME_INIT(pd_t);
     }
 
     explicit operator bool() const {
@@ -99,6 +104,10 @@ struct impl_list_item_t {
         }
         return -1;
     }
+
+#if defined(SELECTIVE_BUILD_ANALYZER)
+    const char *name = {};
+#endif
 
 private:
     status_t operator()(primitive_desc_t **pd, const op_desc_t *adesc,
@@ -174,6 +183,15 @@ private:
             const memory_desc_t *, engine_t *, const memory_desc_t *,
             engine_t *, const primitive_attr_t *);
 };
+
+#if defined(SELECTIVE_BUILD_ANALYZER)
+inline impl_list_item_t&& move(impl_list_item_t &&t, const char *name) {
+    OV_ITT_SCOPED_TASK(
+        dnnl::FACTORY_DNNL,
+        openvino::itt::handle(std::string("REG$CPUEngine$") + t.name + "$" + name));
+    return static_cast<impl_list_item_t&&>(t);
+}
+#endif
 
 } // namespace impl
 } // namespace dnnl
