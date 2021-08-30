@@ -27,22 +27,22 @@ const impl_list_map_t regular_f32_f32_impl_list_map {
     {{f32, f32, 0}, {
         REG_REORDER_P(REG_FAST_DIRECT_COPY_F32_F32)
 
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_blk_reorder_t)))
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_uni_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
-        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64::jit_uni_reorder_t))
+        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64_jit_uni_reorder_t))
 
-        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order::any, spec::reference))
+        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order_any, spec_reference))
 
         nullptr,
     }},
     {{f32, f32, 3}, {
         REG_REORDER_P(REG_FAST_DIRECT_COPY_F32_F32)
 
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_blk_reorder_t)))
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_uni_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
-        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64::jit_uni_reorder_t))
+        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64_jit_uni_reorder_t))
 
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, nCw16c))
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, nCw8c))
@@ -60,21 +60,21 @@ const impl_list_map_t regular_f32_f32_impl_list_map {
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, OIw16i16o))
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, IOw16o16i))
 
-        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order::any, spec::reference))
+        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order_any, spec_reference))
 
         nullptr,
     }},
     {{f32, f32, 4}, {
-        REG_CONV_P_FWD(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::wino_reorder_t<f32, f32>)))
+        REG_CONV_P_FWD(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_wino_reorder_t, f32, f32)))
 
-        REG_RNN_P_FWD(CPU_REORDER_INSTANCE(rnn_weights_reorder_t<f32, f32>))
+        REG_RNN_P_FWD(CPU_REORDER_INSTANCE(rnn_weights_reorder_t, f32, f32))
 
         REG_REORDER_P(REG_FAST_DIRECT_COPY_F32_F32)
 
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_blk_reorder_t)))
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_uni_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
-        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64::jit_uni_reorder_t))
+        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64_jit_uni_reorder_t))
 
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, nChw8c))
@@ -109,20 +109,20 @@ const impl_list_map_t regular_f32_f32_impl_list_map {
 
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, OIhw4i16o4i))
 
-        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order::any, spec::reference))
+        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order_any, spec_reference))
 
         nullptr,
     }},
     {{f32, f32, 5}, {
-        REG_CONV_P_FWD(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::wino_reorder_t<f32, f32>)))
-        REG_RNN_P_FWD(CPU_REORDER_INSTANCE(rnn_weights_reorder_t<f32, f32>))
+        REG_CONV_P_FWD(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_wino_reorder_t, f32, f32)))
+        REG_RNN_P_FWD(CPU_REORDER_INSTANCE(rnn_weights_reorder_t, f32, f32))
 
         REG_REORDER_P(REG_FAST_DIRECT_COPY_F32_F32)
 
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_blk_reorder_t)))
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_uni_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
-        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64::jit_uni_reorder_t))
+        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64_jit_uni_reorder_t))
 
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, nCdhw16c))
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, nCdhw8c))
@@ -160,17 +160,17 @@ const impl_list_map_t regular_f32_f32_impl_list_map {
 
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, gOIhw4i16o4i))
 
-        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order::any, spec::reference))
+        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order_any, spec_reference))
 
         nullptr,
     }},
     {{f32, f32, 6}, {
         REG_REORDER_P(REG_FAST_DIRECT_COPY_F32_F32)
 
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_blk_reorder_t)))
-        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64::jit_uni_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
+        REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
-        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64::jit_uni_reorder_t))
+        DNNL_AARCH64_ONLY(CPU_REORDER_INSTANCE(aarch64_jit_uni_reorder_t))
 
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, gOIdhw4i4o))
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, gOIdhw4o4i))
@@ -185,7 +185,7 @@ const impl_list_map_t regular_f32_f32_impl_list_map {
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, gOIdhw16i16o))
         REG_REORDER_P(REG_SR_BIDIR(f32, any, f32, gIOdhw16o16i))
 
-        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order::any, spec::reference))
+        REG_REORDER_P(REG_SR(f32, any, f32, any, fmt_order_any, spec_reference))
 
         nullptr,
     }},
