@@ -391,7 +391,7 @@ template <>
 void _jit_avx512_core_x8s8s32x_fwd_kernel<Zmm>::compute_ker_dw(int ur_w,
         int pad_l, int pad_r, ic_block_t last_ic_block_flag, bool h_padded) {
 
-    const bool compute_kernel = IMPLICATION(h_padded, jcp.signed_input);
+    const bool compute_kernel = IMPLICATION(h_padded, jcp.signed_input || jcp.with_input_zp);
 
     if (jcp.src_zero_point) {
         push(aux_reg_ker_d);
@@ -559,7 +559,7 @@ void _jit_avx512_core_x8s8s32x_fwd_kernel<Vmm>::compute_ker(int ur_w, int pad_l,
     if (jcp.is_depthwise)
         return compute_ker_dw(ur_w, pad_l, pad_r, last_ic_block_flag, h_padded);
 
-    const bool compute_kernel = IMPLICATION(h_padded, jcp.signed_input);
+    const bool compute_kernel = IMPLICATION(h_padded, jcp.signed_input || jcp.with_input_zp);
 
     assert(IMPLICATION(h_padded, jcp.src_zero_point || jcp.signed_input || jcp.with_input_zp));
 
