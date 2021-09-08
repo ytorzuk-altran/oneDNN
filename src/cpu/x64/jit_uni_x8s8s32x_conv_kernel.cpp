@@ -538,9 +538,9 @@ void _jit_uni_x8s8s32x_fwd_kernel<isa, Vmm>::compute_ker(int ur_w, int pad_l,
 
     int nb_oc_block = jcp.nb_oc_blocking;
 
-    const bool compute_kernel = IMPLICATION(h_padded, jcp.signed_input);
+    const bool compute_kernel = IMPLICATION(h_padded, jcp.signed_input || jcp.with_input_zp);
 
-    assert(IMPLICATION(h_padded, jcp.src_zero_point || jcp.signed_input));
+    assert(IMPLICATION(h_padded, jcp.src_zero_point || jcp.signed_input || jcp.with_input_zp));
 
     if (jcp.src_zero_point) {
         push(aux_reg_ker_d);
