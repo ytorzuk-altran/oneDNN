@@ -1400,6 +1400,7 @@ jit_uni_binary_injector_t<isa, Vmm>::execute_prelu_binary(const Vmm &dst, const 
             = Xbyak::Zmm(rhs_arg_static_params_.rhs_prelu_helper_vmm_idx);
 
     push_opmask(host_, cmp_mask);
+    host_->uni_vpxor(zmm_aux0, zmm_aux0, zmm_aux0);
     host_->vcmpps(cmp_mask, lhs, zmm_aux0, jit_generator::_cmp_lt_os);
     host_->uni_vmulps(dst | cmp_mask, lhs, rhs);
     pop_opmask(host_, cmp_mask);
