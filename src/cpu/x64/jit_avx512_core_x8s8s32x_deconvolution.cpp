@@ -62,6 +62,14 @@ jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::
                 use_exact_tail_scalar_bcast};
         const binary_injector::static_params_t bsp {this->param1, rhs_sp};
 
+        if (jcp.ver == ver_vnni) {
+            vmm_d_weights = Vmm(28);
+            vmm_d_bias = Vmm(29);
+        } else {
+            vmm_d_weights = Vmm(26);
+            vmm_d_bias = Vmm(27);
+        }
+
         const quantization_injector::static_params_t qsp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias};
 
         postops_injector_ = utils::make_unique<
@@ -1268,13 +1276,6 @@ jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::get_ur_w_blks_params() {
 
 template <typename Vmm>
 void jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::generate() {
-    if (jcp.ver == ver_vnni) {
-        vmm_d_weights = Vmm(28);
-        vmm_d_bias = Vmm(29);
-    } else {
-        vmm_d_weights = Vmm(26);
-        vmm_d_bias = Vmm(27);
-    }
     preamble();
 
     if (zp::should_calculate_deconv_zp_src_pad_str_comp(jcp))
