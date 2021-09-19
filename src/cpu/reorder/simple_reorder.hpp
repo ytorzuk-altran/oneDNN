@@ -387,7 +387,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         // This kernel is used primarily for tensors with multiple inner
         // blocks for which generic zero padding must be used.
         // TODO: apply zero padding inside parallel_nd()
-        ctx.zero_pad_output(DNNL_ARG_TO);
+//        ctx.zero_pad_output(DNNL_ARG_TO);
 
         auto ker = [&](const data_t<type_i> *inp, data_t<type_o> *out,
                            int32_t *c, int32_t *zp, const float *s,
@@ -713,7 +713,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         // This kernel is used primarily for tensors with multiple inner
         // blocks for which generic zero padding must be used.
         // TODO: apply zero padding inside parallel_nd()
-        ctx.zero_pad_output(DNNL_ARG_TO);
+//        ctx.zero_pad_output(DNNL_ARG_TO);
 
         auto ker = [&](const data_t<type_i> *inp, data_t<type_o> *out,
                            int32_t *zp, const float *s, const int oc_block,
@@ -981,7 +981,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         const int IC = dims[2];
         const int H = is_1d ? 1 : dims[3];
         const int W = dims[4 - is_1d];
-        const auto zero_padding_needed = !output_d.is_dense();
+//        const auto zero_padding_needed = !output_d.is_dense();
 
         const size_t D_mask = utils::array_product(input_d.dims(),
                 math::ilog2q(pd->attr()->output_scales_.mask_ + 1));
@@ -1060,11 +1060,11 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     if (req_comp) ker_s8(out, &cp[offset], g_block);
                     if (has_asymmetric_comp) ker_zp(out, &zp[offset], g_block);
 
-                    if (zero_padding_needed) {
-                        PRAGMA_OMP_SIMD()
-                        for (int off = g_block; off < blksize; off++)
-                            out[off] = 0;
-                    }
+//                    if (zero_padding_needed) {
+//                        PRAGMA_OMP_SIMD()
+//                        for (int off = g_block; off < blksize; off++)
+//                            out[off] = 0;
+//                    }
                 }
             }
         });
@@ -1324,17 +1324,17 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                     for (int c = 0; c < block_i; ++c) {
                         o[o_off + c] = _qz_a1b0<type_i, type_o>()(i[i_off + c]);
                     }
-                    if (order_keep && b + 1 == nb) {
-                        // zero padding
-                        const auto pad_size
-                                = blksize_16 - ((nb - 1) * blksize_i);
-                        const auto pad_start = block_i + o_off;
-                        const auto pad_end = pad_size + o_off;
-                        PRAGMA_OMP_SIMD()
-                        for (int i = pad_start; i < pad_end; i++) {
-                            o[i] = 0;
-                        }
-                    }
+//                    if (order_keep && b + 1 == nb) {
+//                        // zero padding
+//                        const auto pad_size
+//                                = blksize_16 - ((nb - 1) * blksize_i);
+//                        const auto pad_start = block_i + o_off;
+//                        const auto pad_end = pad_size + o_off;
+//                        PRAGMA_OMP_SIMD()
+//                        for (int i = pad_start; i < pad_end; i++) {
+//                            o[i] = 0;
+//                        }
+//                    }
                 }
             } else {
                 for (int b = 0; b < nb; ++b) {
@@ -1348,17 +1348,17 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         o[o_off + c] = _qz<type_i, type_o>()(
                                 i[i_off + c], o[o_off + c], alpha, beta);
                     }
-                    if (order_keep && b + 1 == nb) {
-                        // zero padding
-                        const auto pad_size
-                                = blksize_16 - ((nb - 1) * blksize_i);
-                        const auto pad_start = block_i + o_off;
-                        const auto pad_end = pad_size + o_off;
-                        PRAGMA_OMP_SIMD()
-                        for (int i = pad_start; i < pad_end; i++) {
-                            o[i] = 0;
-                        }
-                    }
+//                    if (order_keep && b + 1 == nb) {
+//                        // zero padding
+//                        const auto pad_size
+//                                = blksize_16 - ((nb - 1) * blksize_i);
+//                        const auto pad_start = block_i + o_off;
+//                        const auto pad_end = pad_size + o_off;
+//                        PRAGMA_OMP_SIMD()
+//                        for (int i = pad_start; i < pad_end; i++) {
+//                            o[i] = 0;
+//                        }
+//                    }
                 }
             }
         };
@@ -1592,15 +1592,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                             wrap_qz_a1b0(o[flat_off], i[blk_offset]);
                         }
                     }
-                    if (order_keep) {
-                        // zero padding
-                        const auto pad_start = block + l * l_blk_stride;
-                        const auto pad_end = blksize + l * l_blk_stride;
-                        PRAGMA_OMP_SIMD()
-                        for (int i = pad_start; i < pad_end; ++i) {
-                            o[i] = 0;
-                        }
-                    }
+//                    if (order_keep) {
+//                        // zero padding
+//                        const auto pad_start = block + l * l_blk_stride;
+//                        const auto pad_end = blksize + l * l_blk_stride;
+//                        PRAGMA_OMP_SIMD()
+//                        for (int i = pad_start; i < pad_end; ++i) {
+//                            o[i] = 0;
+//                        }
+//                    }
                 }
             } else {
                 for (int l = 0; l < L; ++l) {
@@ -1613,15 +1613,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         else
                             wrap_qz(o[flat_off], i[blk_offset], alpha, beta);
                     }
-                    if (order_keep) {
-                        // zero padding
-                        const auto pad_start = block + l * l_blk_stride;
-                        const auto pad_end = blksize + l * l_blk_stride;
-                        PRAGMA_OMP_SIMD()
-                        for (int i = pad_start; i < pad_end; ++i) {
-                            o[i] = 0;
-                        }
-                    }
+//                    if (order_keep) {
+//                        // zero padding
+//                        const auto pad_start = block + l * l_blk_stride;
+//                        const auto pad_end = blksize + l * l_blk_stride;
+//                        PRAGMA_OMP_SIMD()
+//                        for (int i = pad_start; i < pad_end; ++i) {
+//                            o[i] = 0;
+//                        }
+//                    }
                 }
             }
         };
@@ -1775,23 +1775,23 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                         else
                             wrap_qz_a1b0(o[flat_off], i[blk_off(h0, h1)]);
                     }
-                    if (order_keep && block_h1 < blksize_1) {
-                        // zero padding
-                        PRAGMA_OMP_SIMD()
-                        for (int h1 = block_h1; h1 < blksize_1; h1++) {
-                            o[blk_off(h0, h1)] = 0;
-                        }
-                    }
+//                    if (order_keep && block_h1 < blksize_1) {
+//                        // zero padding
+//                        PRAGMA_OMP_SIMD()
+//                        for (int h1 = block_h1; h1 < blksize_1; h1++) {
+//                            o[blk_off(h0, h1)] = 0;
+//                        }
+//                    }
                 }
-                if (order_keep && block_h0 < blksize_0) {
-                    // zero padding
-                    for (int h0 = block_h0; h0 < blksize_0; h0++) {
-                        PRAGMA_OMP_SIMD()
-                        for (int h1 = 0; h1 < blksize_1; ++h1) {
-                            o[blk_off(h0, h1)] = 0;
-                        }
-                    }
-                }
+//                if (order_keep && block_h0 < blksize_0) {
+//                    // zero padding
+//                    for (int h0 = block_h0; h0 < blksize_0; h0++) {
+//                        PRAGMA_OMP_SIMD()
+//                        for (int h1 = 0; h1 < blksize_1; ++h1) {
+//                            o[blk_off(h0, h1)] = 0;
+//                        }
+//                    }
+//                }
             } else {
                 for (int h0 = 0; h0 < block_h0; ++h0) {
                     for (int h1 = 0; h1 < block_h1; ++h1) {
@@ -1804,23 +1804,23 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                             wrap_qz(o[flat_off], i[blk_off(h0, h1)], alpha,
                                     beta);
                     }
-                    if (order_keep && block_h1 < blksize_1) {
-                        // zero padding
-                        PRAGMA_OMP_SIMD()
-                        for (int h1 = block_h1; h1 < blksize_1; h1++) {
-                            o[blk_off(h0, h1)] = 0;
-                        }
-                    }
+//                    if (order_keep && block_h1 < blksize_1) {
+//                        // zero padding
+//                        PRAGMA_OMP_SIMD()
+//                        for (int h1 = block_h1; h1 < blksize_1; h1++) {
+//                            o[blk_off(h0, h1)] = 0;
+//                        }
+//                    }
                 }
-                if (order_keep && block_h0 < blksize_0) {
-                    // zero padding
-                    for (int h0 = block_h0; h0 < blksize_0; h0++) {
-                        PRAGMA_OMP_SIMD()
-                        for (int h1 = 0; h1 < blksize_1; ++h1) {
-                            o[blk_off(h0, h1)] = 0;
-                        }
-                    }
-                }
+//                if (order_keep && block_h0 < blksize_0) {
+//                    // zero padding
+//                    for (int h0 = block_h0; h0 < blksize_0; h0++) {
+//                        PRAGMA_OMP_SIMD()
+//                        for (int h1 = 0; h1 < blksize_1; ++h1) {
+//                            o[blk_off(h0, h1)] = 0;
+//                        }
+//                    }
+//                }
             }
 
 #undef blk_off
@@ -2110,7 +2110,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         // This kernel is used also for tensors with multiple inner
         // blocks for which generic zero padding must be used.
         // TODO: apply zero padding inside parallel_nd()
-        ctx.zero_pad_output(DNNL_ARG_TO);
+//        ctx.zero_pad_output(DNNL_ARG_TO);
 
         int ndims_start = 0, ndims_mask = 0;
         int smask = pd()->attr()->output_scales_.mask_;
