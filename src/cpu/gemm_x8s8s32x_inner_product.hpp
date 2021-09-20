@@ -60,7 +60,7 @@ struct gemm_x8s8s32x_inner_product_fwd_t : public primitive_t {
                                     weights_md(1)->data_type, f32, s32, s8, u8))
                     && attr()->has_default_values(
                             primitive_attr_t::skip_mask_t::oscale
-                            | primitive_attr_t::skip_mask_t::post_ops)
+                            | primitive_attr_t::skip_mask_t::post_ops, dst_type)
                     && output_scales_mask_ok()
                     && set_default_params() == status::success
                     && dense_gemm_consitency_check(

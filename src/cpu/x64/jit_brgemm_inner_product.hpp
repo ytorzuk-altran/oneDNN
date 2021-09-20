@@ -60,10 +60,10 @@ struct brgemm_inner_product_fwd_t : public primitive_t {
                 if (utils::one_of(src_dt, data_type::u8, data_type::s8)) {
                     return attr()->has_default_values(
                             primitive_attr_t::skip_mask_t::oscale
-                            | primitive_attr_t::skip_mask_t::post_ops);
+                            | primitive_attr_t::skip_mask_t::post_ops, dst_dt);
                 } else {
                     return attr()->has_default_values(
-                            primitive_attr_t::skip_mask_t::post_ops);
+                        primitive_attr_t::skip_mask_t::post_ops, dst_dt);
                 }
             };
 

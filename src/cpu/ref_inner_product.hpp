@@ -57,8 +57,7 @@ struct ref_inner_product_fwd_t : public primitive_t {
                                     && IMPLICATION(src_type == f32,
                                             bias_md_.data_type == f32))
                     && set_default_params() == status::success
-                    && attr()->has_default_values(
-                            smask_t::oscale | smask_t::post_ops)
+                    && attr()->has_default_values(smask_t::oscale | smask_t::post_ops, dst_type)
                     && output_scales_mask_ok();
             return ok ? status::success : status::unimplemented;
         }
