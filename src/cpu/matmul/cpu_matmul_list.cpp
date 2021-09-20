@@ -47,6 +47,7 @@ const impl_list_item_t impl_list[] = {
 #ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_AARCH64_ACL(acl_matmul_t)
 #endif
+        REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core))
         REG_MATMUL_P(CPU_INSTANCE(gemm_f32_matmul_t))
         REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core_bf16_amx_bf16))
         REG_MATMUL_P(CPU_INSTANCE(gemm_bf16_matmul_t, f32))
