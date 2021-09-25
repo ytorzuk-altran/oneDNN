@@ -50,6 +50,7 @@ const impl_list_item_t impl_list[] = {
         REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core))
         REG_MATMUL_P(CPU_INSTANCE(gemm_f32_matmul_t))
         REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core_bf16_amx_bf16))
+        REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core_bf16))
         REG_MATMUL_P(CPU_INSTANCE(gemm_bf16_matmul_t, f32))
         REG_MATMUL_P(CPU_INSTANCE(gemm_bf16_matmul_t, bf16))
         REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core_bf16_amx_int8))
