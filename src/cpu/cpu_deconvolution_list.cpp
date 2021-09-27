@@ -85,9 +85,11 @@ const impl_list_item_t impl_list[] = {
         CPU_INSTANCE_X64(_jit_uni_x8s8s32x_deconvolution_fwd_t, sse41, s8, u8)
         CPU_INSTANCE_X64(_jit_uni_x8s8s32x_deconvolution_fwd_t, sse41, s8, s8)
         CPU_INSTANCE_X64(_jit_uni_x8s8s32x_deconvolution_fwd_t, sse41, s8, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(ref_deconvolution_bwd_weights_t)
         CPU_INSTANCE(ref_deconvolution_bwd_data_t)
         CPU_INSTANCE(ref_deconvolution_fwd_t)
+#endif
         /* eol */
         nullptr,
 };

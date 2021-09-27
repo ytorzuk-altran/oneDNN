@@ -34,9 +34,13 @@ using namespace dnnl::impl::data_type;
 // clang-format off
 const impl_list_item_t impl_list[] = {
         CPU_INSTANCE_X64(jit_prelu_fwd_t)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_prelu_bwd_t)
+#endif
         CPU_INSTANCE(ref_prelu_fwd_t)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE(ref_prelu_bwd_t)
+#endif
         /* eol */
         nullptr,
 };
