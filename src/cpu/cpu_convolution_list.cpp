@@ -111,7 +111,9 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_avx512_core_f32_wino_conv_4x3_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_convolution_winograd_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_common_convolution_fwd_t, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_AARCH64_ACL(acl_wino_convolution_fwd_t)
+#endif
         CPU_INSTANCE_X64(jit_avx2_planar_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_dw_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_fork_dw_convolution_fwd_t)
@@ -122,13 +124,17 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_sse41_1x1_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx2_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_sse41_convolution_fwd_t)
+#ifdef ENABLE_UNUSED_PRIM
+        CPU_INSTANCE_AARCH64_ACL(acl_gemm_convolution_fwd_t)
         CPU_INSTANCE_AARCH64(jit_sve_512_dw_convolution_fwd_t)
         CPU_INSTANCE_AARCH64(jit_sve_512_1x1_convolution_fwd_f32_t)
         CPU_INSTANCE_AARCH64(jit_sve_512_convolution_fwd_t, f32)
         CPU_INSTANCE_AARCH64_ACL(acl_indirect_gemm_convolution_fwd_t)
         CPU_INSTANCE_AARCH64_ACL(acl_gemm_convolution_fwd_t, f32)
+#endif
         CPU_INSTANCE(gemm_convolution_fwd_t)
         CPU_INSTANCE(ref_convolution_fwd_t<f32>)
+        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, bf16, bf16, f32}, {
@@ -204,6 +210,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE(ref_convolution_bwd_data_t, bf16, bf16, bf16, f32)
         nullptr,
     }},
+#ifdef ENABLE_UNUSED_PRIM
     // BWD_W fp
     {{backward_weights, f32, f32, f32}, {
         CPU_INSTANCE_X64(ip_convolution_bwd_weights_t)
@@ -243,7 +250,9 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE(ref_convolution_bwd_weights_t, bf16, bf16, bf16, f32)
         nullptr,
     }},
+#endif
     // FWD int8 (src:s8)
+#ifdef ENABLE_UNUSED_PRIM
     {{forward, s8, s8, f32}, {
         CPU_INSTANCE_X64(ip_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_core_amx_1x1_convolution_fwd_t, s8, s8, f32)
@@ -256,8 +265,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, s8, f32)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, s8, f32)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, s8, f32)
-//        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, f32, s32)
-//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, f32, s32)
+        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, s8, s8, s32}, {
@@ -272,8 +281,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, s8, s32)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, s8, s32)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, s8, s32)
-//        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, s32, s32)
-//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, s32, s32)
+        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, s8, s8, s8}, {
@@ -289,8 +298,8 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, s8, s8)
         CPU_INSTANCE_AARCH64_ACL(acl_gemm_convolution_fwd_t, s8, s8, s8, s32)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, s8, s8)
-//        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, s8, s32)
-//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, s8, s32)
+        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
     {{forward, s8, s8, u8}, {
@@ -305,10 +314,11 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, s8, u8)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, s8, u8)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, s8, u8)
-//        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, u8, s32)
-//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+        CPU_INSTANCE(ref_convolution_fwd_t, s8, s8, u8, s32)
+        CPU_INSTANCE(ref_fused_convolution_fwd_t)
         nullptr,
     }},
+#endif
     // FWD int8 (src:u8)
     {{forward, u8, s8, f32}, {
         CPU_INSTANCE_X64(ip_convolution_fwd_t)
@@ -316,18 +326,25 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t, u8, s8, f32)
         CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_vnni, u8, s8, f32)
         CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_vnni, u8, s8, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t, f32)
+#endif
         CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t, u8, f32)
         CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_convolution_fwd_t, u8, f32)
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_1x1_convolution_fwd_t, avx2, u8, f32)
-        CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, avx2, u8, f32)
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_1x1_convolution_fwd_t, sse41, u8, f32)
+        CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, avx2, u8, f32)
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, u8, f32)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, u8, f32)
+#endif
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, u8, f32)
-//        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, f32, s32)
+#ifdef ENABLE_UNUSED_PRIM
+        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, f32, s32)
+#endif
         nullptr,
     }},
+#ifdef ENABLE_UNUSED_PRIM
     {{forward, u8, s8, s32}, {
         CPU_INSTANCE_X64(ip_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_core_amx_1x1_convolution_fwd_t, u8, s8, s32)
@@ -343,16 +360,19 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, u8, s32)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, u8, s32)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, u8, s32)
-//        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, s32, s32)
+        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, s32, s32)
         nullptr,
     }},
+#endif
     {{forward, u8, s8, s8}, {
         CPU_INSTANCE_X64(ip_convolution_fwd_t)
         CPU_INSTANCE_X64(jit_avx512_core_amx_1x1_convolution_fwd_t, u8, s8, s8)
         CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t, u8, s8, s8)
         CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_vnni, u8, s8, s8)
         CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_vnni, u8, s8, s8)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t, s8)
+#endif
         CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t, u8, s8)
         CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_convolution_fwd_t, u8, s8)
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_1x1_convolution_fwd_t, avx2, u8, s8)
@@ -361,8 +381,10 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, u8, s8)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, u8, s8)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, u8, s8)
-//        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, s8, s32)
-//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+#ifdef ENABLE_UNUSED_PRIM
+        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, s8, s32)
+        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+#endif
         nullptr,
     }},
     {{forward, u8, s8, u8}, {
@@ -371,7 +393,9 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t, u8, s8, u8)
         CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_vnni, u8, s8, u8)
         CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_vnni, u8, s8, u8)
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_X64(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t, u8)
+#endif
         CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t, u8, u8)
         CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_convolution_fwd_t, u8, u8)
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_1x1_convolution_fwd_t, avx2, u8, u8)
@@ -380,10 +404,13 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE_X64(jit_uni_x8s8s32x_convolution_fwd_t, sse41, u8, u8)
         CPU_INSTANCE_AARCH64(jit_sve_512_x8s8s32x_convolution_fwd_t, u8, u8)
         CPU_INSTANCE(_gemm_x8s8s32x_convolution_fwd_t, u8, u8)
-//        CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, u8, s32)
-//        CPU_INSTANCE(ref_fused_convolution_fwd_t)
+#ifdef ENABLE_UNUSED_PRIM
+       CPU_INSTANCE(ref_convolution_fwd_t, u8, s8, u8, s32)
+       CPU_INSTANCE(ref_fused_convolution_fwd_t)
+#endif
         nullptr,
     }},
+#ifdef ENABLE_UNUSED_PRIM
     // BWD int8 (diff_dst:u8)
     {{backward_data, f32, s8, u8}, {
         CPU_INSTANCE(_gemm_u8s8s32x_convolution_bwd_data_t, f32)
@@ -423,6 +450,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         CPU_INSTANCE(ref_convolution_bwd_data_t, u8, s8, s8, s32)
         nullptr,
     }},
+#endif
 };
 // clang-format on
 } // namespace

@@ -24,6 +24,7 @@ namespace cpu {
 
 const impl_list_map_t comp_bf16_s8_impl_list_map {
     // bf16 -> s8
+#ifdef ENABLE_UNUSED_PRIM
     {{bf16, s8, 2}, {
         REG_SR(bf16, oi, s8, OI4i16o4i, fmt_order_keep, spec_conv_req_comp)
         REG_SR(bf16, io, s8, OI4i16o4i, fmt_order_keep, spec_conv_req_comp)
@@ -175,6 +176,7 @@ const impl_list_map_t comp_bf16_s8_impl_list_map {
 
         nullptr,
     }},
+#endif
 };
 
 // clang-format on

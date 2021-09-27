@@ -32,8 +32,8 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const impl_list_item_t impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
     CPU_INSTANCE_X64(jit_uni_reduction_t)
-
     CPU_INSTANCE(ref_reduction_t, f32, f32, f32)
     CPU_INSTANCE(ref_reduction_t, bf16, bf16, f32)
     CPU_INSTANCE(ref_reduction_t, bf16, f32, f32)
@@ -43,6 +43,7 @@ const impl_list_item_t impl_list[] = {
     CPU_INSTANCE(ref_reduction_t, u8, u8, s32)
     CPU_INSTANCE(ref_reduction_t, u8, s32, s32)
     CPU_INSTANCE(ref_reduction_t, u8, f32, f32)
+#endif
     /* eol */
     nullptr,
 };
