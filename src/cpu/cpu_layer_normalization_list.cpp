@@ -28,6 +28,7 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const impl_list_item_t impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         REG_LNORM_P_FWD(CPU_INSTANCE(simple_layer_normalization_fwd_t, f32))
         REG_LNORM_P_BWD(CPU_INSTANCE(simple_layer_normalization_bwd_t, f32))
         REG_LNORM_P_FWD(CPU_INSTANCE(simple_layer_normalization_fwd_t, bf16))
@@ -36,6 +37,7 @@ const impl_list_item_t impl_list[] = {
         REG_LNORM_P_BWD(CPU_INSTANCE(ref_layer_normalization_bwd_t, f32))
         REG_LNORM_P_FWD(CPU_INSTANCE(ref_layer_normalization_fwd_t, bf16))
         REG_LNORM_P_BWD(CPU_INSTANCE(ref_layer_normalization_bwd_t, bf16))
+#endif
         /* eol */
         nullptr,
 };
