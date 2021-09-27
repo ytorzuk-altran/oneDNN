@@ -33,10 +33,12 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const impl_list_item_t impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         REG_PRELU_P_FWD(CPU_INSTANCE_X64(jit_prelu_fwd_t))
         REG_PRELU_P_BWD(CPU_INSTANCE_X64(jit_prelu_bwd_t))
         REG_PRELU_P_FWD(CPU_INSTANCE(ref_prelu_fwd_t))
         REG_PRELU_P_BWD(CPU_INSTANCE(ref_prelu_bwd_t))
+#endif
         /* eol */
         nullptr,
 };

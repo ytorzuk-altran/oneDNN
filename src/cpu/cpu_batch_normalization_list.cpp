@@ -44,6 +44,7 @@ using namespace dnnl::impl::data_type;
 // clang-format off
 const impl_list_item_t impl_list[] = {
         /* fp */
+#ifdef ENABLE_UNUSED_PRIM
         REG_BNORM_P_FWD(CPU_INSTANCE_X64(jit_uni_batch_normalization_fwd_t, avx512_common))
         REG_BNORM_P_BWD(CPU_INSTANCE_X64(jit_uni_batch_normalization_bwd_t, avx512_common))
         REG_BNORM_P_FWD(CPU_INSTANCE_X64(jit_uni_batch_normalization_fwd_t, avx2))
@@ -68,16 +69,21 @@ const impl_list_item_t impl_list[] = {
         REG_BNORM_P_BWD(CPU_INSTANCE(nspc_batch_normalization_bwd_t, f32))
         REG_BNORM_P_FWD(CPU_INSTANCE(nspc_batch_normalization_fwd_t, bf16))
         REG_BNORM_P_BWD(CPU_INSTANCE(nspc_batch_normalization_bwd_t, bf16))
+#endif
         REG_BNORM_P_FWD(CPU_INSTANCE(ref_batch_normalization_fwd_t, f32))
+#ifdef ENABLE_UNUSED_PRIM
         REG_BNORM_P_BWD(CPU_INSTANCE(ref_batch_normalization_bwd_t, f32))
         REG_BNORM_P_FWD(CPU_INSTANCE(ref_batch_normalization_fwd_t, bf16))
         REG_BNORM_P_BWD(CPU_INSTANCE(ref_batch_normalization_bwd_t, bf16))
+#endif
         /* int */
+#ifdef ENABLE_UNUSED_PRIM
         REG_BNORM_P_FWD(CPU_INSTANCE_X64(jit_uni_batch_normalization_s8_fwd_t, avx512_core))
         REG_BNORM_P_FWD(CPU_INSTANCE_X64(jit_uni_batch_normalization_s8_fwd_t, avx2))
         REG_BNORM_P_FWD(CPU_INSTANCE_X64(jit_uni_batch_normalization_s8_fwd_t, sse41))
         REG_BNORM_P_FWD(CPU_INSTANCE_AARCH64(jit_uni_batch_normalization_s8_fwd_t, sve_512))
         REG_BNORM_P_FWD(CPU_INSTANCE(ref_batch_normalization_fwd_t, s8))
+#endif
         /* eol */
         nullptr,
 };
