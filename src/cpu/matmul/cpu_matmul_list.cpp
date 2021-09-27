@@ -44,6 +44,7 @@ using namespace dnnl::impl::cpu::matmul;
 
 // clang-format off
 const impl_list_item_t impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         CPU_INSTANCE_AARCH64_ACL(acl_matmul_t)
         REG_MATMUL_P(CPU_INSTANCE(gemm_f32_matmul_t))
         REG_MATMUL_P(CPU_INSTANCE_X64(brgemm_matmul_t, avx512_core_bf16_amx_bf16))
@@ -60,6 +61,7 @@ const impl_list_item_t impl_list[] = {
         REG_MATMUL_P(CPU_INSTANCE(gemm_x8s8s32x_matmul_t, u8, s8, u8))
         REG_MATMUL_P(CPU_INSTANCE(ref_matmul_t))
         REG_MATMUL_P(CPU_INSTANCE(ref_matmul_int8_t))
+#endif
         /* eol */
         nullptr,
 };

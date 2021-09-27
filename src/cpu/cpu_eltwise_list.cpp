@@ -42,6 +42,7 @@ using namespace dnnl::impl::data_type;
 
 // clang-format off
 const impl_list_item_t impl_list[] = {
+#ifdef ENABLE_UNUSED_PRIM
         REG_ELTWISE_P_FWD(CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t, avx512_common, f32))
         REG_ELTWISE_P_BWD(CPU_INSTANCE_X64(jit_uni_eltwise_bwd_t, avx512_common, f32))
         REG_ELTWISE_P_FWD(CPU_INSTANCE_X64(jit_uni_eltwise_fwd_t, avx512_core, bf16))
@@ -75,6 +76,7 @@ const impl_list_item_t impl_list[] = {
         REG_ELTWISE_P_FWD(CPU_INSTANCE(ref_eltwise_fwd_t, s32))
         REG_ELTWISE_P_FWD(CPU_INSTANCE(ref_eltwise_fwd_t, s8))
         REG_ELTWISE_P_FWD(CPU_INSTANCE(ref_eltwise_fwd_t, u8))
+#endif
         /* eol */
         nullptr,
 };
