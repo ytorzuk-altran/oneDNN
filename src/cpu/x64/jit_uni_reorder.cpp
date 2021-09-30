@@ -1866,10 +1866,11 @@ kernel_t *kernel_t::create(const kernel_t::desc_t &desc) {
 static void prb_block_for_cache(tr::prb_t &prb) {
     /* If strides for 0th and 1st nodes are cache friendly
      * then one can altogether do away with blocking ! */
+    static constexpr int num_elems_thr = 16;
     const bool cache_blocking_needed
-            = ((prb.nodes[0].is % 64 == 0 && prb.nodes[0].n > 16)
-                      || (prb.ndims > 1 && prb.nodes[1].is % 64 == 0
-                              && prb.nodes[1].n > 16))
+            = ((prb.nodes[0].is % 64 == 0 && prb.nodes[0].n > num_elems_thr)
+                      || (prb.ndims > 1 && prb.nodes[1].is % num_elems_thr == 0
+                              && prb.nodes[1].n > num_elems_thr))
             && !prb.is_tail_present;
     if (!cache_blocking_needed) return;
 
@@ -1886,9 +1887,9 @@ static void prb_block_for_cache(tr::prb_t &prb) {
         const auto output_stride = prb.nodes[unit_input_stride_idx].os;
         const auto num_elems = prb.nodes[unit_input_stride_idx].n;
 
-        const bool split_needed = (num_elems > 16) && (num_elems % 16 == 0);
+        const bool split_needed = (num_elems > num_elems_thr) && (num_elems % num_elems_thr == 0);
         const int move_location = (output_stride % 4 != 0) ? 0 : 1;
-        if (split_needed) prb_node_split(prb, unit_input_stride_idx, 16);
+        if (split_needed) prb_node_split(prb, unit_input_stride_idx, num_elems_thr);
 
         /* Because of cache-unfriendly nature of unit-output stride node, let
          * us move unit-input stride node on or near front! */
