@@ -242,7 +242,12 @@ status_t prb_init(prb_t &p, const memory_desc_t &imd, const memory_desc_t &omd,
             ++i_pos;
             ++o_pos;
         } else if (ild.dims[i_pos] < old.dims[o_pos]) {
-            assert(old.dims[o_pos] % ild.dims[i_pos] == 0);
+            // old must be divisible by ild or we will not be
+            // able to create valid nodes. The problem appears
+            // when stag=Acdb48a and dtag=Acdb32a for example.
+            if (old.dims[o_pos] % ild.dims[i_pos] != 0)
+                return status::unimplemented;
+
             int factor = old.dims[o_pos] / ild.dims[i_pos];
             p.nodes[ndims].n = ild.dims[i_pos];
             p.nodes[ndims].is = ild.strides[i_pos];
@@ -252,7 +257,12 @@ status_t prb_init(prb_t &p, const memory_desc_t &imd, const memory_desc_t &omd,
             ++i_pos;
             old.dims[o_pos] = factor;
         } else if (ild.dims[i_pos] > old.dims[o_pos]) {
-            assert(ild.dims[i_pos] % old.dims[o_pos] == 0);
+            // ild must be divisible by old or we will not be
+            // able to create valid nodes. The problem appears
+            // when stag=Acdb32a and dtag=Acdb48a for example.
+            if (ild.dims[i_pos] % old.dims[o_pos] != 0)
+                return status::unimplemented;
+
             int factor = ild.dims[i_pos] / old.dims[o_pos];
             p.nodes[ndims].n = old.dims[o_pos];
             p.nodes[ndims].is = ild.strides[i_pos] * factor;
