@@ -191,8 +191,12 @@ status_t gemm_convolution_fwd_t::execute_forward_ncsp(
     const memory_desc_wrapper src_d(pd()->src_md());
     const memory_desc_wrapper dst_d(pd()->dst_md());
 
-    const size_t src_step = (src_d.blk_off(1) - src_d.off_l(0)) / jcp.ngroups;
-    const size_t dst_step = (dst_d.blk_off(1) - dst_d.off_l(0)) / jcp.ngroups;
+    const size_t src_mb_stride = src_d.blk_off(1);
+    const size_t src_grp_stride = src_d.blk_off(0, 1) * jcp.ic;
+
+    const size_t dst_mb_stride = dst_d.blk_off(1);
+    const size_t dst_grp_stride = dst_d.blk_off(0, 1) * jcp.oc;
+
     const size_t weights_oc_size = jcp.ic * jcp.ks;
     const size_t weights_g_size = weights_oc_size * jcp.oc;
     const bool is_problem_3d = pd()->ndims() == 5;
@@ -217,7 +221,7 @@ status_t gemm_convolution_fwd_t::execute_forward_ncsp(
         auto inner_ker = [&](int spatial, const im_pos_t &curr, im_pos_t &prev,
                                  im_pos_t &step, const im_pos_t &end) {
             const data_t *_src
-                    = src + (curr.n * jcp.ngroups + curr.g) * src_step;
+                    = src + curr.n * src_mb_stride + curr.g * src_grp_stride;
             step.oc = nstl::min(
                     jcp.oc_block, nstl::min(jcp.oc, end.oc) - curr.oc);
             step.sp = nstl::min(jcp.os_block,
@@ -240,7 +244,7 @@ status_t gemm_convolution_fwd_t::execute_forward_ncsp(
             const dim_t M = jcp.os * jcp.od;
             const dim_t m = step.sp;
             const dim_t LDA = jcp.im2col_sz ? m : M;
-            data_t *_dst = dst + (curr.n * jcp.ngroups + curr.g) * dst_step
+            data_t *_dst = dst + curr.n * dst_mb_stride + curr.g * dst_grp_stride
                     + curr.oc * M + curr.od * jcp.os + curr.sp;
             const dim_t K = step.ic * jcp.ks;
             const dim_t LDB = jcp.ic * jcp.ks;
