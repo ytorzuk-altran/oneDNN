@@ -749,7 +749,7 @@ status_t jit_uni_planar_conv_fwd_kernel_f32<isa>::init_conf(jit_conv_conf_t &jcp
         CHECK(memory_desc_init_by_tag(src_md, dat_tag));
         jcp.src_tag = dat_tag;
     } else {
-        jcp.src_tag = src_d.matches_one_of_tag(dat_tag);
+        jcp.src_tag = src_d.mb_stride_relaxed_match(dat_tag);
     }
     if (jcp.src_tag != dat_tag)
         return status::unimplemented;
@@ -758,7 +758,7 @@ status_t jit_uni_planar_conv_fwd_kernel_f32<isa>::init_conf(jit_conv_conf_t &jcp
         CHECK(memory_desc_init_by_tag(dst_md, dat_tag));
         jcp.dst_tag = dat_tag;
     } else {
-        jcp.dst_tag = dst_d.matches_one_of_tag(dat_tag);
+        jcp.dst_tag = dst_d.mb_stride_relaxed_match(dat_tag);
     }
     if (jcp.dst_tag != dat_tag)
         return status::unimplemented;
