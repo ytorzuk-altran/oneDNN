@@ -238,6 +238,10 @@ struct _ref_rnn_common_t : public primitive_t {
             using namespace rnn_utils;
 #if DNNL_X64
             using namespace x64;
+            
+            // WA: Brgemm implementation has perf degradation for RNN node
+            return status::unimplemented;
+            
             const alg_kind_t cell_kind = this->desc()->cell_kind;
 
             const data_type_t src_layer_dt
