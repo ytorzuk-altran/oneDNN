@@ -1207,11 +1207,17 @@ public:
         else
             movq(x, r);
     }
+    void uni_vmovq(const Xbyak::Xmm &x, const Xbyak::Address &addr) {
+        if (is_valid_isa(avx))
+            vmovq(x, addr);
+        else
+            movq(x, addr);
+    }
     void uni_vmovq(const Xbyak::Address &addr, const Xbyak::Xmm &x) {
         if (is_valid_isa(avx))
-            vmovq(x, x);
+            vmovq(addr, x);
         else
-            movq(x, x);
+            movq(addr, x);
     }
 
     void uni_vpackssdw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
