@@ -77,11 +77,6 @@ struct _gemm_x8s8s32x_convolution_fwd_t : public primitive_t {
                     scratchpad, *desc(), src_md_, weights_md_, dst_md_,
                     bias_md_, *attr(), dnnl_get_max_threads());
 
-//            if (status_ == status::success) {
-//                if (!gemm_x8s8s32x_convolution_utils::post_ops_ok(
-//                            attr()->post_ops_, &dst_md_))
-//                    return status::unimplemented;
-//            }
             return status_;
         }
 

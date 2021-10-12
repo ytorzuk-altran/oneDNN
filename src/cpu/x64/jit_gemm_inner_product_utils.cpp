@@ -305,7 +305,7 @@ jit_pp_kernel_t<isa, acc_type, dst_type>::jit_pp_kernel_t(size_t OC, size_t MB,
         static constexpr bool preserve_gpr = true;
         static constexpr bool preserve_vmm = false;
         static const size_t helper_vmm_idx = is_avx512_ ? 31 : 15;
-        static const size_t prelu_helper_vmm_idx = is_avx512_ ? 30 : 0; // todo: [antonvor]
+        static const size_t prelu_helper_vmm_idx = is_avx512_ ? 30 : 0; // todo: [antonvor] check prelu_helper_vmm_idx if is_avx512_ == false
         static constexpr bool use_exact_tail_scalar_bcast = false;
         const auto dst_md_wrapper = memory_desc_wrapper(*dst_md);
 

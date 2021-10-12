@@ -60,10 +60,6 @@ protected:
     data_type_t dst_data_type_ = data_type::undef;
 };
 
-//bool post_ops_ok(const post_ops_t &post_ops, const memory_desc_wrapper *dst_d);
-//bool post_ops_ok(const post_ops_t &post_ops, const memory_desc_t *dst_d);
-//bool mayiuse_jit_pp_kernel() noexcept;
-
 } // namespace gemm_x8s8s32x_convolution_utils
 } // namespace cpu
 } // namespace impl

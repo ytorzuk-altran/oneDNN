@@ -99,31 +99,6 @@ gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::pp_ker_t(const pd_t *pd)
         }
     }
 
-//    const auto &post_ops = jcp_.post_ops;
-//    if (jcp_.with_eltwise || jcp_.with_binary) {
-//#define PARAM_OFF(field) offsetof(ker_args, field)
-//        static constexpr bool preserve_gpr = true;
-//        static constexpr bool preserve_vmm = true;
-//        static constexpr size_t helper_vmm_idx = 31;
-//        static constexpr size_t tail_size = 1;
-//        static constexpr bool use_exact_tail_scalar_bcast = false;
-//        const binary_injector::rhs_arg_static_params_t rhs_arg_static_params {
-//                helper_vmm_idx, reserved_eltwise_gpr, r14, preserve_gpr,
-//                preserve_vmm, PARAM_OFF(post_ops_binary_rhs_arg_vec),
-//                memory_desc_wrapper(pd->dst_md()), tail_size, kreg_rem_mask,
-//                use_exact_tail_scalar_bcast};
-//        const binary_injector::static_params_t binary_static_params {
-//                this->reg_param, rhs_arg_static_params};
-//        static constexpr bool save_state = true;
-//        const eltwise_injector::static_params_t eltwise_static_params {
-//                save_state, reserved_eltwise_gpr, reserved_eltwise_maskr};
-//
-//        postops_injector_ = utils::make_unique<
-//                injector::jit_uni_postops_injector_t<avx512_core>>(
-//                this, post_ops, binary_static_params, eltwise_static_params);
-//#undef PARAM_OFF
-//    }
-
     if (do_sum_) {
         compute_reg_step_ = 2;
         vreg_sum_scale = Zmm(data_reg_base_idx_++);
@@ -149,35 +124,6 @@ gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::pp_ker_t(const pd_t *pd)
     max_unroll_
             = (max_data_reg_idx_ - data_reg_base_idx_ + 1) / compute_reg_step_;
 }
-
-//template <data_type_t dst_data_type>
-//void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::apply_postops(
-//        const bool apply_mask, const int vmm_idx) {
-//#define PARAM_OFF(x) offsetof(ker_args, x)
-//    if (jcp_.with_eltwise || jcp_.with_binary) {
-//        static constexpr int offset = 0;
-//        if (jcp_.with_binary) {
-//            const auto oc_off_oprnd = this->r12;
-//            binary_injector::rhs_arg_dynamic_params_t rhs_arg_params;
-//            rhs_arg_params.vmm_idx_to_oc_elem_off_addr.emplace(
-//                    vmm_idx, ptr[reg_param + PARAM_OFF(g_oc_offset)]);
-//            rhs_arg_params.vmm_idx_to_oc_elem_off_val.emplace(vmm_idx, offset);
-//            rhs_arg_params.vmm_idx_to_oc_off_oprnd.emplace(
-//                    vmm_idx, oc_off_oprnd);
-//            if (apply_mask) rhs_arg_params.vmm_tail_idx_.emplace(vmm_idx);
-//
-//            const injector_utils::register_preserve_guard_t register_guard(
-//                    this, {oc_off_oprnd});
-//            mov(oc_off_oprnd,
-//                    ptr[rsp + reg_binary_post_op_acc_off
-//                            + register_guard.stack_space_occupied()]);
-//
-//            postops_injector_->compute_vector(vmm_idx, rhs_arg_params);
-//        } else
-//            postops_injector_->compute_vector(vmm_idx);
-//    }
-//#undef PARAM_OFF
-//}
 
 template <data_type_t dst_data_type>
 void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::generate() {
@@ -247,9 +193,6 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::generate() {
             vfmadd231ps(vreg_dst(idx), vreg_prev_dst(idx), vreg_sum_scale);
         }
 
-//        apply_postops(apply_mask, vreg_dst_idx(idx));
-
-        // todo: apply_post_ops?
         int eltwise_inj_idx = 0;
         const auto& p = attr_->post_ops_;
         for (int i = 0; i < p.len(); i++) {
@@ -370,8 +313,6 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::generate() {
 
     for (auto& inj : jit_eltwise_injectors_)
         inj->prepare_table();
-
-//    if (jcp_.with_eltwise) postops_injector_->prepare_table();
 }
 
 // operator () specialized for nspc format
@@ -691,7 +632,6 @@ status_t gemm_bf16_convolution_fwd_t<dst_data_type>::execute_forward_ncsp(
         if (this->pd()->is_postprocess_required() && ic + ic_block >= jcp.ic) {
             size_t acc_str = LDC;
             size_t dst_str = M;
-//            float *bias_ptr = bias ? bias + groups * jcp.oc + oc : nullptr;
             (*pp_ker_)(dst_local, acc, bias, groups * jcp.oc, oc, sum_scale, dst_str, acc_str, m,
                     oc_block, post_ops_binary_rhs_arg_vec.data(), dst,
                     groups * jcp.oc + oc);

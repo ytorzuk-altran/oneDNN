@@ -279,10 +279,6 @@ void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
                 quantization_injectors[quantization_inj_idx]->compute_crop(IdxSetPair.second, IdxSetPair.first, false, is_broadcast);
             }
 
-//            for (auto vmm_idx : vmm_idxs) {
-//                quantization_injectors[quantization_inj_idx]->compute_crop(vmm_idx, vmm_idx + 1, qdp.vmm_idx_off.at(vmm_idx), false, is_broadcast);
-//            }
-
             if (qdp.useAddr)
                 quantization_injectors[quantization_inj_idx]->init_input_scale_shift_ptrs(qdp.reg_oc_off_addr);
             else
@@ -293,12 +289,6 @@ void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
                                                                                         false, is_broadcast);
             }
 
-
-//            for (auto vmm_idx : vmm_idxs) {
-//                quantization_injectors[quantization_inj_idx]->compute_input_scale_shift(vmm_idx, vmm_idx + 1, qdp.vmm_idx_off.at(vmm_idx), do_rounding,
-//                        false, is_broadcast);
-//            }
-
             if (qdp.useAddr)
                 quantization_injectors[quantization_inj_idx]->init_output_scale_shift_ptrs(qdp.reg_oc_off_addr);
             else
@@ -307,10 +297,6 @@ void jit_uni_postops_injector_t<isa, Vmm>::compute_vector_range(
             for (auto &IdxSetPair : vecOfVmmIdxsSets) {
                 quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(IdxSetPair.second, IdxSetPair.first, false, is_broadcast);
             }
-
-//            for (auto vmm_idx : vmm_idxs) {
-//                quantization_injectors[quantization_inj_idx]->compute_output_scale_shift(vmm_idx, vmm_idx + 1, qdp.vmm_idx_off.at(vmm_idx), false, is_broadcast);
-//            }
 
             quantization_inj_idx++;
         } else {

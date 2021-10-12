@@ -59,17 +59,6 @@ struct gemm_bf16_convolution_fwd_t : public primitive_t {
                             primitive_attr_t::skip_mask_t::post_ops,
                             dst_data_type)
                     && post_ops_ok();
-//            {
-//                using namespace x64::injector;
-//                static constexpr bool sum_at_pos_0_only = true;
-//                static constexpr bool sum_requires_scale_one = true;
-//                const auto dst_md = memory_desc_wrapper(dst_md_);
-//                ok &= post_ops_ok({avx512_core, {binary, eltwise, sum},
-//                        attr()->post_ops_, &dst_md, sum_at_pos_0_only,
-//                        sum_requires_scale_one,
-//                        {broadcasting_strategy_t::scalar,
-//                                broadcasting_strategy_t::per_oc}});
-//            }
             if (!ok) return status::unimplemented;
 
             auto scratchpad = scratchpad_registry().registrar();
@@ -243,8 +232,6 @@ private:
         std::unique_ptr<bf16_emulation_t> bf16_emu_;
         const primitive_attr_t* attr_;
         nstl::vector<jit_uni_eltwise_injector_f32<avx512_common>*> jit_eltwise_injectors_;
-//        std::unique_ptr<injector::jit_uni_postops_injector_t<avx512_core>>
-//                postops_injector_;
 
         void apply_postops(const bool apply_mask, const int vmm_idx);
         void generate() override;

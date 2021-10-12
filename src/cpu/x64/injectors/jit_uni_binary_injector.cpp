@@ -1351,7 +1351,6 @@ jit_uni_binary_injector_t<isa, Vmm>::execute_cmp_binary(const Vmm &dst,
     pop_opmask(host_, cmp_mask);
 }
 
-// todo: [antonvor]
 template <cpu_isa_t isa, typename Vmm>
 template <typename T>
 typename std::enable_if<std::is_same<T, Xbyak::Zmm>::value
@@ -1364,7 +1363,6 @@ jit_uni_binary_injector_t<isa, Vmm>::execute_prelu_binary(const Vmm &dst, const 
     push_opmask(host_, cmp_mask);
     host_->uni_vpxor(zmm_aux0, zmm_aux0, zmm_aux0);
     host_->vcmpps(cmp_mask, lhs, zmm_aux0, jit_generator::_cmp_lt_os);
-//    host_->uni_vmovups(zmm_aux0, lhs);
     host_->uni_vmulps(dst | cmp_mask, lhs, rhs);
     pop_opmask(host_, cmp_mask);
 }
@@ -1389,7 +1387,7 @@ jit_uni_binary_injector_t<isa, Vmm>::execute_cmp_binary(const Vmm &dst,
     host_->uni_vminps(dst, dst, vreg_one);
 }
 
-// todo: [antonvor]
+// todo: [antonvor] check sse41 path
 template <cpu_isa_t isa, typename Vmm>
 template <typename T>
 typename std::enable_if<!(std::is_same<T, Xbyak::Zmm>::value
@@ -1397,17 +1395,13 @@ typename std::enable_if<!(std::is_same<T, Xbyak::Zmm>::value
 jit_uni_binary_injector_t<isa, Vmm>::execute_prelu_binary(const Vmm &dst,
                                                         const Vmm &lhs, const T &rhs) const {
     const Vmm vmm_aux0 = Vmm(rhs_arg_static_params_.rhs_prelu_helper_vmm_idx);
-//    const Vmm vmm_aux1 = Vmm(rhs_arg_static_params_.rhs_dt_helper_vmm_idx);
 
     push_vmm(host_, vmm_aux0);
     host_->uni_vmulps(rhs, rhs, lhs);
     host_->vpxor(vmm_aux0, vmm_aux0, vmm_aux0);
     host_->vcmpltps(vmm_aux0, lhs, vmm_aux0);
-//    host_->vcmpgtps(vmm_aux0, lhs, vmm_aux0);
     host_->uni_vblendvps(dst, lhs, rhs, vmm_aux0);
     pop_vmm(host_, vmm_aux0);
-//    host_->uni_vmulps(vmm_aux0, lhs, rhs);
-//    host_->uni_vblendvps(dst, lhs, vmm_aux0, lhs); // todo: sse
 }
 
 template <cpu_isa_t isa, typename Vmm>

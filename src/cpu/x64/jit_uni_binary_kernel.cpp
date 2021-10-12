@@ -243,23 +243,6 @@ void jit_uni_binary_kernel_t<isa>::perform_op(
             uni_vcmpps(v0, v0, v1, predicate);
             uni_vminps(v0, v0, vreg_one_);
         }
-        // todo: [antonvor]
-    } else if (alg == binary_prelu) {
-        if (is_avx512) {
-            uni_vpxor(vreg_one_, vreg_one_, vreg_one_);
-            vcmpps(cmp_mask, v0, vreg_one_, _cmp_lt_os);
-            uni_vmulps(v0 | cmp_mask, v0, v1);
-        } else
-            assert(!"not supported operation!");
-
-//        h->vxorpd(vmm_mask, vmm_mask, vmm_mask);
-//        h->vmovups(vmm_aux0, vmm_src);
-//        h->vcmpps(k_mask, vmm_src, vmm_mask, _cmp_lt_os);
-//        if (is_broadcast) {
-//            h->uni_vbroadcastss(vmm_mask, h->ptr[p_weights]);
-//            h->vmulps(vmm_src | k_mask, vmm_aux0, vmm_mask);
-//        } else
-//            h->vmulps(vmm_src | k_mask, vmm_aux0, h->ptr[p_weights + offset]);
     } else
         assert(!"not supported operation!");
 }
@@ -437,7 +420,7 @@ void jit_uni_binary_kernel_t<isa>::forward() {
 
     if (utils::one_of(alg, alg_kind::binary_ge, alg_kind::binary_gt,
                 alg_kind::binary_le, alg_kind::binary_lt, alg_kind::binary_eq,
-                alg_kind::binary_ne, alg_kind::binary_prelu)) {
+                alg_kind::binary_ne)) {
         Xmm xreg_one = Xmm(vreg_one_.getIdx());
         mov(reg_tmp_, float2int(1));
         uni_vmovq(xreg_one, reg_tmp_);
