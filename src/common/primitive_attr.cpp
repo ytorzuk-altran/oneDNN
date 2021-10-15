@@ -797,7 +797,13 @@ status_t dnnl_post_ops_append_dw_conv(post_ops_t *post_ops,
     if (post_ops == nullptr)
         return invalid_arguments;
 
-    return post_ops->append_dw_conv(in_h, in_w, ker_h, ker_w, str_h, str_w, in_dt, weights_data, biases_data);
+//    return post_ops->append_dw_conv(in_h, in_w, ker_h, ker_w, str_h, str_w, in_dt, weights_data, biases_data);
+    status_t res = post_ops->append_dw_conv(in_h, in_w, ker_h, ker_w, str_h, str_w, in_dt, weights_data, biases_data);
+    dnnl_post_ops::entry_t::depthwise_conv_t dw = post_ops[0].entry_.back().depthwise_conv;
+    dnnl::impl::data_type_t wdt = dw.wei_dt;
+    if (wdt == data_type::s8)
+        printf("flflf\n\n\n");
+    return res;
 }
 
 status_t dnnl_primitive_attr_set_rnn_data_qparams(

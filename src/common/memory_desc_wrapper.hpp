@@ -44,7 +44,12 @@ struct memory_desc_wrapper : public c_compatible {
     memory_desc_wrapper(const memory_desc_t &md) : memory_desc_wrapper(&md) {}
 
     /* implementing attributes */
-    int ndims() const { return md_->ndims; }
+//    int ndims() const { return md_->ndims; }
+    int ndims() const {
+        int nd = md_->ndims;
+        if (nd > 10000)
+            assert(false && "Strange");
+        return nd; }
     const dims_t &dims() const { return md_->dims; }
     data_type_t data_type() const { return md_->data_type; }
 
