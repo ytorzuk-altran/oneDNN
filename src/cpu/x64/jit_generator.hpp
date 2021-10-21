@@ -1166,6 +1166,12 @@ public:
         else
             movq(addr, x);
     }
+    void uni_vmovq(const Xbyak::Xmm &x, const Xbyak::Address &addr) {
+        if (is_valid_isa(avx))
+            vmovq(x, addr);
+        else
+            movq(x, addr);
+    }
 
     void uni_vpackssdw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
             const Xbyak::Operand &op) {
