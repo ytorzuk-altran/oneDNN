@@ -57,7 +57,7 @@ struct jit_avx512_core_amx_convolution_fwd_t : public primitive_t {
                     && IMPLICATION(with_bias(),
                             utils::one_of(bias_md_.data_type, data_type::f32,
                                     data_type::bf16))
-                    && attr()->has_default_values(smask_t::post_ops);
+                    && attr()->has_default_values(smask_t::post_ops, dst_type);
             bool is_int8_convolution = true
                     && expect_data_types(src_type, data_type::s8,
                             data_type::undef, dst_type, data_type::s32)
@@ -66,7 +66,7 @@ struct jit_avx512_core_amx_convolution_fwd_t : public primitive_t {
                                     data_type::s32, data_type::s8,
                                     data_type::u8))
                     && attr()->has_default_values(smask_t::oscale
-                            | smask_t::post_ops | smask_t::zero_points_runtime);
+                            | smask_t::post_ops | smask_t::zero_points_runtime, dst_type);
 
             bool ok = true && is_fwd()
                     && set_default_alg_kind(alg_kind::convolution_direct)
