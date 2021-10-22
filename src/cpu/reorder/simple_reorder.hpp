@@ -1182,8 +1182,10 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
 template <SIMPLE_REORDER_TEMPL_DECL>
 struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
-        typename utils::enable_if<(tag_i == format_tag::nchw
-                                          && tag_o == format_tag::nChw16c)
+        typename utils::enable_if<((tag_i == format_tag::nchw
+                                          && tag_o == format_tag::nChw16c) ||
+                                    (tag_i == format_tag::ncw
+                                          && tag_o == format_tag::nCw16c))
                 && type_i == data_type::f32
                 && type_o == data_type::bf16>::type> {
     static bool is_applicable(const memory_desc_wrapper &input_d,
@@ -1200,8 +1202,9 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
 
     static size_t get_scratchpad_size(const memory_desc_wrapper &input_d,
             const memory_desc_wrapper &output_d) {
+        constexpr int ndims = tag_traits<tag_i>::ndims;
         const size_t blksize = 16;
-        const size_t W = input_d.dims()[3];
+        const size_t W = input_d.dims()[ndims - 1];
         return sizeof(float) * blksize * W * dnnl_get_max_threads();
     }
 
@@ -1209,14 +1212,15 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
         DECLARE_COMMON_PARAMS();
 
         constexpr int blksize = 16;
+        constexpr int ndims = tag_traits<tag_i>::ndims;
 
         const auto &flat_d = input_d;
         const auto &dims = input_d.dims();
         const auto &pdims = output_d.padded_dims();
 
         const int C = dims[1];
-        const int H = dims[2];
-        const int W = dims[3];
+        const int H = ndims == 3 ? 1 : dims[ndims - 2];
+        const int W = dims[ndims - 1];
 
         const int wsp_size = W * blksize;
         float *wspace = scratchpad.template get<float>(
@@ -1229,7 +1233,7 @@ struct simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
                 for (c = 0; c < curr_c_block; ++c) {
                     const ptrdiff_t flat_off = 0
                             + c * flat_d.blocking_desc().strides[1]
-                            + w * flat_d.blocking_desc().strides[3];
+                            + w * flat_d.blocking_desc().strides[ndims - 1];
                     o[w * blksize + c] = i[flat_off];
                 }
                 for (/* continue */; c < c_block; ++c) {
