@@ -29,6 +29,7 @@ const impl_list_map_t regular_bf16_impl_list_map {
         REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_blk_reorder_t)))
         REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
 
+        REG_REORDER_P(REG_SR_BIDIR(bf16, any, f32, nCw16c))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, f32, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, f32, nCdhw16c))
 
@@ -38,6 +39,7 @@ const impl_list_map_t regular_bf16_impl_list_map {
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, u8, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, u8, nCdhw16c))
 
+        REG_REORDER_P(REG_SR_BIDIR(bf16, any, bf16, nCw16c))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, bf16, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(bf16, any, bf16, nCdhw16c))
 
