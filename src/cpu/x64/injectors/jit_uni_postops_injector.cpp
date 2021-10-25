@@ -431,8 +431,8 @@ bool post_ops_ok(const post_ops_ok_args_t &post_ops_ok_args) {
                                 enabled_bcast_strategy);
                     }
                     break;
-                case depthwise: if (entry.is_depthwise()) return true;
-                case quantization: if (entry.is_quantization()) return true;
+                case depthwise: if (entry.is_depthwise()) return true; break;
+                case quantization: if (entry.is_quantization()) return true; break;
                 default: assert(false && "Unhandled post_op type");
             }
         }
