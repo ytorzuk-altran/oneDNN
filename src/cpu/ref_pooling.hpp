@@ -82,6 +82,9 @@ struct ref_pooling_fwd_t : public primitive_t {
     ref_pooling_fwd_t(const pd_t *apd) : primitive_t(apd) {}
 
     status_t init(engine_t *engine) override {
+        ref_post_ops
+                = utils::make_unique<ref_post_ops_t>(pd()->attr()->post_ops_);
+        if (!ref_post_ops) return status::out_of_memory;
         return status::success;
     }
 
