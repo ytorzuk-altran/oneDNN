@@ -256,7 +256,6 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     }},
 #endif
     // FWD int8 (src:s8)
-#ifdef ENABLE_UNUSED_PRIM
     {{forward, s8, s8, f32}, {
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_amx_1x1_convolution_fwd_t))
@@ -322,7 +321,6 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE(ref_fused_convolution_fwd_t))
         nullptr,
     }},
-#endif
     // FWD int8 (src:u8)
     {{forward, u8, s8, f32}, {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
