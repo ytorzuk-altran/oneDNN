@@ -23,7 +23,6 @@ namespace cpu {
 // clang-format off
 
 const impl_list_map_t comp_f32_s8_impl_list_map {
-#ifdef ENABLE_UNUSED_PRIM
     // f32 -> s8
     {{f32, s8, 2}, {
         REG_REORDER_P(DNNL_X64_ONLY(CPU_REORDER_INSTANCE(x64_jit_uni_reorder_t)))
@@ -176,7 +175,6 @@ const impl_list_map_t comp_f32_s8_impl_list_map {
         REG_REORDER_P(REG_SR(f32, goidhw, s8, gOIdhw16i16o4i, fmt_order_keep, spec_conv_req_comp))
         nullptr,
     }},
-#endif
 };
 
 // clang-format on
