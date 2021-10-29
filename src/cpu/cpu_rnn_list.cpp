@@ -28,8 +28,8 @@ using namespace dnnl::impl::data_type;
 // clang-format off
 const impl_list_item_t impl_list[] = {
         REG_RNN_P_FWD(CPU_INSTANCE(ref_rnn_fwd_f32_t))
-#ifdef ENABLE_UNUSED_PRIM
         REG_RNN_P_FWD(CPU_INSTANCE(ref_rnn_fwd_bf16_t))
+#ifdef ENABLE_UNUSED_PRIM
         REG_RNN_P_FWD(CPU_INSTANCE(ref_rnn_fwd_s8s8_t))
         REG_RNN_P_FWD(CPU_INSTANCE(ref_rnn_fwd_u8s8_t))
         REG_RNN_P_BWD(CPU_INSTANCE(ref_rnn_bwd_f32_t))
