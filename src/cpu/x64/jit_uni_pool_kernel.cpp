@@ -143,10 +143,16 @@ status_t jit_uni_pool_kernel<isa>::init_conf(jit_pool_conf_t &jpp,
             ? utils::pick(ndims - 3, nwc, nhwc, ndhwc)
             : format_tag::undef;
 
-    const auto fmt_tag = src_d.matches_one_of_tag(
+    const auto fmt_tag = src_d.mb_stride_relaxed_match(
             blocked_fmt_tag, ncsp_fmt_tag, nspc_fmt_tag);
 
-    if (!dst_d.matches_tag(fmt_tag)) return status::unimplemented;
+    dims_t stridesCandidate;
+    stridesCandidate[0] = -1;
+    const auto &blkDesc = dst_d.blocking_desc();
+    for (int s = 1; s < dst_d.ndims(); s++) {
+        stridesCandidate[s] = blkDesc.strides[s];
+    }
+    if (!dst_d.matches_tag(fmt_tag, stridesCandidate)) return status::unimplemented;
 
     if (fmt_tag == ncsp_fmt_tag) {
         // transform input to blocked f32, call f32 jit, transform result to
