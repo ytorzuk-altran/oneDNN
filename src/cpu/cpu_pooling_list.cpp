@@ -97,11 +97,11 @@ const impl_list_item_t impl_list[] = {
         REG_POOLING_P_FWD(CPU_INSTANCE_AARCH64(jit_uni_i8i8_pooling_fwd_t, sve_512))
 #endif
         REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t, s32, s32, s32))
-#ifdef ENABLE_UNUSED_PRIM
         REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t, s8, s8, s32))
         REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t, s8, f32, f32))
         REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t, u8, u8, s32))
         REG_POOLING_P_FWD(CPU_INSTANCE(ref_pooling_fwd_t, u8, f32, f32))
+#ifdef ENABLE_UNUSED_PRIM
 #endif
         /* eol */
         nullptr,
