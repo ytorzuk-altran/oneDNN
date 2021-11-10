@@ -146,6 +146,19 @@ status_t prb_init(prb_t &p, const memory_desc_t &imd, const memory_desc_t &omd,
         if (utils::rnd_up(dim, cblock) != pdim) return unimplemented;
     }
 
+    // todo: [AV] reverted old behavior with pdim_consistent check due to perf problems
+    //  (reference implementation (simple reorder) is faster than jit)
+    for (int d = 0; d < im_d.ndims(); ++d) {
+        const int ip_tmp_dim = im_d.padded_dims()[d];
+        const int op_tmp_dim = om_d.padded_dims()[d];
+        const int ip_tmp_tail = ip_tmp_dim % oblocks[d];
+        const int op_tmp_tail = op_tmp_dim % iblocks[d];
+
+        const bool pdim_consistent = ip_tmp_dim == op_tmp_dim
+                                     && ip_tmp_tail == 0 && op_tmp_tail == 0;
+        if (!pdim_consistent) return status::unimplemented;
+    }
+
     utils::array_set(i_tails, 0, im_d.ndims());
     utils::array_set(o_tails, 0, om_d.ndims());
     utils::array_set(i_paddings, 0, im_d.ndims());
