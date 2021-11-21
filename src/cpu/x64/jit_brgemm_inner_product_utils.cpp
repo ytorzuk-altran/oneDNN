@@ -842,7 +842,7 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
     if (is_int8) {
         jbgp.acc_dt = s32;
         jbgp.with_scales = true;
-        jbgp.weights_compressed 
+        jbgp.weights_compressed
             = (weights_d.extra().flags & memory_extra_flags::ip_compression) != 0;
 
         if (jbgp.weights_compressed) {
@@ -901,15 +901,19 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
             weights_md = want_wei_md;
             return status::success;
         }
-        // return (want_wei_md == weights_md) ? status::success
-        //                                    : status::unimplemented;
-        return status::success;
+         return (want_wei_md == weights_md) ? status::success
+                                            : status::unimplemented;
     };
 
     jbgp.brg_type = brgemm_addr;
     jbgp.nthr = nthreads;
 
     CHECK(set_or_check_tags());
+
+    if (jbgp.weights_compressed) {
+        weights_md.extra.flags = memory_extra_flags::ip_compression;
+        weights_md.extra.compensation_mask = 13;
+    }
 
     switch (jbgp.prop_kind) {
         case forward_training:
