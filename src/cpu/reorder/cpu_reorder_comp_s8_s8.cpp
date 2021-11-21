@@ -198,8 +198,8 @@ const impl_list_map_t comp_s8_s8_impl_list_map {
 const impl_list_map_t compression_s8_s8_impl_list_map {
     // s8 -> s8
     {{s8, s8, 2}, {
-        REG_SR(s8, oi, s8, OI16i64o4i, fmt_order::keep, spec::compression),
-        REG_SR(s8, io, s8, OI16i64o4i, fmt_order::keep, spec::compression),
+        REG_SR(s8, oi, s8, OI16i64o4i, fmt_order::keep, spec::compression)
+        REG_SR(s8, io, s8, OI16i64o4i, fmt_order::keep, spec::compression)
 
         nullptr,
     }},
@@ -208,8 +208,8 @@ const impl_list_map_t compression_s8_s8_impl_list_map {
 const impl_list_map_t compression_f32_s8_impl_list_map {
     // s8 -> s8
     {{f32, s8, 2}, {
-        REG_SR(f32, oi, s8, OI16i64o4i, fmt_order::keep, spec::compression),
-        REG_SR(f32, io, s8, OI16i64o4i, fmt_order::keep, spec::compression),
+        REG_SR(f32, oi, s8, OI16i64o4i, fmt_order::keep, spec::compression)
+        REG_SR(f32, io, s8, OI16i64o4i, fmt_order::keep, spec::compression)
 
         nullptr,
     }},
@@ -218,8 +218,8 @@ const impl_list_map_t compression_f32_s8_impl_list_map {
 const impl_list_map_t conv_compression_f32_s8_impl_list_map {
     // f32 -> s8
      {{f32, s8, 4}, {
-        REG_SR(f32, oihw, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
-        REG_SR(f32, hwio, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(f32, oihw, s8, OIhw16i16o4i, fmt_order::keep, spec::compression)
+        REG_SR(f32, hwio, s8, OIhw16i16o4i, fmt_order::keep, spec::compression)
         nullptr,
     }},
 };
@@ -227,8 +227,8 @@ const impl_list_map_t conv_compression_f32_s8_impl_list_map {
 const impl_list_map_t conv_compression_s8_s8_impl_list_map {
     // s8 -> s8
     {{s8, s8, 4}, {
-        REG_SR(s8, oihw, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
-        REG_SR(s8, hwio, s8, OIhw16i16o4i, fmt_order::keep, spec::compression),
+        REG_SR(s8, oihw, s8, OIhw16i16o4i, fmt_order::keep, spec::compression)
+        REG_SR(s8, hwio, s8, OIhw16i16o4i, fmt_order::keep, spec::compression)
         nullptr,
     }},
 };
