@@ -46,7 +46,7 @@ private:
             = cpu_isa_traits<avx512_core>::vlen / sizeof(float);
 
     const int ic_sub_step = 4;
-    std::unique_ptr<injector::jit_uni_postops_injector_t<avx512_core, Vmm>>
+    std::unique_ptr<injector::jit_uni_postops_injector_t<avx512_core>>
             postops_injector_;
 
     enum {

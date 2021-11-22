@@ -73,7 +73,7 @@ jit_avx512_core_x8s8s32x_deconv_fwd_kernel<Vmm>::
         const quantization_injector::static_params_t qsp {vmm_d_weights.getIdx(), vmm_d_bias.getIdx(), reg_d_weights, reg_d_bias};
 
         postops_injector_ = utils::make_unique<
-                injector::jit_uni_postops_injector_t<avx512_core, Vmm>>(
+                injector::jit_uni_postops_injector_t<avx512_core>>(
                 this, jcp.post_ops, bsp, qsp);
     }
 }
