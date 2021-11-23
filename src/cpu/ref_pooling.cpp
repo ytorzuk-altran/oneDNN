@@ -185,25 +185,6 @@ status_t ref_pooling_fwd_t<src_type, dst_type, acc_type>::execute_forward(
         if (num_summands == 0) return;
 
         d /= num_summands;
-
-        const auto &p = pd()->attr()->post_ops_;
-        for (int i = 0; i < p.len(); i++) {
-            auto &post_op = p.entry_[i];
-            if (post_op.is_quantization()) {
-                auto quant = post_op.quantization;
-                float cl = quant.crop_low_data->shifts_[quant.crop_low_data->count_ == 1 ? 0 : oc];
-                float ch = quant.crop_high_data->shifts_[quant.crop_high_data->count_ == 1 ? 0 : oc];
-                float isc = quant.input_scale_data->scales_[quant.input_scale_data->count_ == 1 ? 0 : oc];
-                float ish = quant.input_shift_data->shifts_[quant.input_shift_data->count_ == 1 ? 0 : oc];
-                float osc = quant.output_scale_data->scales_[quant.output_scale_data->count_ == 1 ? 0 : oc];
-                float osh = quant.output_shift_data->shifts_[quant.output_shift_data->count_ == 1 ? 0 : oc];
-
-                d = nstl::min(ch, nstl::max(cl, d));
-                d = d * isc + ish;
-                d = roundf(d);
-                d = d * osc + osh;
-            }
-        }
     };
 
     const bool is_max_pool = alg == alg_kind::pooling_max;
@@ -224,7 +205,7 @@ status_t ref_pooling_fwd_t<src_type, dst_type, acc_type>::execute_forward(
                 args.ctx = &ctx;
                 args.l_offset = data_l_off;
                 args.dst_md = pd()->dst_md();
-                ref_post_ops->execute(res, args);
+                ref_post_ops->execute(res, args, oc);
 
                 dst[data_p_off] = cpu::saturate_and_round<dst_data_t>(res);
             });
