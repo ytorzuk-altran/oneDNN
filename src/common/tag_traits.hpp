@@ -59,7 +59,6 @@ enum class inner_blk_t {
     _8a8b,
     _8b8a,
     _8a32b,
-    _16a32b,
     _8b8c,
     _8c8b,
     _16a16b,
