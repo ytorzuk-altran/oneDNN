@@ -699,7 +699,7 @@ public:
     }
 
     void uni_vsubps(const Xbyak::Xmm &x, const Xbyak::Operand &op1,
-            const Xbyak::Operand &op2 = Xbyak::Operand()) {
+            const Xbyak::Operand &op2) {
         if (is_valid_isa(avx))
             vsubps(x, op1, op2);
         else {
@@ -1625,7 +1625,7 @@ public:
     }
 
     void uni_vpand(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
-                   const Xbyak::Operand &op = Xbyak::Operand()) {
+                   const Xbyak::Operand &op) {
         if (is_valid_isa(avx))
             vpand(x1, x2, op);
         else {
@@ -1634,7 +1634,7 @@ public:
         }
     }
     void uni_vpand(const Xbyak::Ymm &x1, const Xbyak::Ymm &x2,
-                    const Xbyak::Operand &op = Xbyak::Operand()) {
+                    const Xbyak::Operand &op) {
         vpand(x1, x2, op);
     }
 
@@ -1675,11 +1675,13 @@ public:
     }
 
     void uni_vmovhlps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
-                      const Xbyak::Operand &op) {
+                      const Xbyak::Xmm &x3) {
         if (is_valid_isa(avx))
-            vmovhlps(x1, x2, op);
-        else
-            movhlps(x1, x2);
+            vmovhlps(x1, x2, x3);
+        else {
+            assert(x1.getIdx() == x2.getIdx());
+            movhlps(x1, x3);
+        }
     }
 
     void mul_by_const(
