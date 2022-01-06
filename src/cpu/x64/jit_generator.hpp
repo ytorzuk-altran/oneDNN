@@ -1421,20 +1421,6 @@ public:
             movq(x, addr);
     }
 
-    void uni_movshdup(const Xbyak::Xmm &x, const Xbyak::Operand &op) {
-        if (is_valid_isa(avx))
-            vmovshdup(x, op);
-        else
-            movshdup(x, op);
-    }
-
-    void uni_movhlps(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2) {
-        if (is_valid_isa(avx))
-            vmovhlps(x1, x2);
-        else
-            movhlps(x1, x2);
-    }
-
     void uni_vpackssdw(const Xbyak::Xmm &x1, const Xbyak::Xmm &x2,
             const Xbyak::Operand &op) {
         if (is_valid_isa(avx))
