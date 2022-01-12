@@ -910,10 +910,10 @@ status_t init_ip_conf(cpu_isa_t isa, jit_brgemm_primitive_conf_t &jbgp,
 
     CHECK(set_or_check_tags());
 
-    if (jbgp.weights_compressed) {
-        weights_md.extra.flags = memory_extra_flags::ip_compression;
-        weights_md.extra.compensation_mask = 13;
-    }
+//    if (jbgp.weights_compressed) {
+//        weights_md.extra.flags = memory_extra_flags::ip_compression;
+//        weights_md.extra.compensation_mask = 13;
+//    }
 
     switch (jbgp.prop_kind) {
         case forward_training:
