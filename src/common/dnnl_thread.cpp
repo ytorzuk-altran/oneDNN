@@ -29,15 +29,6 @@
 namespace dnnl {
 namespace impl {
 
-static int adjust_num_threads(int nthr, dim_t work_amount) {
-    if (nthr == 0) nthr = dnnl_get_current_num_threads();
-#if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_OMP
-    return (work_amount == 1 || omp_in_parallel()) ? 1 : nthr;
-#else
-    return (int)std::min((dim_t)nthr, work_amount);
-#endif
-}
-
 void parallel(int nthr, const std::function<void(int, int)> &f) {
     nthr = adjust_num_threads(nthr, INT64_MAX);
 #if DNNL_CPU_THREADING_RUNTIME == DNNL_RUNTIME_SEQ

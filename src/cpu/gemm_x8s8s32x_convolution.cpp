@@ -218,7 +218,7 @@ _gemm_x8s8s32x_convolution_fwd_t<src_type, dst_type>::execute_forward_thr(
     balance211(work_amount, nthr, ithr, start, end);
     nd_iterator_init(start, n, MB, g, jcp.ngroups, ohb, nb_oh, owb, nb_ow);
     const uint8_t shift = jcp.signed_input ? 128 : 0;
-    parallel_nd(jcp.im2col_sz, [&](ptrdiff_t i) { col[i] = shift; });
+    parallel_nd_legacy(jcp.im2col_sz, [&](ptrdiff_t i) { col[i] = shift; });
 
     status_t st = status::success;
 
