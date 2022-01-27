@@ -2081,7 +2081,23 @@ struct simple_reorder_t : public primitive_t {
     struct pd_t : public cpu_reorder_pd_t {
         using cpu_reorder_pd_t::cpu_reorder_pd_t;
 
-        DECLARE_COMMON_PD_T("simple:any", simple_reorder_t);
+        pd_t *clone() const override {
+            auto new_pd = utils::make_unique<pd_t>(*this);
+            if (!new_pd->is_initialized()) return nullptr;
+            return new_pd.release();
+        }
+        status_t create_primitive(
+                std::pair<std::shared_ptr<primitive_t>, bool> &primitive,
+                engine_t *engine) const override {
+            DNNL_PRIMITIVE_CREATE(pd_t) \
+            return primitive_t::create_primitive_common<simple_reorder_t, pd_t>(
+                    primitive, this, engine, false);
+        }
+        const char *name() const override { return impl_str.c_str(); }
+        template <typename pd_t>
+        friend status_t primitive_desc_t::create(primitive_desc_t **pd,
+                const op_desc_t *adesc, const primitive_attr_t *attr,
+                engine_t *engine, const primitive_desc_t *hint_fwd);
 
     private:
         static status_t create(reorder_pd_t **reorder_pd, engine_t *engine,
@@ -2107,6 +2123,12 @@ struct simple_reorder_t : public primitive_t {
                 delete _pd;
                 return status::unimplemented;
             }
+            _pd->impl_str = "simple:any";
+            (_pd->impl_str += "_") += dnnl_dt2str(type_i);
+            (_pd->impl_str += "_") += dnnl_fmt_tag2str(tag_i);
+            (_pd->impl_str += "_") += dnnl_dt2str(type_o);
+            (_pd->impl_str += "_") += dnnl_fmt_tag2str(tag_o);
+            (_pd->impl_str += "_") += order_keep ? "true" : "false";
 
             const size_t scratchpad_sz_
                     = simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL,
@@ -2118,6 +2140,7 @@ struct simple_reorder_t : public primitive_t {
             return safe_ptr_assign(*reorder_pd, _pd);
         }
         friend dnnl::impl::impl_list_item_t;
+        std::string impl_str;
     };
 
     simple_reorder_t(const pd_t *apd) : primitive_t(apd) {}
