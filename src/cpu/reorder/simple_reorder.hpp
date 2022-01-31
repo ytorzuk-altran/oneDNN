@@ -33,6 +33,7 @@
 #include "cpu/reorder/cpu_reorder_pd.hpp"
 
 #include "cpu/simple_q10n.hpp"
+#include <iostream>
 
 namespace dnnl {
 namespace impl {
@@ -2146,6 +2147,7 @@ struct simple_reorder_t : public primitive_t {
     simple_reorder_t(const pd_t *apd) : primitive_t(apd) {}
 
     status_t execute(const exec_ctx_t &ctx) const override {
+        std::cout << "SIMPLE_REORDER: " << pd()->name() << std::endl;
         return simple_reorder_impl<SIMPLE_REORDER_TEMPL_CALL, spec>::execute(
                 pd(), ctx);
     }
