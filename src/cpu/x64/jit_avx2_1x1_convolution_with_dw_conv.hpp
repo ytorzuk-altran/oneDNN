@@ -157,25 +157,16 @@ struct jit_avx2_1x1_convolution_with_dw_conv_fwd_t : public primitive_t {
     }
 
     status_t init(engine_t *engine) override {
-        CHECK(safe_ptr_assign(kernel_old_,
-                              new jit_avx2_1x1_conv_kernel_f32_old(pd()->jcp_, pd()->jcp_dw_, *pd()->attr())));
         CHECK(kernel_old_->create_kernel());
-        CHECK(init_rtus_driver<avx2>(this));
-
-        CHECK(safe_ptr_assign(kernel_dw_,
-                              new jit_uni_dw_conv_row_f32<avx2>((pd()->jcp_dw_), *pd()->attr(), pd()->jcp_dw_.ch_block)));
-        CHECK(kernel_dw_->create_kernel());
-
+        if (kernel_dw_)
+            CHECK(kernel_dw_->create_kernel());
         return status::success;
     }
 
     ~jit_avx2_1x1_convolution_with_dw_conv_fwd_t() {
         delete kernel_old_;
         delete rtus_driver_;
-
-        if (pd()->jcp_.with_dw_conv) {
-            delete kernel_dw_;
-        }
+        delete kernel_dw_;
     }
 
     typedef typename prec_traits<data_type::f32>::type data_t;
