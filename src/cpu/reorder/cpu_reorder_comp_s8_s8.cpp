@@ -127,7 +127,9 @@ const impl_list_map_t comp_s8_s8_impl_list_map {
         REG_REORDER_P(REG_SR(s8, ihwo, s8, OIhw16i16o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, oihw, s8, OIhw16i16o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, hwio, s8, OIhw16i16o4i, fmt_order_keep, spec_conv_req_comp))
+#endif
         REG_REORDER_P(REG_SR(s8, iohw, s8, OIhw4i16o4i, fmt_order_keep, spec_conv_req_comp))
+#ifdef ENABLE_UNUSED_PRIM
         REG_REORDER_P(REG_SR(s8, iohw, s8, OIhw2i8o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, iohw, s8, OIhw4o4i, fmt_order_keep, spec_conv_req_comp))
 #endif

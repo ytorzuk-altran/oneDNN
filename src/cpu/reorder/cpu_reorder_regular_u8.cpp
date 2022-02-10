@@ -57,10 +57,8 @@ const impl_list_map_t regular_u8_impl_list_map {
         REG_REORDER_P(REG_SR_BIDIR(u8, any, s32, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(u8, any, bf16, nChw16c))
         REG_REORDER_P(REG_SR_BIDIR(u8, any, s8, nChw16c))
-
-        REG_REORDER_P(REG_SR(u8, any, u8, nChw16c, fmt_order_keep))
 #endif
-        REG_REORDER_P(REG_SR(u8, any, u8, nChw16c, fmt_order_reverse))
+        REG_REORDER_P(REG_SR_BIDIR(u8, any, u8, nChw16c))
         REG_REORDER_P(REG_SR(u8, any, f32, nChw8c, fmt_order_keep))
 #ifdef ENABLE_UNUSED_PRIM
         REG_REORDER_P(REG_SR(u8, any, f32, nChw8c, fmt_order_reverse))
