@@ -32,6 +32,7 @@ const impl_list_map_t comp_s8_s8_impl_list_map {
         REG_REORDER_P(REG_SR(s8, io, s8, OI4i32o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, oi, s8, OI4i64o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, io, s8, OI4i64o4i, fmt_order_keep, spec_conv_req_comp))
+#ifdef ENABLE_UNUSED_PRIM
         REG_REORDER_P(REG_SR(s8, ab, s8, BA16a16b4a, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, ab, s8, BA16a32b4a, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, ab, s8, BA16a48b4a, fmt_order_keep, spec_conv_req_comp))
@@ -40,6 +41,7 @@ const impl_list_map_t comp_s8_s8_impl_list_map {
         REG_REORDER_P(REG_SR(s8, ba, s8, BA16a32b4a, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, ba, s8, BA16a48b4a, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, ba, s8, BA16a64b4a, fmt_order_keep, spec_conv_req_comp))
+#endif
         nullptr,
     }},
     // s8 -> s8
@@ -62,14 +64,20 @@ const impl_list_map_t comp_s8_s8_impl_list_map {
         REG_REORDER_P(REG_SR(s8, oiw, s8, OIw4o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, wio, s8, OIw4o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, iwo, s8, Owi16o, fmt_order_keep, spec_conv_req_comp))
+#ifdef ENABLE_UNUSED_PRIM
         REG_REORDER_P(REG_SR(s8, oiw, s8, Owi16o, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, wio, s8, Owi16o, fmt_order_keep, spec_conv_req_comp))
+#endif
         REG_REORDER_P(REG_SR(s8, iwo, s8, OwI16o4i, fmt_order_keep, spec_conv_req_comp))
+#ifdef ENABLE_UNUSED_PRIM
         REG_REORDER_P(REG_SR(s8, oiw, s8, OwI16o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, wio, s8, OwI16o4i, fmt_order_keep, spec_conv_req_comp))
+#endif
         REG_REORDER_P(REG_SR(s8, iwo, s8, OIw16i16o4i, fmt_order_keep, spec_conv_req_comp))
+#ifdef ENABLE_UNUSED_PRIM
         REG_REORDER_P(REG_SR(s8, oiw, s8, OIw16i16o4i, fmt_order_keep, spec_conv_req_comp))
         REG_REORDER_P(REG_SR(s8, wio, s8, OIw16i16o4i, fmt_order_keep, spec_conv_req_comp))
+#endif
         nullptr,
     }},
     {{s8, s8, 4}, {

@@ -102,11 +102,15 @@ private:
 const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     // FWD fp
     {{forward, f32, f32, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core))
+#endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_planar_convolution_fwd_t))
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core))
+#endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_common_1x1_convolution_fwd_f32_t))
@@ -138,6 +142,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, bf16, bf16, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16_amx_bf16))
@@ -145,6 +150,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_bf16))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16))
+#endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_dw_convolution_fwd_t, avx512_core, bf16, f32))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_fwd_t, avx512_core, bf16, f32))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_fwd_t, f32))
@@ -154,6 +160,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, bf16, bf16, bf16}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16_amx_bf16))
@@ -161,6 +168,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_bf16))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16))
+#endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_dw_convolution_fwd_t, avx512_core, bf16, bf16))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_fwd_t, avx512_core, bf16, bf16))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_fwd_t, bf16))
@@ -172,7 +180,9 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     }},
     // BWD_D fp
     {{backward_data, f32, f32, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_BWD_D(REG_IP_P_BWD(CPU_INSTANCE_X64(ip_convolution_bwd_data_t)))
+#endif
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_dw_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_fork_dw_convolution_bwd_data_t))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_common_1x1_convolution_bwd_data_f32_t))
@@ -193,8 +203,10 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{backward_data, f32, bf16, bf16}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_BWD_D(REG_IP_P_BWD(CPU_INSTANCE_X64(ip_convolution_bwd_data_t)))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_bwd_data_t, f32, bf16, bf16))
+#endif
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_dw_convolution_bwd_data_t, avx512_core, bf16, f32))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_bwd_data_t, avx512_core, bf16, f32))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_bwd_data_t, f32))
@@ -204,8 +216,10 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{backward_data, bf16, bf16, bf16}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_BWD_D(REG_IP_P_BWD(CPU_INSTANCE_X64(ip_convolution_bwd_data_t)))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_bwd_data_t, bf16, bf16, bf16))
+#endif
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_dw_convolution_bwd_data_t, avx512_core, bf16, bf16))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_uni_fork_dw_convolution_bwd_data_t, avx512_core, bf16, bf16))
         REG_CONV_P_BWD_D(CPU_INSTANCE_X64(jit_avx512_core_bf16_1x1_convolution_bwd_data_t, bf16))
@@ -325,6 +339,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
 #endif
     // FWD int8 (src:u8)
     {{forward, u8, s8, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16_amx_int8))
@@ -332,7 +347,6 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_vnni))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_vnni))
-#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t))
 #endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t))
@@ -373,6 +387,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     }},
 #endif
     {{forward, u8, s8, s8}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16_amx_int8))
@@ -380,7 +395,6 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_vnni))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_vnni))
-#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t))
 #endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t))
@@ -400,6 +414,7 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, u8, s8, u8}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brdgmm_dw_convolution_fwd_t))
         REG_CONV_P_FWD(REG_IP_P_FWD(CPU_INSTANCE_X64(ip_convolution_fwd_t)))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_bf16_amx_int8))
@@ -407,7 +422,6 @@ const std::map<conv_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_amx_convolution_fwd_t))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_1x1_convolution_fwd_t, avx512_core_vnni))
         REG_CONV_P_FWD(CPU_INSTANCE_X64(brgemm_convolution_fwd_t, avx512_core_vnni))
-#ifdef ENABLE_UNUSED_PRIM
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_u8s8s32x_wino_convolution_fwd_t))
 #endif
         REG_CONV_P_FWD(CPU_INSTANCE_X64(jit_avx512_core_x8s8s32x_1x1_convolution_fwd_t))

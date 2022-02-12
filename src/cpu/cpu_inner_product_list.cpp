@@ -70,7 +70,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, bf16, bf16, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_bf16))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16))
         REG_IP_P_FWD(CPU_INSTANCE_X64(gemm_bf16_inner_product_fwd_t, f32))
 #ifdef ENABLE_UNUSED_PRIM
@@ -79,7 +81,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, bf16, bf16, bf16}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_bf16))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16))
         REG_IP_P_FWD(CPU_INSTANCE_X64(gemm_bf16_inner_product_fwd_t, bf16))
 #ifdef ENABLE_UNUSED_PRIM
@@ -130,7 +134,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     }},
 #endif
     {{forward, s8, s8, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni))
         REG_IP_P_FWD(CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, f32))
 #ifdef ENABLE_UNUSED_PRIM
@@ -148,7 +154,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     }},
 #endif
     {{forward, s8, s8, s8}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni))
         REG_IP_P_FWD(CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, s8))
 #ifdef ENABLE_UNUSED_PRIM
@@ -157,7 +165,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, s8, s8, u8}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni))
         REG_IP_P_FWD(CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, s8, u8))
 #ifdef ENABLE_UNUSED_PRIM
@@ -166,7 +176,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, u8, s8, f32}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni))
         REG_IP_P_FWD(CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, f32))
 #ifdef ENABLE_UNUSED_PRIM
@@ -184,7 +196,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
     }},
 #endif
     {{forward, u8, s8, s8}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni))
         REG_IP_P_FWD(CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, s8))
 #ifdef ENABLE_UNUSED_PRIM
@@ -193,7 +207,9 @@ const std::map<ip_impl_key_t, std::vector<impl_list_item_t>> impl_list_map {
         nullptr,
     }},
     {{forward, u8, s8, u8}, {
+#ifdef ENABLE_UNUSED_PRIM
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_bf16_amx_int8))
+#endif
         REG_IP_P_FWD(CPU_INSTANCE_X64(brgemm_inner_product_fwd_t, avx512_core_vnni))
         REG_IP_P_FWD(CPU_INSTANCE(gemm_x8s8s32x_inner_product_fwd_t, u8, u8))
 #ifdef ENABLE_UNUSED_PRIM
