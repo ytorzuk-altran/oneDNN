@@ -721,7 +721,8 @@ public:
             // previously there was "subps(x, op2)" for some reason
             vsubss(x, op1, op2);
         else {
-            assert(x.isEqualIfNotInherited(op1));
+            if (!x.isEqualIfNotInherited(op1))
+                movss(x, op1);
             subss(x, op2);
         }
     }
@@ -794,7 +795,8 @@ public:
         if (is_valid_isa(avx))
             vmulss(x, op1, op2);
         else {
-            assert(x.isEqualIfNotInherited(op1));
+            if (!x.isEqualIfNotInherited(op1))
+                movss(x, op1);
             mulss(x, op2);
         }
     }
