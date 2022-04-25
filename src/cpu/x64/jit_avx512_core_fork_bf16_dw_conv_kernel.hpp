@@ -36,7 +36,7 @@ struct jit_avx512_fork_dw_conv_fwd_kernel_bf16 : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_fork_dw_conv_fwd_kernel_bf16)
 
     jit_avx512_fork_dw_conv_fwd_kernel_bf16(const jit_conv_conf_t &ajcp, const memory_desc_t &dst_md, const primitive_attr_t& attr)
-        : jit_generator(jit_name()), jcp(ajcp), attr_(attr), bf16_emu_(nullptr) {
+        : jit_generator(), jcp(ajcp), attr_(attr), bf16_emu_(nullptr) {
         if (!isa_has_bf16(jcp.isa))
             bf16_emu_ = new bf16_emulation_t(this, bf16_emu_reserv_1,
                     bf16_emu_reserv_2, bf16_emu_reserv_3, bf16_emu_reserv_4,
@@ -141,7 +141,7 @@ struct jit_avx512_fork_dw_conv_bwd_data_kernel_bf16 : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_avx512_fork_dw_conv_bwd_data_kernel_bf16)
 
     jit_avx512_fork_dw_conv_bwd_data_kernel_bf16(const jit_conv_conf_t &ajcp, const primitive_attr_t&)
-        : jit_generator(jit_name()), jcp(ajcp), bf16_emu_(nullptr) {
+        : jit_generator(), jcp(ajcp), bf16_emu_(nullptr) {
 
         if (!isa_has_bf16(jcp.isa))
             bf16_emu_ = new bf16_emulation_t(this, bf16_emu_reserv_1,

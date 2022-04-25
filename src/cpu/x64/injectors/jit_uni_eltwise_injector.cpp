@@ -36,7 +36,7 @@ bool is_alg_supported(alg_kind_t alg) {
     using namespace alg_kind;
     return utils::one_of(alg, eltwise_relu, eltwise_tanh, eltwise_elu,
             eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
-            eltwise_bounded_relu, eltwise_soft_relu, eltwise_soft_relu_v2,
+            eltwise_bounded_relu, eltwise_soft_relu,
             eltwise_logistic, eltwise_logsigmoid, eltwise_mish, eltwise_exp,
             eltwise_gelu_tanh, eltwise_hardswish, eltwise_swish, eltwise_log,
             eltwise_clip, eltwise_clip_v2, eltwise_pow, eltwise_gelu_erf,

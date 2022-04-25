@@ -36,7 +36,7 @@ struct jit_uni_fork_dw_conv_fwd_kernel_f32 : public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_fork_dw_conv_fwd_kernel_f32)
 
     jit_uni_fork_dw_conv_fwd_kernel_f32(const jit_conv_conf_t &ajcp, const memory_desc_t &dst_md, const primitive_attr_t &attr)
-            : jit_generator(jit_name()), jcp(ajcp), attr_(attr) {
+            : jit_generator(), jcp(ajcp), attr_(attr) {
     }
 
     ~jit_uni_fork_dw_conv_fwd_kernel_f32() {
@@ -139,7 +139,7 @@ struct jit_uni_fork_dw_conv_bwd_data_kernel_f32: public jit_generator {
     DECLARE_CPU_JIT_AUX_FUNCTIONS(jit_uni_fork_dw_conv_bwd_data_kernel_f32)
 
     jit_uni_fork_dw_conv_bwd_data_kernel_f32(const jit_conv_conf_t &ajcp, const primitive_attr_t &attr)
-            : jit_generator(jit_name()), jcp(ajcp), attr_(attr) {}
+            : jit_generator(), jcp(ajcp), attr_(attr) {}
 
     ~jit_uni_fork_dw_conv_bwd_data_kernel_f32() {
         for (auto inj : depthwise_injectors)

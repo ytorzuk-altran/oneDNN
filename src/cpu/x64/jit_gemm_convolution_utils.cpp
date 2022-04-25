@@ -34,7 +34,7 @@ struct jit_pp_kernel_t : pp_kernel_t, public jit_generator {
             gemm_convolution_utils::jit_pp_kernel_t);
 
     jit_pp_kernel_t(const convolution_pd_t *pd, const conv_gemm_conf_t &jcp)
-            : pp_kernel_t(pd, jcp), jit_generator(jit_name()), idx_compute_vreg_start_(0), idx_compute_vreg_max_(isa == avx512_core ? 31 : 15) {
+            : pp_kernel_t(pd, jcp), jit_generator(), idx_compute_vreg_start_(0), idx_compute_vreg_max_(isa == avx512_core ? 31 : 15) {
         if (utils::one_of(isa, avx2, sse41)) {
             idx_compute_vreg_start_ += 1;   //  Vmm(0) - for masks
         }

@@ -34,7 +34,7 @@ namespace x64 {
 template <cpu_isa_t isa>
 struct jit_uni_planar_conv_fwd_kernel_f32: public jit_generator {
     jit_uni_planar_conv_fwd_kernel_f32(jit_conv_conf_t ajcp,
-            const primitive_attr_t &attr): jit_generator(jit_name()), jcp(ajcp), attr_(attr) {}
+            const primitive_attr_t &attr): jit_generator(), jcp(ajcp), attr_(attr) {}
 
     ~jit_uni_planar_conv_fwd_kernel_f32() {
         for (auto inj : eltwise_injectors)

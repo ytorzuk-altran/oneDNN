@@ -38,7 +38,7 @@ struct jit_pp_ker_t : pp_ker_t, public jit_generator {
 
     jit_pp_ker_t(const convolution_pd_t *pd, const conv_gemm_conf_t &jcp)
             : pp_ker_t(pd, jcp)
-            , jit_generator(jit_name())
+            , jit_generator()
             , do_eltwise_(false)
             , do_sum_(false)
             , sum_scale_(0)

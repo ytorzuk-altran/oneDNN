@@ -184,7 +184,6 @@ const std::map<pk_dt_impl_key_t, std::vector<impl_list_item_t>> &impl_list_map()
         {{backward_data, bf16, bf16, bf16}, REG_BWD_D_PK({
             CPU_INSTANCE_X64(ip_convolution_bwd_data_t)
             CPU_INSTANCE_AMX(jit_avx512_core_amx_convolution_bwd_data_t<bf16, bf16, bf16>)
-            CPU_INSTANCE_AVX512(brgemm_convolution_bwd_t<avx512_core_bf16>)
             CPU_INSTANCE_AVX512(jit_uni_fork_dw_convolution_bwd_data_t<avx512_core, bf16, bf16>)
             CPU_INSTANCE_AVX512(jit_avx512_core_bf16_1x1_convolution_bwd_data_t<bf16>)
             CPU_INSTANCE_AVX512(jit_avx512_core_bf16_convolution_bwd_data_t)

@@ -156,7 +156,7 @@ ref_eltwise_scalar_fwd_t::ref_eltwise_scalar_fwd_t(
     : alg_(alg), alpha_(alpha), beta_(beta), scale_(scale) {
     assert(utils::one_of(alg_, eltwise_relu, eltwise_tanh, eltwise_elu,
             eltwise_square, eltwise_abs, eltwise_sqrt, eltwise_linear,
-            eltwise_bounded_relu, eltwise_soft_relu, eltwise_soft_relu_v2,
+            eltwise_bounded_relu, eltwise_soft_relu,
             eltwise_logsigmoid, eltwise_mish, eltwise_logistic, eltwise_exp,
             eltwise_gelu_tanh, eltwise_swish, eltwise_log, eltwise_clip,
             eltwise_clip_v2, eltwise_pow, eltwise_gelu_erf, eltwise_round,

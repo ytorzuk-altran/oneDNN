@@ -261,7 +261,7 @@ struct _jit_avx512_core_bf16_bwd_data_kernel : public jit_generator {
 
     _jit_avx512_core_bf16_bwd_data_kernel(const jit_conv_conf_t &ajcp, const primitive_attr_t& attr)
         : jit_generator(
-                jit_name(), nullptr, ker_code_size, true, avx512_core_bf16)
+                nullptr, ker_code_size, true, avx512_core_bf16)
         , jcp(ajcp)
         , attr_(attr)
         , bf16_emu_(nullptr) {

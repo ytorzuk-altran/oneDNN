@@ -44,7 +44,7 @@ struct jit_avx2_1x1_conv_kernel_f32_old : public jit_generator {
 
     jit_avx2_1x1_conv_kernel_f32_old(
             const jit_1x1_conv_conf_t &ajcp, jit_conv_conf_t ajcp_dw, const primitive_attr_t &attr)
-            : jit_generator(jit_name()), jcp(ajcp), jcp_dw(ajcp_dw), attr_(attr) {}
+            : jit_generator(), jcp(ajcp), jcp_dw(ajcp_dw), attr_(attr) {}
 
     ~jit_avx2_1x1_conv_kernel_f32_old() {
         for (auto inj : eltwise_injectors)

@@ -71,7 +71,7 @@ void cvt_acc_to_dst(const conv_gemm_conf_t &jcp, size_t g_start, size_t g_end,
 
 template <data_type_t dst_data_type>
 gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::pp_ker_t(const pd_t *pd)
-    : jit_generator(jit_name())
+    : jit_generator()
     , jcp_(pd->jcp_)
     , post_ops_(pd->attr()->post_ops_)
     , do_sum_(dst_data_type != data_type::f32 && jcp_.with_sum)

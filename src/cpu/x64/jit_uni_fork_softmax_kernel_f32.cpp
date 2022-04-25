@@ -28,7 +28,7 @@ using namespace Xbyak;
 
 template<cpu_isa_t isa>
 jit_uni_fork_softmax_kernel_f32<isa>::jit_uni_fork_softmax_kernel_f32(jit_softmax_conf_t ajpp)
-    : jit_generator(jit_name(), nullptr, MAX_CODE_SIZE, true, isa), jpp(ajpp) {
+    : jit_generator(nullptr, MAX_CODE_SIZE, true, isa), jpp(ajpp) {
     if (jpp.dt == data_type::bf16 && !mayiuse(avx512_core_bf16)) {
         bf16_emu_.reset(new bf16_emulation_t(this, bf16_emu_zmm_1, bf16_emu_zmm_2, bf16_emu_zmm_3,
                                              bf16_emu_gpr, bf16_emu_zmm_4, bf16_emu_zmm_5));
