@@ -116,10 +116,10 @@ gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::pp_ker_t(const pd_t *pd)
             PARAM_OFF(dst_orig), memory_desc_wrapper(pd->dst_md()),
             tail_size, kreg_rem_mask, use_exact_tail_scalar_bcast};
 #undef PARAM_OFF
-        const binary_injector::static_params_t bsp {this->param1, rhs_sp};
+        const binary_injector::static_params_t bsp {this->reg_param, rhs_sp};
         jit_binary_injector_ = utils::make_unique<
                 binary_injector::jit_uni_binary_injector_t<avx512_core>>(
-                this, bsp);            
+                this, bsp);
     }
     if (do_sum_) {
         compute_reg_step_ = 2;
