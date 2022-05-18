@@ -229,14 +229,15 @@ void gemm_bf16_convolution_fwd_t<dst_data_type>::pp_ker_t::generate() {
                 jit_eltwise_injectors_[eltwise_inj_idx]->compute_vector(vreg_dst_idx(idx));
                 eltwise_inj_idx++;
             } else if (post_op.is_binary()){
+                auto cur_idx = vreg_dst_idx(idx);
                 binary_injector::rhs_arg_dynamic_params_t rhs_arg_params;
-                rhs_arg_params.vmm_idx_to_out_addr.emplace(idx, dst_addr);
+                rhs_arg_params.vmm_idx_to_out_addr.emplace(cur_idx, dst_addr);
                 rhs_arg_params.vmm_idx_to_out_elem_off_val.emplace(
-                        idx, 0);
+                        cur_idx, 0);
                 if (apply_mask) 
-                    rhs_arg_params.vmm_tail_idx_.emplace(idx);
+                    rhs_arg_params.vmm_tail_idx_.emplace(cur_idx);
                 jit_binary_injector_->compute_vector(
-                        idx, binary_inj_idx, post_op, rhs_arg_params);
+                        cur_idx, binary_inj_idx, post_op, rhs_arg_params);
 
                 binary_inj_idx++;
             } else if (post_op.is_depthwise()) {
