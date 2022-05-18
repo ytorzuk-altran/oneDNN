@@ -81,7 +81,7 @@ struct jit_pp_ker_t : pp_ker_t, public jit_generator {
 #define PARAM_OFF(field) offsetof(ker_args_t, field)
             static constexpr bool preserve_gpr = true;
             static constexpr bool preserve_vmm = true;
-            static constexpr size_t helper_vmm_idx = 1;
+            static constexpr size_t helper_vmm_idx = 15;
             static constexpr size_t tail_size = 0;
             static constexpr bool use_exact_tail_scalar_bcast = false;
             const binary_injector::rhs_arg_static_params_t rhs_sp {
@@ -344,15 +344,16 @@ void jit_pp_ker_t<isa>::generate() {
 
                 uni_vfmadd231ps(vreg_dst(idx), vreg_prev_dst(idx), vreg_sum_scale);
             } else if (post_op.is_binary()) {
+                auto cur_idx = vreg_dst(idx).getIdx();
                 binary_injector::rhs_arg_dynamic_params_t rhs_arg_params;
                 auto dst_addr = ptr[reg_dst + offset * dst_data_type_size_];
-                rhs_arg_params.vmm_idx_to_out_addr.emplace(idx, dst_addr);
+                rhs_arg_params.vmm_idx_to_out_addr.emplace(cur_idx, dst_addr);
                 rhs_arg_params.vmm_idx_to_out_elem_off_val.emplace(
-                        idx, 0 * sizeof(float));
+                        cur_idx, 0 * sizeof(float));
                 if (mayiuse(avx512_core) && apply_mask) 
-                    rhs_arg_params.vmm_tail_idx_.emplace(idx);
+                    rhs_arg_params.vmm_tail_idx_.emplace(cur_idx);
                 jit_binary_injector_->compute_vector(
-                        idx, binary_inj_idx, post_op, rhs_arg_params);
+                        cur_idx, binary_inj_idx, post_op, rhs_arg_params);
 
                 binary_inj_idx++;
             } else if (post_op.is_eltwise()) {
