@@ -2322,7 +2322,13 @@ typename std::enable_if<!(std::is_same<T, Xbyak::Zmm>::value
 jit_uni_binary_injector_t<isa, Vmm>::execute_prelu_binary(const Vmm &dst,
                                                         const Vmm &lhs, const T &rhs) const {
     // in sse4 vmm_aux0 as mask it's index must be 0
-    const Vmm vmm_aux0 = Vmm(rhs_arg_static_params_.rhs_prelu_helper_vmm_idx);
+    Vmm vmm_aux0 = Vmm(rhs_arg_static_params_.rhs_prelu_helper_vmm_idx);
+
+    if (dst == vmm_aux0) {
+        vmm_aux0 = Vmm(14);
+        if (isa == sse41)
+            assert(!"conflict mask register");
+    }
 
     push_vmm(host_, vmm_aux0);
     host_->uni_vmulps(rhs, rhs, lhs);
