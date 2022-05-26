@@ -1215,6 +1215,7 @@ status_t jit_avx2_conv_bwd_data_kernel_f32::init_conf(jit_conv_conf_t &jcp,
     jcp.oc = diff_dst_d.dims()[1] / jcp.ngroups;
     jcp.oc_without_padding = jcp.oc;
     jcp.ic = diff_src_d.dims()[1] / jcp.ngroups;
+    jcp.ic_without_padding = jcp.ic;
 
     jcp.id = (ndims == 5) ? diff_src_d.dims()[2] : 1;
     jcp.ih = (ndims == 3) ? 1 : diff_src_d.dims()[ndims - 2];
