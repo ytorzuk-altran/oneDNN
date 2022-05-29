@@ -1407,14 +1407,21 @@ void jit_uni_pool_kernel<isa>::generate() {
 
         n_oi -= nstl::max(0, r_pad_iterations);
 
+        // this case will fail(when l_pad and r_pad have renited part:
+        //  onednn_verbose,exec,cpu,pooling_v2,jit:avx2,forward_inference,src_f32::blocked:aBcd8b:f0 dst_f32::blocked:aBcd8b:f0 ws_undef::undef::f0,,alg:pooling_max,mb1ic8_ih13oh13kh13sh1dh0ph6_iw13ow13kw13sw1dw0pw6,3.7991  
+        int cur_n_oi = 0;
+
         for (int i = 0; i < l_pad_iterations; ++i) {
             n_oi--;
             const int cur_l_pad = l_pad - i * ur_stride_w;
-            if (n_oi < 0 && r_pad1 > 0)
+            if (n_oi < 0 && r_pad1 > 0) {
+                const int cur_r_pad = calculate_end_padding(l_pad, ur_w * (i + 1), iw, stride_w, kw);
                 process_oi(
-                        ur_w, ur_bc, cur_l_pad, r_pad1, with_c_tail_processing);
+                    ur_w, ur_bc, cur_l_pad, cur_r_pad, with_c_tail_processing);
+            }
             else if (n_oi >= 0)
                 process_oi(ur_w, ur_bc, cur_l_pad, 0, with_c_tail_processing);
+            cur_n_oi++;
         }
 
         xor_(oi_iter, oi_iter);
@@ -1428,16 +1435,12 @@ void jit_uni_pool_kernel<isa>::generate() {
                 cmp(oi_iter, n_oi);
                 jl(ow_loop, T_NEAR);
             }
+            cur_n_oi += n_oi;
         }
 
-        if (n_oi >= 0) {
-            const int r_pad1_tail = r_pad1 % ur_stride_w != 0
-                    ? r_pad1 % ur_stride_w
-                    : ur_stride_w;
-            for (int i = 0; i < r_pad_iterations; ++i) {
-                const int cur_r_pad = r_pad1_tail + ur_stride_w * i;
-                process_oi(ur_w, ur_bc, 0, cur_r_pad, with_c_tail_processing);
-            }
+        for (int i = cur_n_oi; i < n_oi_iterations; ++i) {
+            const int cur_r_pad = calculate_end_padding(l_pad, ur_w * (i + 1), iw, stride_w, kw);
+            process_oi(ur_w, ur_bc, 0, cur_r_pad, with_c_tail_processing);
         }
 
         if (ur_w_tail != 0) {
