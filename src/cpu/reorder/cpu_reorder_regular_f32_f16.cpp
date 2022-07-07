@@ -26,7 +26,7 @@ const impl_list_map_t &regular_f32_f16_impl_list_map() {
     static const impl_list_map_t the_map = REG_REORDER_P({
         // f32 -> f16
         {{f32, f16, 0}, {
-            REG_SR(f32, any, f16, any, fmt_order::any, spec::reference)
+            REG_SR(f32, any, f16, any, fmt_order_any, spec_reference)
 
             nullptr,
         }},

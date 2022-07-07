@@ -27,9 +27,9 @@
 #define REG_BWD_D_PK(...) __VA_ARGS__
 #else
 #define REG_BWD_PK(...) \
-    { nullptr }
+    { nullptr }, 
 #define REG_BWD_D_PK(...) \
-    { nullptr }
+    { nullptr }, 
 #endif
 
 // Primitives section
@@ -49,14 +49,14 @@
 #define REG_BINARY_P(...) __VA_ARGS__
 #else
 #define REG_BINARY_P(...) \
-    { nullptr }
+    { nullptr },
 #endif
 
 #if BUILD_PRIMITIVE_ALL || BUILD_CONCAT
 #define REG_CONCAT_P(...) __VA_ARGS__
 #else
 #define REG_CONCAT_P(...) \
-    { nullptr }
+    { nullptr },
 #endif
 
 #if BUILD_PRIMITIVE_ALL || BUILD_CONVOLUTION
@@ -121,7 +121,7 @@
 #define REG_MATMUL_P(...) __VA_ARGS__
 #else
 #define REG_MATMUL_P(...) \
-    { nullptr }
+    { nullptr }, 
 #endif
 
 #if BUILD_PRIMITIVE_ALL || BUILD_POOLING
@@ -142,7 +142,7 @@
 #define REG_REDUCTION_P(...) __VA_ARGS__
 #else
 #define REG_REDUCTION_P(...) \
-    { nullptr }
+    { nullptr }, 
 #endif
 
 #if BUILD_PRIMITIVE_ALL || BUILD_REORDER
@@ -184,7 +184,7 @@
 #define REG_SUM_P(...) __VA_ARGS__
 #else
 #define REG_SUM_P(...) \
-    { nullptr }
+    { nullptr },
 #endif
 
 // Primitive CPU ISA section is in src/cpu/platform.hpp
